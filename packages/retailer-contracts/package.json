@@ -1,0 +1,13 @@
+{
+  "name": "@shopping-app/retailer-contracts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@shopping-app/domain": "workspace:*"
+  },
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  }
+}

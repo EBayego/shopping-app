@@ -1,0 +1,71 @@
+# shopping-app
+
+Monorepo TypeScript para los componentes compartidos y proveedores de `shopping-app`.
+Este repositorio contiene únicamente la estructura y el tooling iniciales; todavía no
+incluye una aplicación móvil, Supabase ni integraciones reales con supermercados.
+
+## Estructura
+
+```text
+apps/                       Futuras aplicaciones.
+packages/
+  domain/                   Tipos de dominio compartidos.
+  retailer-contracts/       Contratos y errores para proveedores.
+  product-normalization/    Futura normalización de productos.
+  voice-parser/             Futuro análisis de entradas de voz.
+providers/
+  dia/                      Futuro proveedor de DIA.
+  mercadona/                Futuro proveedor de Mercadona.
+  alcampo/                  Futuro proveedor de Alcampo.
+  eroski/                   Futuro proveedor de Eroski.
+tooling/
+  provider-poc/             CLI de prueba con providers mock.
+```
+
+Los workspaces se declaran en `pnpm-workspace.yaml`. Todos los módulos TypeScript
+extienden `tsconfig.base.json`, que activa el modo estricto y comprobaciones
+adicionales comunes.
+
+## Comandos
+
+Requiere Node.js y pnpm. Desde la raíz del repositorio:
+
+```bash
+pnpm install
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm format
+pnpm provider-poc --provider dia --postal-code 50009 --query "leche"
+```
+
+- `typecheck` comprueba todos los módulos TypeScript.
+- `lint` ejecuta ESLint sobre packages, providers y tooling.
+- `test` ejecuta Vitest una vez para todo el monorepo.
+- `format` aplica Prettier a los archivos compatibles.
+- `provider-poc` ejecuta búsquedas o consultas de producto contra providers mock.
+
+El CLI también admite consultar un producto concreto:
+
+```bash
+pnpm provider-poc --provider dia --postal-code 50009 --product 261354
+```
+
+## Añadir un package
+
+1. Crea una carpeta en `packages/<nombre>` (o en `providers/<nombre>` si es un
+   proveedor).
+2. Añade un `package.json` con un nombre único bajo el scope `@shopping-app`.
+3. Añade un `tsconfig.json` que extienda `../../tsconfig.base.json`.
+4. Crea `src/index.ts` como punto de entrada.
+5. Ejecuta `pnpm install` si añadiste dependencias y valida con `pnpm typecheck`,
+   `pnpm lint` y `pnpm test`.
+
+## Tests
+
+Los tests pueden colocarse junto al código usando los sufijos `.test.ts` o
+`.spec.ts`. Ejecuta toda la suite con:
+
+```bash
+pnpm test
+```

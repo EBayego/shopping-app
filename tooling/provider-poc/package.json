@@ -1,0 +1,13 @@
+{
+  "name": "@shopping-app/provider-poc",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@shopping-app/domain": "workspace:*",
+    "@shopping-app/retailer-contracts": "workspace:*"
+  }
+}

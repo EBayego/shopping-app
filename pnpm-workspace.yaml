@@ -1,0 +1,8 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "providers/*"
+  - "tooling/*"
+
+allowBuilds:
+  esbuild: true
