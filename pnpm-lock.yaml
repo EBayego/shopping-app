@@ -45,7 +45,14 @@ importers:
 
   packages/voice-parser: {}
 
-  providers/alcampo: {}
+  providers/alcampo:
+    dependencies:
+      '@shopping-app/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@shopping-app/retailer-contracts':
+        specifier: workspace:*
+        version: link:../../packages/retailer-contracts
 
   providers/dia:
     dependencies:
@@ -58,7 +65,14 @@ importers:
 
   providers/eroski: {}
 
-  providers/mercadona: {}
+  providers/mercadona:
+    dependencies:
+      '@shopping-app/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@shopping-app/retailer-contracts':
+        specifier: workspace:*
+        version: link:../../packages/retailer-contracts
 
   tooling/provider-poc:
     dependencies:
@@ -68,6 +82,9 @@ importers:
       '@shopping-app/provider-dia':
         specifier: workspace:*
         version: link:../../providers/dia
+      '@shopping-app/provider-mercadona':
+        specifier: workspace:*
+        version: link:../../providers/mercadona
       '@shopping-app/retailer-contracts':
         specifier: workspace:*
         version: link:../../packages/retailer-contracts

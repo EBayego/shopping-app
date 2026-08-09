@@ -5,6 +5,7 @@ export type {
   PromotionType,
   ProviderHealth,
   ProviderHealthStatus,
+  RetailerCategory,
   RetailerProduct,
 } from "./models.js";
 export { isRetailer, RETAILERS } from "./retailer.js";

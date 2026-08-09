@@ -38,4 +38,40 @@ describe("runProviderPoc", () => {
       expect(result.offers).toHaveLength(1);
     }
   });
+
+  it("ejecuta las capabilities de catálogo cuando el provider las expone", async () => {
+    const provider = Object.assign(createMockProvider("MERCADONA"), {
+      getCategories: () =>
+        Promise.resolve([{ externalId: "6", name: "Leche", level: 0 }]),
+      getProductsByCategory: () =>
+        Promise.resolve({ products: [], offers: [] }),
+    });
+
+    const categories = await runProviderPoc(
+      {
+        provider: "MERCADONA",
+        postalCode: "50009",
+        categories: true,
+      },
+      provider,
+    );
+    expect(categories).toMatchObject({
+      mode: "categories",
+      categories: [{ externalId: "6", name: "Leche" }],
+    });
+
+    const category = await runProviderPoc(
+      {
+        provider: "MERCADONA",
+        postalCode: "50009",
+        category: "72",
+      },
+      provider,
+    );
+    expect(category).toMatchObject({
+      mode: "category",
+      products: [],
+      offers: [],
+    });
+  });
 });

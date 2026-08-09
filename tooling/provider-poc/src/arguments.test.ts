@@ -37,6 +37,36 @@ describe("parseArguments", () => {
     });
   });
 
+  it("parsea las capabilities de catálogo", () => {
+    expect(
+      parseArguments([
+        "--provider",
+        "mercadona",
+        "--postal-code",
+        "50009",
+        "--categories",
+      ]),
+    ).toEqual({
+      provider: "MERCADONA",
+      postalCode: "50009",
+      categories: true,
+    });
+    expect(
+      parseArguments([
+        "--provider",
+        "mercadona",
+        "--postal-code",
+        "50009",
+        "--category",
+        "72",
+      ]),
+    ).toEqual({
+      provider: "MERCADONA",
+      postalCode: "50009",
+      category: "72",
+    });
+  });
+
   it.each([
     [["--provider", "unknown", "--postal-code", "50009", "--query", "x"]],
     [["--provider", "dia", "--query", "x"]],

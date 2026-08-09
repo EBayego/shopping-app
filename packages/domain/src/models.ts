@@ -34,6 +34,14 @@ export interface RetailerProduct {
   rawData?: unknown;
 }
 
+export interface RetailerCategory {
+  externalId: string;
+  name: string;
+  parentExternalId?: string;
+  level?: number;
+  order?: number;
+}
+
 export interface ProductOffer {
   retailerProductId: string;
   marketId: string;

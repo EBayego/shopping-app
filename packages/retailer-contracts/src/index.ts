@@ -9,6 +9,8 @@ export {
 } from "./errors.js";
 export type { ProviderErrorOptions } from "./errors.js";
 export type {
+  CatalogRetailerProvider,
   RetailerProvider,
   RetailerSearchResult,
 } from "./retailer-provider.js";
+export { supportsCatalog } from "./retailer-provider.js";

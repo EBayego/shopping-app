@@ -1,0 +1,43 @@
+{
+  "id": 72,
+  "name": "Leche y bebidas vegetales",
+  "order": 373,
+  "categories": [
+    {
+      "id": 343,
+      "name": "Leche semidesnatada",
+      "order": 373,
+      "products": [
+        {
+          "id": "10382",
+          "slug": "leche-semidesnatada-hacendado-brick",
+          "brand": "Hacendado",
+          "published": true,
+          "share_url": "/product/10382/leche-semidesnatada-hacendado-brick",
+          "thumbnail": "https://prod-mercadona.imgix.net/images/leche.jpg?fit=crop&h=300&w=300",
+          "categories": [
+            {
+              "id": 6,
+              "name": "Huevos, leche y mantequilla",
+              "level": 0,
+              "order": 373
+            }
+          ],
+          "display_name": "Leche semidesnatada Hacendado",
+          "unavailable_from": null,
+          "price_instructions": {
+            "is_pack": false,
+            "pack_size": null,
+            "unit_size": 1.0,
+            "unit_price": "0.84",
+            "approx_size": false,
+            "size_format": "l",
+            "total_units": null,
+            "reference_price": "0.840",
+            "reference_format": "L"
+          }
+        }
+      ]
+    }
+  ]
+}

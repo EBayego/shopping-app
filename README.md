@@ -15,7 +15,7 @@ packages/
   voice-parser/             Futuro análisis de entradas de voz.
 providers/
   dia/                      Provider de DIA (detalle provisional vía analytics).
-  mercadona/                Futuro proveedor de Mercadona.
+  mercadona/                Provider de catálogo de Mercadona por warehouse.
   alcampo/                  Futuro proveedor de Alcampo.
   eroski/                   Futuro proveedor de Eroski.
 tooling/
@@ -43,13 +43,34 @@ pnpm provider-poc --provider dia --postal-code 50009 --query "leche"
 - `lint` ejecuta ESLint sobre packages, providers y tooling.
 - `test` ejecuta Vitest una vez para todo el monorepo.
 - `format` aplica Prettier a los archivos compatibles.
-- `provider-poc` usa el provider real para DIA y providers mock para el resto.
+- `provider-poc` usa los providers reales para DIA y Mercadona, y providers mock
+  para el resto.
 
 El CLI también admite consultar un producto concreto:
 
 ```bash
 pnpm provider-poc --provider dia --postal-code 50009 --product 261354
 ```
+
+Mercadona está orientado a ingestión de catálogo y admite listar categorías,
+obtener productos/ofertas por categoría y consultar detalle/precio de producto:
+
+```bash
+pnpm provider-poc --provider mercadona --postal-code 50009 --categories
+pnpm provider-poc --provider mercadona --postal-code 50009 --category 72
+pnpm provider-poc --provider mercadona --postal-code 50009 --product 10382
+```
+
+`MercadonaProvider.searchProducts` lanza
+`ProviderCapabilityUnavailableError`: no se ha confirmado un endpoint remoto de
+búsqueda textual. El flujo previsto es categorías/productos → ingestión →
+PostgreSQL, sin consultas live desde la aplicación móvil. El mercado usa como
+identidad inmutable el warehouse devuelto al resolver el código postal.
+
+La navegación de catálogo se modela mediante la capability opcional y genérica
+`CatalogRetailerProvider`. Un consumidor puede detectarla con
+`supportsCatalog(provider)` y trabajar con `RetailerCategory`, sin importar el
+provider concreto ni comprobar el retailer.
 
 La búsqueda común devuelve productos y ofertas como colecciones separadas. DIA
 las obtiene en la misma petición de la primera página. Para procesos que necesiten
@@ -61,6 +82,7 @@ explícitamente con `RUN_LIVE_PROVIDER_TESTS=true`:
 
 ```bash
 RUN_LIVE_PROVIDER_TESTS=true pnpm test providers/dia/src/dia-provider.live.test.ts
+RUN_LIVE_PROVIDER_TESTS=true pnpm test providers/mercadona/src/mercadona-provider.live.test.ts
 ```
 
 ## Añadir un package
