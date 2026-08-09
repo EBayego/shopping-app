@@ -35,9 +35,13 @@ describe.skipIf(process.env.RUN_LIVE_PROVIDER_TESTS !== "true")(
     it("busca leche con resultados válidos", async () => {
       const provider = new DiaProvider({ timeoutMs: 15_000 });
       const market = await provider.resolveMarket("50009");
-      const products = await provider.searchProducts("leche", market);
+      const { products, offers } = await provider.searchProducts(
+        "leche",
+        market,
+      );
 
       expect(products.length).toBeGreaterThan(0);
+      expect(offers.length).toBeGreaterThan(0);
       for (const product of products) {
         expect(product.externalId.trim()).not.toBe("");
         expect(product.name.trim()).not.toBe("");

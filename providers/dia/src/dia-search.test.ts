@@ -70,7 +70,7 @@ describe("DiaProvider search", () => {
     const provider = createProvider(fetchMock);
     const market = await provider.resolveMarket("50009");
 
-    const products = await provider.searchProducts("leche", market);
+    const { products, offers } = await provider.searchProducts("leche", market);
 
     expect(products).toHaveLength(5);
     expect(products[0]).toEqual({
@@ -99,6 +99,9 @@ describe("DiaProvider search", () => {
       "https://www.dia.es/huevos-leche-y-mantequilla/leche-sin-lactosa-y-enriquecidas/p/LACTOSA1L",
     );
     expect(products[0]).not.toHaveProperty("normalPrice");
+    expect(offers).toHaveLength(3);
+    expect(offers[0]).not.toHaveProperty("name");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
     const searchCall = fetchMock.mock.calls[1];
     expect(searchCall?.[0]).toBeInstanceOf(URL);
@@ -198,7 +201,7 @@ describe("DiaProvider search", () => {
     const market = await provider.resolveMarket("50009");
     await expect(
       provider.searchProducts("inexistente", market),
-    ).resolves.toEqual([]);
+    ).resolves.toEqual({ products: [], offers: [] });
   });
 
   it("mapea HTTP 429 y 5xx a errores tipados", async () => {
@@ -247,8 +250,13 @@ describe("DiaProvider search", () => {
 
     expect(marketId).toBe("postal-code:50009");
     expect(
-      [...firstSearch, product, ...secondSearch].every(
+      [...firstSearch.products, product, ...secondSearch.products].every(
         (candidate) => candidate.marketId === marketId,
+      ),
+    ).toBe(true);
+    expect(
+      [...firstSearch.offers, ...secondSearch.offers].every(
+        (offer) => offer.marketId === marketId,
       ),
     ).toBe(true);
     expect(offers.every((offer) => offer.marketId === marketId)).toBe(true);

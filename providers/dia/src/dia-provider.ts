@@ -13,6 +13,7 @@ import {
   ProviderUnavailableError,
   RateLimitedError,
   type RetailerProvider,
+  type RetailerSearchResult,
 } from "@shopping-app/retailer-contracts";
 
 import { parseDiaProductAnalytics, parseDiaSearchPage } from "./dia-dtos.js";
@@ -36,9 +37,7 @@ export interface DiaSearchPagination {
   totalItems: number;
 }
 
-export interface DiaSearchPage {
-  products: RetailerProduct[];
-  offers: ProductOffer[];
+export interface DiaSearchPage extends RetailerSearchResult {
   pagination: DiaSearchPagination;
 }
 
@@ -86,9 +85,13 @@ export class DiaProvider implements RetailerProvider {
   async searchProducts(
     query: string,
     market: Market,
-  ): Promise<RetailerProduct[]> {
-    const page = await this.searchProductsPage(query, market, 1);
-    return page.products;
+  ): Promise<RetailerSearchResult> {
+    const { products, offers } = await this.searchProductsPage(
+      query,
+      market,
+      1,
+    );
+    return { products, offers };
   }
 
   async searchProductsPage(

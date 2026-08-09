@@ -51,9 +51,10 @@ El CLI también admite consultar un producto concreto:
 pnpm provider-poc --provider dia --postal-code 50009 --product 261354
 ```
 
-La búsqueda común de DIA devuelve la primera página de productos. Para procesos
-de ingestión, `DiaProvider.searchProductsPage(query, market, page)` expone además
-la paginación y las ofertas separadas de los datos de producto.
+La búsqueda común devuelve productos y ofertas como colecciones separadas. DIA
+las obtiene en la misma petición de la primera página. Para procesos que necesiten
+paginación, `DiaProvider.searchProductsPage(query, market, page)` expone además
+los metadatos de página.
 
 Los tests live están desactivados por defecto. El caso conocido de DIA se activa
 explícitamente con `RUN_LIVE_PROVIDER_TESTS=true`:

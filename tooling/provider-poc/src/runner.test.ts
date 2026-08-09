@@ -17,6 +17,8 @@ describe("runProviderPoc", () => {
     expect(result.mode).toBe("search");
     if (result.mode === "search") {
       expect(result.products).toHaveLength(1);
+      expect(result.offers).toHaveLength(1);
+      expect(result.offers[0]?.retailerProductId).toBe("261354");
     }
   });
 

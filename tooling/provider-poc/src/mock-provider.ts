@@ -9,6 +9,7 @@ import {
   MarketResolutionError,
   ProductNotFoundError,
   type RetailerProvider,
+  type RetailerSearchResult,
 } from "@shopping-app/retailer-contracts";
 
 const PRODUCT_FIXTURES = [
@@ -50,14 +51,18 @@ export class MockRetailerProvider implements RetailerProvider {
     });
   }
 
-  searchProducts(query: string, market: Market): Promise<RetailerProduct[]> {
+  searchProducts(query: string, market: Market): Promise<RetailerSearchResult> {
     return Promise.resolve().then(() => {
       this.assertMarket(market);
       const normalizedQuery = query.trim().toLocaleLowerCase("es-ES");
 
-      return PRODUCT_FIXTURES.filter((fixture) =>
+      const fixtures = PRODUCT_FIXTURES.filter((fixture) =>
         fixture.name.toLocaleLowerCase("es-ES").includes(normalizedQuery),
-      ).map((fixture) => this.toProduct(fixture, market));
+      );
+      return {
+        products: fixtures.map((fixture) => this.toProduct(fixture, market)),
+        offers: fixtures.map((fixture) => this.toOffer(fixture, market)),
+      };
     });
   }
 
@@ -86,23 +91,7 @@ export class MockRetailerProvider implements RetailerProvider {
           throw new ProductNotFoundError(this.retailer, productId);
         }
 
-        return {
-          retailerProductId: fixture.externalId,
-          marketId: market.externalId,
-          normalPrice: fixture.normalPrice,
-          ...("promoPrice" in fixture
-            ? {
-                promoPrice: fixture.promoPrice,
-                promotionType: "fixed-price" as const,
-                promotionText: "Promoción mock",
-              }
-            : {}),
-          pricePerUnit: fixture.normalPrice / fixture.packageSize,
-          referenceUnit: fixture.packageUnit,
-          requiresMembership: false,
-          available: true,
-          observedAt: new Date(),
-        };
+        return this.toOffer(fixture, market);
       });
     });
   }
@@ -142,6 +131,29 @@ export class MockRetailerProvider implements RetailerProvider {
       marketId: market.externalId,
       observedAt: new Date(),
       rawData: { mock: true },
+    };
+  }
+
+  private toOffer(
+    fixture: (typeof PRODUCT_FIXTURES)[number],
+    market: Market,
+  ): ProductOffer {
+    return {
+      retailerProductId: fixture.externalId,
+      marketId: market.externalId,
+      normalPrice: fixture.normalPrice,
+      ...(fixture.externalId === "261354"
+        ? {
+            promoPrice: fixture.promoPrice,
+            promotionType: "fixed-price" as const,
+            promotionText: "Promoción mock",
+          }
+        : {}),
+      pricePerUnit: fixture.normalPrice / fixture.packageSize,
+      referenceUnit: fixture.packageUnit,
+      requiresMembership: false,
+      available: true,
+      observedAt: new Date(),
     };
   }
 }

@@ -20,6 +20,7 @@ export type ProviderPocResult =
       mode: "search";
       market: Market;
       products: RetailerProduct[];
+      offers: ProductOffer[];
     }
   | {
       mode: "product";
@@ -35,8 +36,11 @@ export async function runProviderPoc(
   const market = await provider.resolveMarket(options.postalCode);
 
   if (options.query !== undefined) {
-    const products = await provider.searchProducts(options.query, market);
-    return { mode: "search", market, products };
+    const { products, offers } = await provider.searchProducts(
+      options.query,
+      market,
+    );
+    return { mode: "search", market, products, offers };
   }
 
   const product = await provider.getProduct(options.product, market);
