@@ -49,7 +49,11 @@ importers:
         specifier: workspace:*
         version: link:../retailer-contracts
 
-  packages/product-normalization: {}
+  packages/product-normalization:
+    dependencies:
+      '@shopping-app/domain':
+        specifier: workspace:*
+        version: link:../domain
 
   packages/retailer-contracts:
     dependencies:

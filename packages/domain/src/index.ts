@@ -1,5 +1,11 @@
 export type {
   Market,
+  CanonicalProduct,
+  ProductMatchCandidate,
+  ProductMatchConfidence,
+  ProductMatchReason,
+  ProductMatchStatus,
+  ProductMatchType,
   ProductOffer,
   ProductUnit,
   PromotionType,
