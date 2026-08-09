@@ -8,6 +8,7 @@ import {
   ProviderCapabilityUnavailableError,
   ProviderContractChangedError,
   RateLimitedError,
+  supportsSearch,
 } from "@shopping-app/retailer-contracts";
 
 import { EroskiProvider } from "./eroski-provider.js";
@@ -65,14 +66,12 @@ describe("EroskiProvider", () => {
     expect((fetchMock.mock.calls[0]?.[0] as URL).href).toBe(PRODUCT_URL);
   });
 
-  it("declara mercado y búsqueda como capacidades no disponibles", async () => {
+  it("no finge SEARCH y declara mercado no disponible", async () => {
     const provider = new EroskiProvider({ fetch: vi.fn<typeof fetch>() });
     await expect(provider.resolveMarket("50009")).rejects.toBeInstanceOf(
       ProviderCapabilityUnavailableError,
     );
-    await expect(
-      provider.searchProducts("pavo", MARKET),
-    ).rejects.toBeInstanceOf(ProviderCapabilityUnavailableError);
+    expect(supportsSearch(provider)).toBe(false);
   });
 
   it("no inventa una URL para ids cuyo slug canónico no está confirmado", async () => {

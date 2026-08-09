@@ -9,6 +9,8 @@ import {
   MarketResolutionError,
   ProductNotFoundError,
   type RetailerProvider,
+  type SearchRetailerProvider,
+  type PriceRefreshRetailerProvider,
   type RetailerSearchResult,
 } from "@shopping-app/retailer-contracts";
 
@@ -32,7 +34,9 @@ const PRODUCT_FIXTURES = [
   },
 ] as const;
 
-export class MockRetailerProvider implements RetailerProvider {
+export class MockRetailerProvider
+  implements SearchRetailerProvider, PriceRefreshRetailerProvider
+{
   constructor(readonly retailer: Retailer) {}
 
   resolveMarket(postalCode: string): Promise<Market> {

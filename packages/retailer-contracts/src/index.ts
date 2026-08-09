@@ -10,7 +10,14 @@ export {
 export type { ProviderErrorOptions } from "./errors.js";
 export type {
   CatalogRetailerProvider,
+  PriceRefreshRetailerProvider,
+  RetailerObservationSet,
   RetailerProvider,
   RetailerSearchResult,
+  SearchRetailerProvider,
 } from "./retailer-provider.js";
-export { supportsCatalog } from "./retailer-provider.js";
+export {
+  supportsCatalog,
+  supportsPriceRefresh,
+  supportsSearch,
+} from "./retailer-provider.js";

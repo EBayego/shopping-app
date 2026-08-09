@@ -4,10 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   ProductNotFoundError,
-  ProviderCapabilityUnavailableError,
   ProviderContractChangedError,
   RateLimitedError,
   supportsCatalog,
+  supportsSearch,
 } from "@shopping-app/retailer-contracts";
 
 import { MercadonaProvider } from "./mercadona-provider.js";
@@ -173,15 +173,10 @@ describe("MercadonaProvider", () => {
     );
   });
 
-  it("deja searchProducts explícitamente pendiente", async () => {
+  it("declara catálogo sin fingir la capability SEARCH", () => {
     const provider = new MercadonaProvider({ fetch: vi.fn<typeof fetch>() });
-    await expect(
-      provider.searchProducts("leche", {
-        retailer: "MERCADONA",
-        externalId: "warehouse:4491",
-        postalCode: "50009",
-      }),
-    ).rejects.toBeInstanceOf(ProviderCapabilityUnavailableError);
+    expect(supportsCatalog(provider)).toBe(true);
+    expect(supportsSearch(provider)).toBe(false);
   });
 
   it("detecta cambios de contrato y mapea 404", async () => {

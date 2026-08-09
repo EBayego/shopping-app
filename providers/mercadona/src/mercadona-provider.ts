@@ -8,11 +8,11 @@ import type {
 import {
   MarketResolutionError,
   ProductNotFoundError,
-  ProviderCapabilityUnavailableError,
   ProviderContractChangedError,
   ProviderUnavailableError,
   RateLimitedError,
   type CatalogRetailerProvider,
+  type PriceRefreshRetailerProvider,
   type RetailerSearchResult,
 } from "@shopping-app/retailer-contracts";
 
@@ -34,7 +34,9 @@ export interface MercadonaProviderOptions extends MercadonaHttpClientOptions {
   now?: () => Date;
 }
 
-export class MercadonaProvider implements CatalogRetailerProvider {
+export class MercadonaProvider
+  implements CatalogRetailerProvider, PriceRefreshRetailerProvider
+{
   private readonly client: MercadonaHttpClient;
   private readonly mapper = new MercadonaMapper();
   private readonly now: () => Date;
@@ -67,17 +69,6 @@ export class MercadonaProvider implements CatalogRetailerProvider {
     } catch (error) {
       throw this.marketError(normalizedPostalCode, error);
     }
-  }
-
-  searchProducts(query: string, market: Market): Promise<RetailerSearchResult> {
-    void query;
-    void market;
-    return Promise.reject(
-      new ProviderCapabilityUnavailableError("MERCADONA", "searchProducts", {
-        message:
-          "Mercadona has no confirmed remote text-search endpoint; ingest categories and products instead",
-      }),
-    );
   }
 
   async getCategories(market: Market): Promise<RetailerCategory[]> {

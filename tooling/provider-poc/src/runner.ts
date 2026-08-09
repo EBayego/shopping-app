@@ -7,6 +7,8 @@ import type {
 import {
   ProviderCapabilityUnavailableError,
   supportsCatalog,
+  supportsPriceRefresh,
+  supportsSearch,
   type RetailerProvider,
 } from "@shopping-app/retailer-contracts";
 import { DiaProvider } from "@shopping-app/provider-dia";
@@ -73,6 +75,12 @@ export async function runProviderPoc(
   }
 
   if (options.query !== undefined) {
+    if (!supportsSearch(provider)) {
+      throw new ProviderCapabilityUnavailableError(
+        options.provider,
+        "searchProducts",
+      );
+    }
     const { products, offers } = await provider.searchProducts(
       options.query,
       market,
@@ -81,6 +89,12 @@ export async function runProviderPoc(
   }
 
   const product = await provider.getProduct(options.product, market);
+  if (!supportsPriceRefresh(provider)) {
+    throw new ProviderCapabilityUnavailableError(
+      options.provider,
+      "refreshPrices",
+    );
+  }
   const offers = await provider.refreshPrices([options.product], market);
   return { mode: "product", market, product, offers };
 }

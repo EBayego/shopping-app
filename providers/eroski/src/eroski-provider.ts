@@ -12,7 +12,7 @@ import {
   ProviderUnavailableError,
   RateLimitedError,
   type RetailerProvider,
-  type RetailerSearchResult,
+  type PriceRefreshRetailerProvider,
 } from "@shopping-app/retailer-contracts";
 
 import type { EroskiProductDto } from "./eroski-dtos.js";
@@ -37,7 +37,9 @@ export interface EroskiProviderOptions extends EroskiHttpClientOptions {
   now?: () => Date;
 }
 
-export class EroskiProvider implements RetailerProvider {
+export class EroskiProvider
+  implements RetailerProvider, PriceRefreshRetailerProvider
+{
   private readonly client: EroskiHttpClient;
   private readonly parser = new EroskiHtmlParser();
   private readonly mapper = new EroskiMapper();
@@ -59,16 +61,6 @@ export class EroskiProvider implements RetailerProvider {
       new ProviderCapabilityUnavailableError("EROSKI", "resolveMarket", {
         message:
           "Eroski market/store selection by postal code is not confirmed",
-      }),
-    );
-  }
-
-  searchProducts(query: string, market: Market): Promise<RetailerSearchResult> {
-    void query;
-    void market;
-    return Promise.reject(
-      new ProviderCapabilityUnavailableError("EROSKI", "searchProducts", {
-        message: "No Eroski public search contract is confirmed",
       }),
     );
   }

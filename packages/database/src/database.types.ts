@@ -500,13 +500,16 @@ export type Database = {
       }
       retailer_products: {
         Row: {
+          active: boolean
           brand: string | null
           category: string | null
+          consecutive_misses: number
           created_at: string
           external_id: string
           gtin: string | null
           id: string
           image_url: string | null
+          last_seen_at: string
           market_id: string | null
           name: string
           observed_at: string
@@ -522,13 +525,16 @@ export type Database = {
           variable_weight: boolean
         }
         Insert: {
+          active?: boolean
           brand?: string | null
           category?: string | null
+          consecutive_misses?: number
           created_at?: string
           external_id: string
           gtin?: string | null
           id?: string
           image_url?: string | null
+          last_seen_at: string
           market_id?: string | null
           name: string
           observed_at: string
@@ -544,13 +550,16 @@ export type Database = {
           variable_weight?: boolean
         }
         Update: {
+          active?: boolean
           brand?: string | null
           category?: string | null
+          consecutive_misses?: number
           created_at?: string
           external_id?: string
           gtin?: string | null
           id?: string
           image_url?: string | null
+          last_seen_at?: string
           market_id?: string | null
           name?: string
           observed_at?: string
@@ -756,12 +765,46 @@ export type Database = {
         }
         Returns: string
       }
+      ingest_product_offers_batch: {
+        Args: {
+          payload: Json
+          target_market_id: string
+          target_retailer_id: string
+        }
+        Returns: undefined
+      }
+      ingest_retailer_products_batch: {
+        Args: {
+          payload: Json
+          target_market_id: string
+          target_retailer_id: string
+        }
+        Returns: undefined
+      }
       join_group_by_invite: { Args: { invite_code: string }; Returns: string }
+      list_price_refresh_candidates: {
+        Args: { target_market_id: string; target_retailer_id: string }
+        Returns: {
+          in_active_list: boolean
+          last_used_at: string
+          offer_observed_at: string
+          retailer_product_external_id: string
+        }[]
+      }
+      record_catalog_product_misses: {
+        Args: {
+          required_misses?: number
+          seen_external_ids: string[]
+          target_market_id: string
+          target_retailer_id: string
+        }
+        Returns: number
+      }
     }
     Enums: {
       group_member_role: "owner" | "member"
       provider_health_status: "healthy" | "degraded" | "unavailable"
-      provider_sync_status: "running" | "succeeded" | "failed"
+      provider_sync_status: "running" | "succeeded" | "partial" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -891,7 +934,7 @@ export const Constants = {
     Enums: {
       group_member_role: ["owner", "member"],
       provider_health_status: ["healthy", "degraded", "unavailable"],
-      provider_sync_status: ["running", "succeeded", "failed"],
+      provider_sync_status: ["running", "succeeded", "partial", "failed"],
     },
   },
 } as const

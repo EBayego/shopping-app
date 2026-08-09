@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
 
-import { ProviderCapabilityUnavailableError } from "@shopping-app/retailer-contracts";
-
 import { MercadonaProvider } from "./mercadona-provider.js";
 
 describe.skipIf(process.env.RUN_LIVE_PROVIDER_TESTS !== "true")(
@@ -50,9 +48,6 @@ describe.skipIf(process.env.RUN_LIVE_PROVIDER_TESTS !== "true")(
         refreshStartedAt.getTime(),
       );
       expect(market.externalId).toBe("warehouse:4491");
-      await expect(
-        provider.searchProducts("leche", market),
-      ).rejects.toBeInstanceOf(ProviderCapabilityUnavailableError);
     }, 60_000);
   },
 );

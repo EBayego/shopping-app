@@ -6,6 +6,7 @@ import {
   ProviderCapabilityUnavailableError,
   ProviderContractChangedError,
   ProviderUnavailableError,
+  supportsSearch,
 } from "@shopping-app/retailer-contracts";
 
 import { AlcampoProvider } from "./alcampo-provider.js";
@@ -83,15 +84,12 @@ describe("AlcampoProvider", () => {
     );
   });
 
-  it("declara búsqueda y resolución de mercado como no disponibles", async () => {
+  it("no finge SEARCH y declara resolución de mercado no disponible", async () => {
     const provider = new AlcampoProvider({ sessionContext: context() });
-    const market = provider.configuredMarket();
     await expect(provider.resolveMarket("50009")).rejects.toBeInstanceOf(
       ProviderCapabilityUnavailableError,
     );
-    await expect(
-      provider.searchProducts("leche", market),
-    ).rejects.toBeInstanceOf(ProviderCapabilityUnavailableError);
+    expect(supportsSearch(provider)).toBe(false);
   });
 
   it("mapea 403 sin reintentar y detecta respuestas incompatibles", async () => {

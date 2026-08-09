@@ -12,7 +12,7 @@ import {
   ProviderUnavailableError,
   RateLimitedError,
   type RetailerProvider,
-  type RetailerSearchResult,
+  type PriceRefreshRetailerProvider,
 } from "@shopping-app/retailer-contracts";
 
 import { parseAlcampoProduct, type AlcampoProductDto } from "./alcampo-dtos.js";
@@ -30,7 +30,9 @@ export interface AlcampoProviderOptions extends AlcampoHttpClientOptions {
   now?: () => Date;
 }
 
-export class AlcampoProvider implements RetailerProvider {
+export class AlcampoProvider
+  implements RetailerProvider, PriceRefreshRetailerProvider
+{
   private readonly client: AlcampoHttpClient;
   private readonly mapper = new AlcampoMapper();
   private readonly context: AlcampoSessionContext | undefined;
@@ -50,17 +52,6 @@ export class AlcampoProvider implements RetailerProvider {
       new ProviderCapabilityUnavailableError("ALCAMPO", "resolveMarket", {
         message:
           "Alcampo store and session selection endpoints are not confirmed",
-      }),
-    );
-  }
-
-  searchProducts(query: string, market: Market): Promise<RetailerSearchResult> {
-    void query;
-    void market;
-    return Promise.reject(
-      new ProviderCapabilityUnavailableError("ALCAMPO", "searchProducts", {
-        message:
-          "No Alcampo search endpoint is confirmed for this experimental provider",
       }),
     );
   }

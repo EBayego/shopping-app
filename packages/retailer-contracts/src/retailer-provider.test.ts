@@ -4,16 +4,18 @@ import type { ProviderHealth } from "@shopping-app/domain";
 
 import {
   supportsCatalog,
+  supportsPriceRefresh,
+  supportsSearch,
   type CatalogRetailerProvider,
   type RetailerProvider,
+  type PriceRefreshRetailerProvider,
+  type SearchRetailerProvider,
 } from "./retailer-provider.js";
 
 function baseProvider(): RetailerProvider {
   return {
     resolveMarket: () => Promise.reject(new Error("not used")),
-    searchProducts: () => Promise.resolve({ products: [], offers: [] }),
     getProduct: () => Promise.reject(new Error("not used")),
-    refreshPrices: () => Promise.resolve([]),
     healthCheck: () =>
       Promise.resolve({
         retailer: "MERCADONA",
@@ -44,5 +46,27 @@ describe("supportsCatalog", () => {
       ).resolves.toHaveLength(1);
     }
     expect(supportsCatalog(baseProvider())).toBe(false);
+  });
+});
+
+describe("supportsSearch", () => {
+  it("narrows only providers that actually expose searchProducts", () => {
+    const provider: SearchRetailerProvider = {
+      ...baseProvider(),
+      searchProducts: () => Promise.resolve({ products: [], offers: [] }),
+    };
+    expect(supportsSearch(provider)).toBe(true);
+    expect(supportsSearch(baseProvider())).toBe(false);
+  });
+});
+
+describe("supportsPriceRefresh", () => {
+  it("detects the explicit capability without exceptions", () => {
+    const provider: PriceRefreshRetailerProvider = {
+      ...baseProvider(),
+      refreshPrices: () => Promise.resolve([]),
+    };
+    expect(supportsPriceRefresh(provider)).toBe(true);
+    expect(supportsPriceRefresh(baseProvider())).toBe(false);
   });
 });

@@ -11,6 +11,7 @@ mediante Supabase y los providers viven como módulos independientes.
 apps/                       Futuras aplicaciones.
 packages/
   domain/                   Tipos de dominio compartidos.
+  ingestion/                Pipeline genérico RetailerProvider -> Supabase.
   retailer-contracts/       Contratos y errores para proveedores.
   product-normalization/    Futura normalización de productos.
   voice-parser/             Futuro análisis de entradas de voz.
@@ -20,6 +21,7 @@ providers/
   alcampo/                  Futuro proveedor de Alcampo.
   eroski/                   Futuro proveedor de Eroski.
 tooling/
+  ingest/                   CLI de ingestión persistente y dry-run.
   provider-poc/             CLI de prueba con providers mock.
 supabase/                   Configuración, migraciones y seeds de PostgreSQL.
 ```
@@ -40,6 +42,32 @@ pnpm test
 pnpm format
 pnpm provider-poc --provider dia --postal-code 50009 --query "leche"
 ```
+
+La ingesta persistente requiere credenciales backend de Supabase en
+`SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`:
+
+```bash
+pnpm ingest --provider dia --postal-code 50009 --query "leche"
+pnpm ingest --provider dia --postal-code 50009 --query "leche" --dry-run
+pnpm ingest refresh --provider dia --postal-code 50009
+pnpm ingest refresh --provider dia --postal-code 50009 --dry-run
+pnpm ingest refresh --provider dia --postal-code 50009 --product-id 261354
+```
+
+El dry-run de SEARCH no necesita credenciales de base de datos. El dry-run de
+PRICE_REFRESH sí las necesita para seleccionar productos conocidos, aunque no
+crea sync runs ni llama a `refreshPrices`.
+
+El refresh selecciona productos conocidos presentes en intents sin completar,
+ofertas stale/very-stale o IDs manuales. Por defecto una oferta pasa a `STALE` a
+las 6 horas y a `VERY_STALE` a las 24 horas; ambos umbrales son configurables en
+`PriceRefreshPipelineOptions`. El modelo admite `lastUsedAt`, pero la consulta SQL
+actual lo deja vacío porque todavía no existe una fuente fiable de eventos de uso
+o compra.
+
+Mercadona permanece deshabilitado para `--query`: su provider no tiene una
+capability de búsqueda textual confirmada. El registro del CLI lo rechaza antes
+de acceder a Supabase. Su futura ingesta debe usar el catálogo por categorías.
 
 ## Supabase local
 
@@ -92,11 +120,11 @@ pnpm provider-poc --provider mercadona --postal-code 50009 --category 72
 pnpm provider-poc --provider mercadona --postal-code 50009 --product 10382
 ```
 
-`MercadonaProvider.searchProducts` lanza
-`ProviderCapabilityUnavailableError`: no se ha confirmado un endpoint remoto de
-búsqueda textual. El flujo previsto es categorías/productos → ingestión →
-PostgreSQL, sin consultas live desde la aplicación móvil. El mercado usa como
-identidad inmutable el warehouse devuelto al resolver el código postal.
+`MercadonaProvider` implementa `CatalogRetailerProvider`, pero no
+`SearchRetailerProvider`: no se ha confirmado un endpoint remoto de búsqueda
+textual. El flujo previsto es categorías/productos → ingestión → PostgreSQL, sin
+consultas live desde la aplicación móvil. El mercado usa como identidad inmutable
+el warehouse devuelto al resolver el código postal.
 
 La navegación de catálogo se modela mediante la capability opcional y genérica
 `CatalogRetailerProvider`. Un consumidor puede detectarla con

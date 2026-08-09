@@ -1,0 +1,16 @@
+{
+  "name": "@shopping-app/ingest-cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@shopping-app/domain": "workspace:*",
+    "@shopping-app/ingestion": "workspace:*",
+    "@shopping-app/provider-dia": "workspace:*",
+    "@shopping-app/provider-mercadona": "workspace:*",
+    "@shopping-app/retailer-contracts": "workspace:*"
+  }
+}

@@ -40,6 +40,15 @@ importers:
 
   packages/domain: {}
 
+  packages/ingestion:
+    dependencies:
+      '@shopping-app/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@shopping-app/retailer-contracts':
+        specifier: workspace:*
+        version: link:../retailer-contracts
+
   packages/product-normalization: {}
 
   packages/retailer-contracts:
@@ -85,6 +94,24 @@ importers:
       '@shopping-app/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@shopping-app/retailer-contracts':
+        specifier: workspace:*
+        version: link:../../packages/retailer-contracts
+
+  tooling/ingest:
+    dependencies:
+      '@shopping-app/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@shopping-app/ingestion':
+        specifier: workspace:*
+        version: link:../../packages/ingestion
+      '@shopping-app/provider-dia':
+        specifier: workspace:*
+        version: link:../../providers/dia
+      '@shopping-app/provider-mercadona':
+        specifier: workspace:*
+        version: link:../../providers/mercadona
       '@shopping-app/retailer-contracts':
         specifier: workspace:*
         version: link:../../packages/retailer-contracts

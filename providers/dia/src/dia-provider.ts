@@ -12,7 +12,8 @@ import {
   ProviderContractChangedError,
   ProviderUnavailableError,
   RateLimitedError,
-  type RetailerProvider,
+  type SearchRetailerProvider,
+  type PriceRefreshRetailerProvider,
   type RetailerSearchResult,
 } from "@shopping-app/retailer-contracts";
 
@@ -41,7 +42,9 @@ export interface DiaSearchPage extends RetailerSearchResult {
   pagination: DiaSearchPagination;
 }
 
-export class DiaProvider implements RetailerProvider {
+export class DiaProvider
+  implements SearchRetailerProvider, PriceRefreshRetailerProvider
+{
   private readonly client: DiaHttpClient;
   private readonly mapper = new DiaMapper();
   private readonly createId: () => string;

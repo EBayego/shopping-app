@@ -9,6 +9,7 @@
     "test": "vitest run --passWithNoTests",
     "format": "prettier --write .",
     "provider-poc": "tsx tooling/provider-poc/src/cli.ts",
+    "ingest": "tsx tooling/ingest/src/cli.ts",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",
     "supabase:reset": "supabase db reset",
