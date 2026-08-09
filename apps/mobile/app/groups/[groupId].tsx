@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, Share, StyleSheet, Text, View } from "react-native";
@@ -9,17 +10,22 @@ import { ScreenState } from "../../components/screen-state";
 import { useSession } from "../../features/auth/session-provider";
 import {
   useAddIntentMutation,
+  useChangeIntentQuantityMutation,
+  useDeleteIntentMutation,
+  useEditIntentMutation,
   useGenerateInviteMutation,
   useGroupDetailQuery,
   useToggleIntentMutation,
   useUpdatePostalCodeMutation,
 } from "../../features/groups/queries";
+import { useGroupRealtime } from "../../features/groups/realtime";
 import { createInviteLink } from "../../features/groups/invites";
 import {
   isValidSpanishPostalCode,
   normalizeShoppingItemInput,
 } from "../../features/groups/validation";
 import { getErrorMessage } from "../../lib/errors";
+import { createOperationId } from "../../lib/operation-id";
 import { colors, spacing } from "../../lib/theme";
 
 function firstParameter(value: string | string[] | undefined): string {
@@ -34,9 +40,13 @@ export default function GroupDetailScreen() {
   const groupId = firstParameter(params.groupId);
   const joinOutcome = firstParameter(params.joinOutcome);
   const session = useSession();
+  const queryClient = useQueryClient();
   const detail = useGroupDetailQuery(groupId);
   const addIntent = useAddIntentMutation(groupId);
   const toggleIntent = useToggleIntentMutation(groupId);
+  const editIntent = useEditIntentMutation(groupId);
+  const changeQuantity = useChangeIntentQuantityMutation(groupId);
+  const deleteIntent = useDeleteIntentMutation(groupId);
   const generateInvite = useGenerateInviteMutation();
   const updatePostalCode = useUpdatePostalCodeMutation(groupId);
   const [newItem, setNewItem] = useState("");
@@ -45,6 +55,15 @@ export default function GroupDetailScreen() {
   const [postalCode, setPostalCode] = useState("");
   const [postalCodeError, setPostalCodeError] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [editingIntentId, setEditingIntentId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [editingError, setEditingError] = useState<string | null>(null);
+
+  useGroupRealtime(
+    groupId,
+    session.status === "ready" && groupId.length > 0,
+    queryClient,
+  );
 
   const activeListId = selectedListId ?? detail.data?.lists[0]?.id ?? null;
   const activeIntents = useMemo(
@@ -97,7 +116,11 @@ export default function GroupDetailScreen() {
       const normalized = normalizeShoppingItemInput(newItem);
       setInputError(null);
       addIntent.mutate(
-        { shoppingListId: activeListId, ...normalized },
+        {
+          shoppingListId: activeListId,
+          operationId: createOperationId(),
+          ...normalized,
+        },
         { onSuccess: () => setNewItem("") },
       );
     } catch (error) {
@@ -112,8 +135,31 @@ export default function GroupDetailScreen() {
       return;
     }
     setPostalCodeError(null);
-    updatePostalCode.mutate({ shoppingListId: activeListId, postalCode });
+    updatePostalCode.mutate({
+      shoppingListId: activeListId,
+      postalCode,
+      operationId: createOperationId(),
+    });
   };
+
+  const submitIntentEdit = (intentId: string) => {
+    try {
+      const normalized = normalizeShoppingItemInput(editingText);
+      setEditingError(null);
+      editIntent.mutate(
+        { intentId, operationId: createOperationId(), ...normalized },
+        { onSuccess: () => setEditingIntentId(null) },
+      );
+    } catch (error) {
+      setEditingError(getErrorMessage(error));
+    }
+  };
+
+  const mutationError =
+    toggleIntent.error ??
+    editIntent.error ??
+    changeQuantity.error ??
+    deleteIntent.error;
 
   const shareInvite = async () => {
     const inviteCode = generateInvite.data;
@@ -242,19 +288,20 @@ export default function GroupDetailScreen() {
           ) : (
             <View style={styles.items}>
               {activeIntents.map((intent) => (
-                <Pressable
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: intent.checked }}
-                  key={intent.id}
-                  onPress={() =>
-                    toggleIntent.mutate({
-                      intentId: intent.id,
-                      checked: !intent.checked,
-                    })
-                  }
-                  style={styles.item}
-                >
-                  <View
+                <View key={intent.id} style={styles.item}>
+                  <Pressable
+                    accessibilityLabel={
+                      intent.checked ? "Desmarcar producto" : "Marcar producto"
+                    }
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: intent.checked }}
+                    onPress={() =>
+                      toggleIntent.mutate({
+                        intentId: intent.id,
+                        checked: !intent.checked,
+                        operationId: createOperationId(),
+                      })
+                    }
                     style={[
                       styles.checkbox,
                       intent.checked && styles.checkboxChecked,
@@ -263,19 +310,109 @@ export default function GroupDetailScreen() {
                     {intent.checked ? (
                       <Text style={styles.checkmark}>✓</Text>
                     ) : null}
+                  </Pressable>
+                  <View style={styles.itemBody}>
+                    {editingIntentId === intent.id ? (
+                      <>
+                        <AppInput
+                          autoFocus
+                          error={editingError ?? undefined}
+                          label="Nombre del producto"
+                          onChangeText={setEditingText}
+                          onSubmitEditing={() => submitIntentEdit(intent.id)}
+                          value={editingText}
+                        />
+                        <View style={styles.itemActions}>
+                          <AppButton
+                            loading={editIntent.isPending}
+                            style={styles.smallButton}
+                            onPress={() => submitIntentEdit(intent.id)}
+                          >
+                            Guardar
+                          </AppButton>
+                          <AppButton
+                            style={styles.smallButton}
+                            tone="secondary"
+                            onPress={() => setEditingIntentId(null)}
+                          >
+                            Cancelar
+                          </AppButton>
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <Text
+                          style={[
+                            styles.itemText,
+                            intent.checked && styles.itemChecked,
+                          ]}
+                        >
+                          {intent.raw_text}
+                        </Text>
+                        <View style={styles.itemActions}>
+                          <Pressable
+                            accessibilityLabel="Reducir cantidad"
+                            onPress={() =>
+                              changeQuantity.mutate({
+                                intentId: intent.id,
+                                direction: "decrement",
+                                operationId: createOperationId(),
+                              })
+                            }
+                            style={styles.quantityButton}
+                          >
+                            <Text style={styles.quantityButtonText}>−</Text>
+                          </Pressable>
+                          <Text style={styles.quantity}>
+                            {intent.requested_quantity ?? 1}
+                          </Text>
+                          <Pressable
+                            accessibilityLabel="Aumentar cantidad"
+                            onPress={() =>
+                              changeQuantity.mutate({
+                                intentId: intent.id,
+                                direction: "increment",
+                                operationId: createOperationId(),
+                              })
+                            }
+                            style={styles.quantityButton}
+                          >
+                            <Text style={styles.quantityButtonText}>+</Text>
+                          </Pressable>
+                          <Pressable
+                            accessibilityRole="button"
+                            onPress={() => {
+                              setEditingIntentId(intent.id);
+                              setEditingText(intent.raw_text);
+                              setEditingError(null);
+                            }}
+                          >
+                            <Text style={styles.actionText}>Editar</Text>
+                          </Pressable>
+                          <Pressable
+                            accessibilityRole="button"
+                            onPress={() =>
+                              deleteIntent.mutate({
+                                intentId: intent.id,
+                                operationId: createOperationId(),
+                              })
+                            }
+                          >
+                            <Text style={styles.deleteText}>Eliminar</Text>
+                          </Pressable>
+                        </View>
+                      </>
+                    )}
                   </View>
-                  <Text
-                    style={[
-                      styles.itemText,
-                      intent.checked && styles.itemChecked,
-                    ]}
-                  >
-                    {intent.raw_text}
-                  </Text>
-                </Pressable>
+                </View>
               ))}
             </View>
           )}
+          {mutationError ? (
+            <Text style={styles.error}>
+              {getErrorMessage(mutationError)} Se ha reconciliado la lista.
+            </Text>
+          ) : null}
         </>
       )}
 
@@ -360,6 +497,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
+  itemBody: { flex: 1, gap: spacing.sm },
+  itemActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
   checkbox: {
     width: 24,
     height: 24,
@@ -373,6 +517,30 @@ const styles = StyleSheet.create({
   checkmark: { color: "#FFFFFF", fontWeight: "800" },
   itemText: { color: colors.text, fontSize: 16, flex: 1 },
   itemChecked: { color: colors.muted, textDecorationLine: "line-through" },
+  quantityButton: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+  },
+  quantityButtonText: {
+    color: colors.primary,
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  quantity: {
+    color: colors.text,
+    minWidth: 24,
+    textAlign: "center",
+    fontWeight: "700",
+  },
+  actionText: { color: colors.primary, fontWeight: "700", padding: spacing.xs },
+  deleteText: { color: colors.danger, fontWeight: "700", padding: spacing.xs },
+  smallButton: { minHeight: 40, flexGrow: 1 },
   inviteBox: {
     borderTopWidth: 1,
     borderTopColor: colors.border,

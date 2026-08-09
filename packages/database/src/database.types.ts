@@ -823,6 +823,27 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      apply_shopping_intent_operation: {
+        Args: {
+          action: string
+          checked?: boolean
+          intent_id?: string
+          normalized_name?: string
+          operation_id: string
+          raw_text?: string
+          shopping_list_id?: string
+        }
+        Returns: Json
+      }
+      apply_shopping_list_operation: {
+        Args: {
+          name?: string
+          operation_id: string
+          postal_code?: string
+          shopping_list_id: string
+        }
+        Returns: Json
+      }
       change_product_match: {
         Args: {
           target_canonical_product_id: string

@@ -125,33 +125,124 @@ export async function generateGroupInvite(groupId: string): Promise<string> {
 export async function addShoppingIntent(
   shoppingListId: string,
   input: { rawText: string; normalizedName: string },
-): Promise<void> {
-  const { error } = await getSupabaseClient().from("shopping_intents").insert({
-    shopping_list_id: shoppingListId,
-    raw_text: input.rawText,
-    normalized_name: input.normalizedName,
+  operationId: string,
+): Promise<ShoppingIntent> {
+  return applyIntentOperation({
+    action: "add",
+    operationId,
+    shoppingListId,
+    rawText: input.rawText,
+    normalizedName: input.normalizedName,
   });
+}
+
+type IntentOperation =
+  | {
+      action: "add";
+      operationId: string;
+      shoppingListId: string;
+      rawText: string;
+      normalizedName: string;
+    }
+  | {
+      action: "edit";
+      operationId: string;
+      intentId: string;
+      rawText: string;
+      normalizedName: string;
+    }
+  | {
+      action: "set_checked";
+      operationId: string;
+      intentId: string;
+      checked: boolean;
+    }
+  | {
+      action: "increment" | "decrement" | "delete";
+      operationId: string;
+      intentId: string;
+    };
+
+async function applyIntentOperation(
+  operation: IntentOperation,
+): Promise<ShoppingIntent> {
+  const { data, error } = await getSupabaseClient().rpc(
+    "apply_shopping_intent_operation",
+    {
+      operation_id: operation.operationId,
+      action: operation.action,
+      ...(operation.action === "add"
+        ? { shopping_list_id: operation.shoppingListId }
+        : { intent_id: operation.intentId }),
+      ...(operation.action === "add" || operation.action === "edit"
+        ? {
+            raw_text: operation.rawText,
+            normalized_name: operation.normalizedName,
+          }
+        : {}),
+      ...(operation.action === "set_checked"
+        ? { checked: operation.checked }
+        : {}),
+    },
+  );
   if (error) throw error;
+  return data as unknown as ShoppingIntent;
 }
 
 export async function setShoppingIntentChecked(
   intentId: string,
   checked: boolean,
-): Promise<void> {
-  const { error } = await getSupabaseClient()
-    .from("shopping_intents")
-    .update({ checked })
-    .eq("id", intentId);
-  if (error) throw error;
+  operationId: string,
+): Promise<ShoppingIntent> {
+  return applyIntentOperation({
+    action: "set_checked",
+    operationId,
+    intentId,
+    checked,
+  });
+}
+
+export async function editShoppingIntent(
+  intentId: string,
+  input: { rawText: string; normalizedName: string },
+  operationId: string,
+): Promise<ShoppingIntent> {
+  return applyIntentOperation({
+    action: "edit",
+    operationId,
+    intentId,
+    rawText: input.rawText,
+    normalizedName: input.normalizedName,
+  });
+}
+
+export async function changeShoppingIntentQuantity(
+  intentId: string,
+  direction: "increment" | "decrement",
+  operationId: string,
+): Promise<ShoppingIntent> {
+  return applyIntentOperation({ action: direction, operationId, intentId });
+}
+
+export async function deleteShoppingIntent(
+  intentId: string,
+  operationId: string,
+): Promise<ShoppingIntent> {
+  return applyIntentOperation({ action: "delete", operationId, intentId });
 }
 
 export async function updateShoppingListPostalCode(
   shoppingListId: string,
   postalCode: string,
+  operationId: string,
 ): Promise<void> {
-  const { error } = await getSupabaseClient()
-    .from("shopping_lists")
-    .update({ postal_code: postalCode.trim() })
-    .eq("id", shoppingListId);
+  const { error } = await getSupabaseClient().rpc(
+    "apply_shopping_list_operation",
+    {
+      operation_id: operationId,
+      shopping_list_id: shoppingListId,
+      postal_code: postalCode.trim(),
+    },
+  );
   if (error) throw error;
 }
