@@ -917,6 +917,10 @@ export type Database = {
           very_stale_after_ms: number
         }[]
       }
+      get_basket_comparison_inputs: {
+        Args: { shopping_list_id: string }
+        Returns: Json
+      }
       ingest_product_offers_batch: {
         Args: {
           payload: Json

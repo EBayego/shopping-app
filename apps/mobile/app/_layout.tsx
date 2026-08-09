@@ -38,6 +38,10 @@ export default function RootLayout() {
                   options={{ title: "Lista compartida" }}
                 />
                 <Stack.Screen
+                  name="comparison/[listId]"
+                  options={{ title: "Comparar cesta" }}
+                />
+                <Stack.Screen
                   name="join/[inviteCode]"
                   options={{ title: "Unirse a un grupo" }}
                 />

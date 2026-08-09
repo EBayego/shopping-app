@@ -1,6 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import type { ShoppingIntentDraft } from "@shopping-app/voice-parser";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, Share, StyleSheet, Text, View } from "react-native";
 
@@ -46,6 +46,7 @@ export default function GroupDetailScreen() {
     joinOutcome?: string | string[];
   }>();
   const groupId = firstParameter(params.groupId);
+  const router = useRouter();
   const joinOutcome = firstParameter(params.joinOutcome);
   const session = useSession();
   const queryClient = useQueryClient();
@@ -336,6 +337,15 @@ export default function GroupDetailScreen() {
               Actualizar código postal
             </AppButton>
           </View>
+
+          {activeListId && activeIntents.length > 0 ? (
+            <AppButton
+              tone="secondary"
+              onPress={() => router.push(`/comparison/${activeListId}`)}
+            >
+              Comparar cesta entre supermercados
+            </AppButton>
+          ) : null}
 
           <View style={styles.addBox}>
             {searchOpen && activeListId ? (

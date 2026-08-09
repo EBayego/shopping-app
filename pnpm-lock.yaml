@@ -44,6 +44,9 @@ importers:
       '@shopping-app/database':
         specifier: workspace:*
         version: link:../../packages/database
+      '@shopping-app/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@shopping-app/product-normalization':
         specifier: workspace:*
         version: link:../../packages/product-normalization

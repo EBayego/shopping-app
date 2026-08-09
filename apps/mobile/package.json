@@ -12,6 +12,7 @@
   "dependencies": {
     "@react-native-community/netinfo": "12.0.1",
     "@shopping-app/database": "workspace:*",
+    "@shopping-app/domain": "workspace:*",
     "@shopping-app/product-normalization": "workspace:*",
     "@shopping-app/voice-parser": "workspace:*",
     "@supabase/supabase-js": "^2.112.2",
