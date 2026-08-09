@@ -27,6 +27,7 @@ import {
 import { getErrorMessage } from "../../lib/errors";
 import { createOperationId } from "../../lib/operation-id";
 import { colors, spacing } from "../../lib/theme";
+import { useOfflineSync } from "../../offline/offline-sync-provider";
 
 function firstParameter(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -41,6 +42,7 @@ export default function GroupDetailScreen() {
   const joinOutcome = firstParameter(params.joinOutcome);
   const session = useSession();
   const queryClient = useQueryClient();
+  const sync = useOfflineSync();
   const detail = useGroupDetailQuery(groupId);
   const addIntent = useAddIntentMutation(groupId);
   const toggleIntent = useToggleIntentMutation(groupId);
@@ -61,7 +63,7 @@ export default function GroupDetailScreen() {
 
   useGroupRealtime(
     groupId,
-    session.status === "ready" && groupId.length > 0,
+    session.status === "ready" && groupId.length > 0 && sync.isOnline,
     queryClient,
   );
 
@@ -190,6 +192,35 @@ export default function GroupDetailScreen() {
             ? "Ya eras miembro de este grupo."
             : "Te has unido al grupo correctamente."}
         </Text>
+      ) : null}
+
+      {!sync.isOnline ||
+      sync.isSyncing ||
+      sync.pendingCount > 0 ||
+      sync.conflictCount > 0 ? (
+        <View
+          style={[
+            styles.syncBanner,
+            sync.conflictCount > 0 && styles.syncErrorBanner,
+          ]}
+        >
+          <Text style={styles.syncText}>
+            {!sync.isOnline
+              ? `Sin conexión${sync.pendingCount > 0 ? ` · ${sync.pendingCount} cambio(s) pendiente(s)` : ""}`
+              : sync.isSyncing
+                ? "Sincronizando cambios…"
+                : sync.conflictCount > 0
+                  ? `${sync.conflictCount} cambio(s) necesitan revisión`
+                  : sync.lastError && sync.pendingCount > 0
+                    ? `No se pudo sincronizar · ${sync.pendingCount} cambio(s) siguen seguros en el dispositivo`
+                    : `${sync.pendingCount} cambio(s) pendiente(s)`}
+          </Text>
+          {sync.isOnline && !sync.isSyncing && sync.pendingCount > 0 ? (
+            <Pressable onPress={sync.syncNow}>
+              <Text style={styles.actionText}>Reintentar</Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
 
       <View style={styles.membersBox}>
@@ -409,9 +440,7 @@ export default function GroupDetailScreen() {
             </View>
           )}
           {mutationError ? (
-            <Text style={styles.error}>
-              {getErrorMessage(mutationError)} Se ha reconciliado la lista.
-            </Text>
+            <Text style={styles.error}>{getErrorMessage(mutationError)}</Text>
           ) : null}
         </>
       )}
@@ -462,6 +491,19 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderRadius: 12,
   },
+  syncBanner: {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.sm,
+  },
+  syncErrorBanner: { borderColor: colors.danger },
+  syncText: { color: colors.muted, flex: 1 },
   membersBox: { gap: spacing.xs },
   title: { color: colors.text, fontSize: 28, fontWeight: "800" },
   sectionTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },

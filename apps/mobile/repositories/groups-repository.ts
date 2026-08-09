@@ -7,6 +7,7 @@ import type {
   JoinGroupResult,
   ShoppingIntent,
 } from "../features/groups/types";
+import type { ShoppingOperation, ShoppingSyncBackend } from "../offline/types";
 
 export async function listGroups(): Promise<readonly GroupSummary[]> {
   const { data, error } = await getSupabaseClient()
@@ -246,3 +247,49 @@ export async function updateShoppingListPostalCode(
   );
   if (error) throw error;
 }
+
+export const shoppingSyncBackend: ShoppingSyncBackend = {
+  apply(operation: ShoppingOperation) {
+    switch (operation.kind) {
+      case "add_intent":
+        return addShoppingIntent(
+          operation.shoppingListId,
+          {
+            rawText: operation.localIntent.raw_text,
+            normalizedName: operation.localIntent.normalized_name,
+          },
+          operation.operationId,
+        );
+      case "edit_intent":
+        return editShoppingIntent(
+          operation.intentId,
+          {
+            rawText: operation.rawText,
+            normalizedName: operation.normalizedName,
+          },
+          operation.operationId,
+        );
+      case "set_checked":
+        return setShoppingIntentChecked(
+          operation.intentId,
+          operation.checked,
+          operation.operationId,
+        );
+      case "change_quantity":
+        return changeShoppingIntentQuantity(
+          operation.intentId,
+          operation.direction,
+          operation.operationId,
+        );
+      case "delete_intent":
+        return deleteShoppingIntent(operation.intentId, operation.operationId);
+      case "update_postal_code":
+        return updateShoppingListPostalCode(
+          operation.shoppingListId,
+          operation.postalCode,
+          operation.operationId,
+        ).then(() => undefined);
+    }
+  },
+  getGroupDetail,
+};
