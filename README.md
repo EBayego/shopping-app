@@ -1,14 +1,14 @@
 # shopping-app
 
-Monorepo TypeScript para los componentes compartidos y proveedores de `shopping-app`.
-Este repositorio contiene únicamente la estructura y el tooling iniciales; todavía no
-incluye todavía una aplicación móvil. El backend PostgreSQL se ejecuta localmente
+Monorepo TypeScript para la aplicación, componentes compartidos y proveedores de `shopping-app`.
+La aplicación móvil vive en `apps/mobile`. El backend PostgreSQL se ejecuta localmente
 mediante Supabase y los providers viven como módulos independientes.
 
 ## Estructura
 
 ```text
-apps/                       Futuras aplicaciones.
+apps/
+  mobile/                   Aplicación React Native con Expo Router.
 packages/
   domain/                   Tipos de dominio compartidos.
   ingestion/                Pipeline genérico RetailerProvider -> Supabase.
@@ -42,6 +42,26 @@ pnpm test
 pnpm format
 pnpm provider-poc --provider dia --postal-code 50009 --query "leche"
 ```
+
+## Aplicación móvil
+
+La app usa Expo SDK 57, Expo Router, TanStack Query y el cliente público de Supabase.
+Copia `apps/mobile/.env.example` a `apps/mobile/.env` y configura exclusivamente:
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=...
+EXPO_PUBLIC_SUPABASE_ANON_KEY=...
+```
+
+Nunca uses `SUPABASE_SERVICE_ROLE_KEY` en este archivo. Para iniciar el servidor de
+desarrollo:
+
+```bash
+pnpm --filter @shopping-app/mobile start
+```
+
+Si pruebas contra Supabase local desde un dispositivo o emulador, utiliza una URL
+alcanzable desde ese dispositivo en vez de asumir que `127.0.0.1` apunta al equipo host.
 
 La ingesta persistente requiere credenciales backend de Supabase en
 `SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`:

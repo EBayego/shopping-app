@@ -5,7 +5,7 @@
   "packageManager": "pnpm@11.20.0",
   "scripts": {
     "typecheck": "pnpm --recursive --if-present typecheck",
-    "lint": "eslint \"packages/**/*.ts\" \"providers/**/*.ts\" \"tooling/**/*.ts\"",
+    "lint": "eslint \"apps/**/*.ts\" \"apps/**/*.tsx\" \"packages/**/*.ts\" \"providers/**/*.ts\" \"tooling/**/*.ts\"",
     "test": "vitest run --passWithNoTests",
     "format": "prettier --write .",
     "provider-poc": "tsx tooling/provider-poc/src/cli.ts",

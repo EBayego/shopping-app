@@ -13,7 +13,13 @@ export default tseslint.config(
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
-    files: ["packages/**/*.ts", "providers/**/*.ts", "tooling/**/*.ts"],
+    files: [
+      "apps/**/*.ts",
+      "apps/**/*.tsx",
+      "packages/**/*.ts",
+      "providers/**/*.ts",
+      "tooling/**/*.ts",
+    ],
     languageOptions: {
       parserOptions: {
         projectService: true,
