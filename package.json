@@ -8,13 +8,19 @@
     "lint": "eslint \"packages/**/*.ts\" \"providers/**/*.ts\" \"tooling/**/*.ts\"",
     "test": "vitest run --passWithNoTests",
     "format": "prettier --write .",
-    "provider-poc": "tsx tooling/provider-poc/src/cli.ts"
+    "provider-poc": "tsx tooling/provider-poc/src/cli.ts",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset",
+    "supabase:test": "supabase test db",
+    "supabase:types": "supabase gen types typescript --local --schema public > packages/database/src/database.types.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.34.0",
     "@types/node": "^24.3.0",
     "eslint": "^9.34.0",
     "prettier": "^3.6.2",
+    "supabase": "2.110.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.41.0",

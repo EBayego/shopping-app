@@ -2,7 +2,8 @@
 
 Monorepo TypeScript para los componentes compartidos y proveedores de `shopping-app`.
 Este repositorio contiene únicamente la estructura y el tooling iniciales; todavía no
-incluye una aplicación móvil, Supabase ni integraciones reales con supermercados.
+incluye todavía una aplicación móvil. El backend PostgreSQL se ejecuta localmente
+mediante Supabase y los providers viven como módulos independientes.
 
 ## Estructura
 
@@ -20,6 +21,7 @@ providers/
   eroski/                   Futuro proveedor de Eroski.
 tooling/
   provider-poc/             CLI de prueba con providers mock.
+supabase/                   Configuración, migraciones y seeds de PostgreSQL.
 ```
 
 Los workspaces se declaran en `pnpm-workspace.yaml`. Todos los módulos TypeScript
@@ -38,6 +40,35 @@ pnpm test
 pnpm format
 pnpm provider-poc --provider dia --postal-code 50009 --query "leche"
 ```
+
+## Supabase local
+
+Requiere Docker Desktop en ejecución. El CLI está instalado como devDependency
+con versión fija, por lo que todos los comandos se ejecutan mediante pnpm:
+
+```bash
+pnpm supabase:start
+pnpm supabase:reset
+pnpm supabase:test
+pnpm supabase:types
+pnpm supabase:stop
+```
+
+`pnpm supabase:reset` recrea PostgreSQL desde `supabase/migrations` y carga los
+retailers base definidos en `supabase/seed.sql`. PostgreSQL es la fuente de verdad;
+los tipos de `packages/database` se regeneran desde el esquema local, no se editan
+manualmente.
+
+Anonymous Auth está habilitado: sus sesiones usan el rol PostgreSQL
+`authenticated` y quedan sometidas a las mismas políticas RLS que cualquier otra
+sesión autenticada. La creación de grupos y sus invitaciones se realiza únicamente
+mediante las RPC `create_group_with_initial_list`, `generate_group_invite` y
+`join_group_by_invite`. Los códigos de invitación se devuelven una sola vez y la
+base de datos conserva únicamente su hash en un esquema privado.
+
+Las tablas de grupos, listas e items son privadas para sus miembros. El catálogo y
+los precios permiten lectura autenticada, mientras que su escritura y las tablas
+operativas de providers quedan reservadas al rol backend `service_role`.
 
 - `typecheck` comprueba todos los módulos TypeScript.
 - `lint` ejecuta ESLint sobre packages, providers y tooling.
