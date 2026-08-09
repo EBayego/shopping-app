@@ -4,9 +4,16 @@ import type {
   RetailerProduct,
 } from "@shopping-app/domain";
 import type { RetailerProvider } from "@shopping-app/retailer-contracts";
+import { DiaProvider } from "@shopping-app/provider-dia";
 
 import type { ProviderPocArguments } from "./arguments.js";
 import { createMockProvider } from "./mock-provider.js";
+
+function createProvider(
+  provider: ProviderPocArguments["provider"],
+): RetailerProvider {
+  return provider === "DIA" ? new DiaProvider() : createMockProvider(provider);
+}
 
 export type ProviderPocResult =
   | {
@@ -23,7 +30,7 @@ export type ProviderPocResult =
 
 export async function runProviderPoc(
   options: ProviderPocArguments,
-  provider: RetailerProvider = createMockProvider(options.provider),
+  provider: RetailerProvider = createProvider(options.provider),
 ): Promise<ProviderPocResult> {
   const market = await provider.resolveMarket(options.postalCode);
 

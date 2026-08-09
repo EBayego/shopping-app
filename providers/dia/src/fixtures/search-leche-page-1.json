@@ -1,0 +1,91 @@
+{
+  "cart": {
+    "postal_code": "50009",
+    "total_amount": 0,
+    "total_units": 0
+  },
+  "pagination": {
+    "page_number": 1,
+    "page_size": 30,
+    "total_pages": 14
+  },
+  "total_items": 410,
+  "facets": [],
+  "search_items": [
+    {
+      "brand": "DIA Láctea",
+      "brand_type": "D",
+      "dia_brand": true,
+      "display_name": "Leche semidesnatada Dia Láctea pack 6 x 1 L",
+      "image": "/product_images/504P6.jpg",
+      "l1_category_description": "Huevos, leche y mantequilla",
+      "l2_category_description": "Leche",
+      "object_id": "object-504P6",
+      "sku_id": "504P6",
+      "units_in_cart": 0,
+      "units_in_stock": 170,
+      "url": "/huevos-leche-y-mantequilla/leche/p/504P6",
+      "prices": {
+        "currency": "EUR",
+        "discount_percentage": 0,
+        "is_club_price": false,
+        "is_promo_price": false,
+        "measure_unit": "LITRO",
+        "price": 5.04,
+        "price_per_unit": 0.84,
+        "strikethrough_price": 5.04
+      }
+    },
+    {
+      "display_name": "Leche semidesnatada sin lactosa Dia Láctea 1 L",
+      "image": "https://www.dia.es/product_images/LACTOSA1L.jpg",
+      "sku_id": "LACTOSA1L",
+      "units_in_stock": 25,
+      "url": "https://www.dia.es/huevos-leche-y-mantequilla/leche-sin-lactosa-y-enriquecidas/p/LACTOSA1L",
+      "product_info": ["Sin lactosa"]
+    },
+    {
+      "brand": "DIA Láctea",
+      "display_name": "Leche entera Dia Láctea 1 L",
+      "sku_id": "SIN-STOCK",
+      "units_in_stock": 0,
+      "prices": {
+        "currency": "EUR",
+        "is_club_price": false,
+        "is_promo_price": false,
+        "measure_unit": "LITRO",
+        "price": 0.95,
+        "price_per_unit": 0.95
+      }
+    },
+    {
+      "brand": "Marca promocional",
+      "display_name": "Leche de crecimiento pack 3 x 1 L",
+      "sku_id": "PROMO3L",
+      "units_in_stock": 12,
+      "stamp_code": "PROMO",
+      "stamp_description": "Oferta",
+      "prices": {
+        "currency": "EUR",
+        "discount_percentage": 25,
+        "is_club_price": false,
+        "is_promo_price": true,
+        "measure_unit": "LITRO",
+        "price": 1.8,
+        "price_per_unit": 0.6,
+        "strikethrough_price": 2.4
+      }
+    },
+    {
+      "display_name": "Bebida láctea 1 L",
+      "sku_id": "STOCK-UNKNOWN",
+      "prices": {
+        "currency": "EUR",
+        "is_club_price": false,
+        "is_promo_price": false,
+        "measure_unit": "LITRO",
+        "price": 1.2
+      }
+    }
+  ]
+}

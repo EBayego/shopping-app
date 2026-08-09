@@ -14,7 +14,7 @@ packages/
   product-normalization/    Futura normalización de productos.
   voice-parser/             Futuro análisis de entradas de voz.
 providers/
-  dia/                      Futuro proveedor de DIA.
+  dia/                      Provider de DIA (detalle provisional vía analytics).
   mercadona/                Futuro proveedor de Mercadona.
   alcampo/                  Futuro proveedor de Alcampo.
   eroski/                   Futuro proveedor de Eroski.
@@ -43,12 +43,23 @@ pnpm provider-poc --provider dia --postal-code 50009 --query "leche"
 - `lint` ejecuta ESLint sobre packages, providers y tooling.
 - `test` ejecuta Vitest una vez para todo el monorepo.
 - `format` aplica Prettier a los archivos compatibles.
-- `provider-poc` ejecuta búsquedas o consultas de producto contra providers mock.
+- `provider-poc` usa el provider real para DIA y providers mock para el resto.
 
 El CLI también admite consultar un producto concreto:
 
 ```bash
 pnpm provider-poc --provider dia --postal-code 50009 --product 261354
+```
+
+La búsqueda común de DIA devuelve la primera página de productos. Para procesos
+de ingestión, `DiaProvider.searchProductsPage(query, market, page)` expone además
+la paginación y las ofertas separadas de los datos de producto.
+
+Los tests live están desactivados por defecto. El caso conocido de DIA se activa
+explícitamente con `RUN_LIVE_PROVIDER_TESTS=true`:
+
+```bash
+RUN_LIVE_PROVIDER_TESTS=true pnpm test providers/dia/src/dia-provider.live.test.ts
 ```
 
 ## Añadir un package

@@ -47,7 +47,14 @@ importers:
 
   providers/alcampo: {}
 
-  providers/dia: {}
+  providers/dia:
+    dependencies:
+      '@shopping-app/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@shopping-app/retailer-contracts':
+        specifier: workspace:*
+        version: link:../../packages/retailer-contracts
 
   providers/eroski: {}
 
@@ -58,6 +65,9 @@ importers:
       '@shopping-app/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@shopping-app/provider-dia':
+        specifier: workspace:*
+        version: link:../../providers/dia
       '@shopping-app/retailer-contracts':
         specifier: workspace:*
         version: link:../../packages/retailer-contracts

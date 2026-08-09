@@ -1,0 +1,11 @@
+{
+  "cart": {
+    "postal_code": "50009"
+  },
+  "pagination": {
+    "page_number": 1,
+    "page_size": 30,
+    "total_pages": 14
+  },
+  "total_items": 410
+}
