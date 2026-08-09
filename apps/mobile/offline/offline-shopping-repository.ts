@@ -67,6 +67,14 @@ export function createLocalIntent(input: {
   rawText: string;
   normalizedName: string;
   canonicalProductId?: string | null;
+  requestedQuantity?: number;
+  requestedUnit?: string;
+  packageCount?: number;
+  packageSize?: number;
+  packageUnit?: string;
+  totalAmount?: number;
+  brandPreference?: string;
+  variant?: string;
 }): ShoppingIntent {
   const now = new Date().toISOString();
   return {
@@ -74,14 +82,14 @@ export function createLocalIntent(input: {
     shopping_list_id: input.shoppingListId,
     raw_text: input.rawText,
     normalized_name: input.normalizedName,
-    requested_quantity: 1,
-    requested_unit: null,
-    package_count: null,
-    package_size: null,
-    package_unit: null,
-    total_amount: null,
-    brand_preference: null,
-    variant: null,
+    requested_quantity: input.requestedQuantity ?? 1,
+    requested_unit: input.requestedUnit ?? null,
+    package_count: input.packageCount ?? null,
+    package_size: input.packageSize ?? null,
+    package_unit: input.packageUnit ?? null,
+    total_amount: input.totalAmount ?? null,
+    brand_preference: input.brandPreference ?? null,
+    variant: input.variant ?? null,
     canonical_product_id: input.canonicalProductId ?? null,
     checked: false,
     created_by: null,

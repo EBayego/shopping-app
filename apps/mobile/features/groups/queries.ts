@@ -13,6 +13,7 @@ import {
   listOfflineGroups,
 } from "../../offline/offline-shopping-repository";
 import { useOfflineSync } from "../../offline/offline-sync-provider";
+import type { AddShoppingIntentInput } from "./types";
 
 export const groupKeys = {
   all: ["groups"] as const,
@@ -69,19 +70,19 @@ export function useAddIntentMutation(groupId: string) {
       normalizedName,
       canonicalProductId,
       operationId,
+      ...structured
     }: {
       shoppingListId: string;
-      rawText: string;
-      normalizedName: string;
-      canonicalProductId?: string | null;
       operationId: string;
-    }) => {
+      canonicalProductId?: string | null;
+    } & AddShoppingIntentInput) => {
       const localIntent = createLocalIntent({
         operationId,
         shoppingListId,
         rawText,
         normalizedName,
         ...(canonicalProductId === undefined ? {} : { canonicalProductId }),
+        ...structured,
       });
       return enqueueShoppingOperation({
         kind: "add_intent",

@@ -825,11 +825,19 @@ export type Database = {
       }
       add_shopping_product_operation: {
         Args: {
+          brand_preference?: string
           canonical_product_id?: string
           normalized_name: string
           operation_id: string
+          package_count?: number
+          package_size?: number
+          package_unit?: string
           raw_text: string
+          requested_quantity?: number
+          requested_unit?: string
           shopping_list_id: string
+          total_amount?: number
+          variant?: string
         }
         Returns: Json
       }

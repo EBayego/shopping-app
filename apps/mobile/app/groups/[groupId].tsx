@@ -1,4 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
+import type { ShoppingIntentDraft } from "@shopping-app/voice-parser";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Pressable, Share, StyleSheet, Text, View } from "react-native";
@@ -23,6 +24,8 @@ import { createInviteLink } from "../../features/groups/invites";
 import { resultName } from "../../features/search/formatting";
 import { ProductSearchPanel } from "../../features/search/product-search-panel";
 import type { ProductSearchResult } from "../../features/search/types";
+import { voiceDraftToIntentInput } from "../../features/voice/voice-intent-input";
+import { VoiceShoppingPanel } from "../../features/voice/voice-shopping-panel";
 import {
   isValidSpanishPostalCode,
   normalizeShoppingItemInput,
@@ -31,6 +34,7 @@ import { getErrorMessage } from "../../lib/errors";
 import { createOperationId } from "../../lib/operation-id";
 import { colors, spacing } from "../../lib/theme";
 import { useOfflineSync } from "../../offline/offline-sync-provider";
+import { speechRecognitionService } from "../../services/expo-speech-recognition-service";
 
 function firstParameter(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -55,6 +59,7 @@ export default function GroupDetailScreen() {
   const generateInvite = useGenerateInviteMutation();
   const updatePostalCode = useUpdatePostalCodeMutation(groupId);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
   const [postalCode, setPostalCode] = useState("");
@@ -156,6 +161,21 @@ export default function GroupDetailScreen() {
     } catch (error) {
       setInputError(getErrorMessage(error));
     }
+  };
+
+  const addVoiceDrafts = async (
+    drafts: readonly ShoppingIntentDraft[],
+  ): Promise<void> => {
+    if (!activeListId) return;
+    setInputError(null);
+    for (const draft of drafts) {
+      await addIntent.mutateAsync({
+        shoppingListId: activeListId,
+        operationId: createOperationId(),
+        ...voiceDraftToIntentInput(draft),
+      });
+    }
+    setVoiceOpen(false);
   };
 
   const submitPostalCode = () => {
@@ -326,10 +346,35 @@ export default function GroupDetailScreen() {
                 onSelectProduct={addSearchResult}
                 shoppingListId={activeListId}
               />
+            ) : voiceOpen ? (
+              <VoiceShoppingPanel
+                adding={addIntent.isPending}
+                onClose={() => setVoiceOpen(false)}
+                onConfirm={addVoiceDrafts}
+                service={speechRecognitionService}
+              />
             ) : (
-              <AppButton onPress={() => setSearchOpen(true)}>
-                Añadir producto
-              </AppButton>
+              <View style={styles.addActions}>
+                <AppButton
+                  style={styles.addAction}
+                  onPress={() => {
+                    setVoiceOpen(false);
+                    setSearchOpen(true);
+                  }}
+                >
+                  Añadir producto
+                </AppButton>
+                <AppButton
+                  style={styles.addAction}
+                  tone="secondary"
+                  onPress={() => {
+                    setSearchOpen(false);
+                    setVoiceOpen(true);
+                  }}
+                >
+                  🎙 Añadir por voz
+                </AppButton>
+              </View>
             )}
             {inputError ? <Text style={styles.error}>{inputError}</Text> : null}
             {addIntent.error ? (
@@ -515,6 +560,8 @@ export default function GroupDetailScreen() {
 
 const styles = StyleSheet.create({
   heading: { gap: spacing.xs },
+  addActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  addAction: { flexGrow: 1 },
   successBanner: {
     color: colors.text,
     backgroundColor: colors.successBackground,

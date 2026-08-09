@@ -5,6 +5,8 @@ node_modules/
 dist/
 coverage/
 .expo/
+apps/mobile/android/
+apps/mobile/ios/
 *.tsbuildinfo
 
 # Environment files

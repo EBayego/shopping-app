@@ -40,3 +40,16 @@ export interface JoinGroupResult {
   groupId: string;
   outcome: "joined" | "already-member";
 }
+
+export interface AddShoppingIntentInput {
+  rawText: string;
+  normalizedName: string;
+  requestedQuantity?: number;
+  requestedUnit?: string;
+  packageCount?: number;
+  packageSize?: number;
+  packageUnit?: string;
+  totalAmount?: number;
+  brandPreference?: string;
+  variant?: string;
+}

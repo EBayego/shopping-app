@@ -129,6 +129,14 @@ export async function addShoppingIntent(
     rawText: string;
     normalizedName: string;
     canonicalProductId?: string | null;
+    requestedQuantity?: number;
+    requestedUnit?: string;
+    packageCount?: number;
+    packageSize?: number;
+    packageUnit?: string;
+    totalAmount?: number;
+    brandPreference?: string;
+    variant?: string;
   },
   operationId: string,
 ): Promise<ShoppingIntent> {
@@ -142,6 +150,28 @@ export async function addShoppingIntent(
       ...(input.canonicalProductId == null
         ? {}
         : { canonical_product_id: input.canonicalProductId }),
+      ...(input.requestedQuantity === undefined
+        ? {}
+        : { requested_quantity: input.requestedQuantity }),
+      ...(input.requestedUnit === undefined
+        ? {}
+        : { requested_unit: input.requestedUnit }),
+      ...(input.packageCount === undefined
+        ? {}
+        : { package_count: input.packageCount }),
+      ...(input.packageSize === undefined
+        ? {}
+        : { package_size: input.packageSize }),
+      ...(input.packageUnit === undefined
+        ? {}
+        : { package_unit: input.packageUnit }),
+      ...(input.totalAmount === undefined
+        ? {}
+        : { total_amount: input.totalAmount }),
+      ...(input.brandPreference === undefined
+        ? {}
+        : { brand_preference: input.brandPreference }),
+      ...(input.variant === undefined ? {} : { variant: input.variant }),
     },
   );
   if (error) throw error;
@@ -269,6 +299,34 @@ export const shoppingSyncBackend: ShoppingSyncBackend = {
             rawText: operation.localIntent.raw_text,
             normalizedName: operation.localIntent.normalized_name,
             canonicalProductId: operation.localIntent.canonical_product_id,
+            ...(operation.localIntent.requested_quantity === null
+              ? {}
+              : {
+                  requestedQuantity: operation.localIntent.requested_quantity,
+                }),
+            ...(operation.localIntent.requested_unit === null
+              ? {}
+              : { requestedUnit: operation.localIntent.requested_unit }),
+            ...(operation.localIntent.package_count === null
+              ? {}
+              : { packageCount: operation.localIntent.package_count }),
+            ...(operation.localIntent.package_size === null
+              ? {}
+              : { packageSize: operation.localIntent.package_size }),
+            ...(operation.localIntent.package_unit === null
+              ? {}
+              : { packageUnit: operation.localIntent.package_unit }),
+            ...(operation.localIntent.total_amount === null
+              ? {}
+              : { totalAmount: operation.localIntent.total_amount }),
+            ...(operation.localIntent.brand_preference === null
+              ? {}
+              : {
+                  brandPreference: operation.localIntent.brand_preference,
+                }),
+            ...(operation.localIntent.variant === null
+              ? {}
+              : { variant: operation.localIntent.variant }),
           },
           operation.operationId,
         );

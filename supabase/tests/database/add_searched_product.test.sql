@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select extensions.plan(3);
+select extensions.plan(4);
 
 insert into auth.users (
   instance_id, id, aud, role, raw_app_meta_data, raw_user_meta_data,
@@ -43,6 +43,29 @@ select extensions.is(
   null,
   'a free item remains valid without a canonical association'
 );
+
+with voice_intent as (
+  select public.add_shopping_product_operation(
+    '80000000-0000-4000-8000-000000000014',
+    '80000000-0000-4000-8000-000000000002',
+    'dos botellas de leche de dos litros', 'leche', null,
+    null, null, 2, 2, 'l', 4, 'Pascual', 'semidesnatada'
+  ) as result
+)
+select extensions.is(
+  concat_ws(
+    '|',
+    result ->> 'package_count',
+    result ->> 'package_size',
+    result ->> 'package_unit',
+    result ->> 'total_amount',
+    result ->> 'brand_preference',
+    result ->> 'variant'
+  ),
+  '2|2|l|4|Pascual|semidesnatada',
+  'voice-parsed packaging, brand and variant are persisted'
+)
+from voice_intent;
 
 select set_config('request.jwt.claims', '{"sub":"82222222-2222-4222-8222-222222222222","role":"authenticated","is_anonymous":true}', true);
 select extensions.throws_ok(
