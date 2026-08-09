@@ -20,6 +20,9 @@ import {
 } from "../../features/groups/queries";
 import { useGroupRealtime } from "../../features/groups/realtime";
 import { createInviteLink } from "../../features/groups/invites";
+import { resultName } from "../../features/search/formatting";
+import { ProductSearchPanel } from "../../features/search/product-search-panel";
+import type { ProductSearchResult } from "../../features/search/types";
 import {
   isValidSpanishPostalCode,
   normalizeShoppingItemInput,
@@ -51,7 +54,7 @@ export default function GroupDetailScreen() {
   const deleteIntent = useDeleteIntentMutation(groupId);
   const generateInvite = useGenerateInviteMutation();
   const updatePostalCode = useUpdatePostalCodeMutation(groupId);
-  const [newItem, setNewItem] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
   const [postalCode, setPostalCode] = useState("");
@@ -112,10 +115,10 @@ export default function GroupDetailScreen() {
         member.role === "owner",
     );
 
-  const submitItem = () => {
+  const addFreeItem = (text: string) => {
     if (!activeListId) return;
     try {
-      const normalized = normalizeShoppingItemInput(newItem);
+      const normalized = normalizeShoppingItemInput(text);
       setInputError(null);
       addIntent.mutate(
         {
@@ -123,7 +126,32 @@ export default function GroupDetailScreen() {
           operationId: createOperationId(),
           ...normalized,
         },
-        { onSuccess: () => setNewItem("") },
+        { onSuccess: () => setSearchOpen(false) },
+      );
+    } catch (error) {
+      setInputError(getErrorMessage(error));
+    }
+  };
+
+  const addSearchResult = (result: ProductSearchResult) => {
+    if (!activeListId) return;
+    try {
+      const name = resultName(result);
+      const normalized = result.canonicalProduct
+        ? {
+            rawText: name,
+            normalizedName: result.canonicalProduct.normalizedName,
+          }
+        : normalizeShoppingItemInput(name);
+      setInputError(null);
+      addIntent.mutate(
+        {
+          shoppingListId: activeListId,
+          operationId: createOperationId(),
+          ...normalized,
+          canonicalProductId: result.canonicalProduct?.id ?? null,
+        },
+        { onSuccess: () => setSearchOpen(false) },
       );
     } catch (error) {
       setInputError(getErrorMessage(error));
@@ -290,23 +318,25 @@ export default function GroupDetailScreen() {
           </View>
 
           <View style={styles.addBox}>
-            <AppInput
-              error={inputError ?? undefined}
-              label="Añadir producto"
-              onChangeText={setNewItem}
-              onSubmitEditing={submitItem}
-              placeholder="Leche, pan, tomates…"
-              returnKeyType="done"
-              value={newItem}
-            />
+            {searchOpen && activeListId ? (
+              <ProductSearchPanel
+                adding={addIntent.isPending}
+                onAddFreeItem={addFreeItem}
+                onClose={() => setSearchOpen(false)}
+                onSelectProduct={addSearchResult}
+                shoppingListId={activeListId}
+              />
+            ) : (
+              <AppButton onPress={() => setSearchOpen(true)}>
+                Añadir producto
+              </AppButton>
+            )}
+            {inputError ? <Text style={styles.error}>{inputError}</Text> : null}
             {addIntent.error ? (
               <Text style={styles.error}>
                 {getErrorMessage(addIntent.error)}
               </Text>
             ) : null}
-            <AppButton loading={addIntent.isPending} onPress={submitItem}>
-              Añadir
-            </AppButton>
           </View>
 
           {activeIntents.length === 0 ? (

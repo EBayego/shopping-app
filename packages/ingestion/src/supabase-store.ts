@@ -9,8 +9,8 @@ import type {
 import type {
   FinishSyncRunInput,
   IngestionScope,
-  IngestionStore,
   PriceRefreshCandidate,
+  PriceRefreshStore,
   StartSyncRunInput,
 } from "./types.js";
 
@@ -24,7 +24,7 @@ interface IdRow {
   id: string;
 }
 
-export class SupabaseIngestionStore implements IngestionStore {
+export class SupabaseIngestionStore implements PriceRefreshStore {
   private readonly baseUrl: string;
   private readonly serviceRoleKey: string;
   private readonly fetch: typeof globalThis.fetch;
@@ -116,6 +116,26 @@ export class SupabaseIngestionStore implements IngestionStore {
         ? {}
         : { lastUsedAt: new Date(row.last_used_at) }),
     }));
+  }
+
+  async getOfferFreshnessConfig(): Promise<{
+    staleAfterMs: number;
+    veryStaleAfterMs: number;
+  }> {
+    const rows = await this.request<
+      Array<{ stale_after_ms: number; very_stale_after_ms: number }>
+    >("/rest/v1/rpc/get_offer_freshness_policy", {
+      method: "POST",
+      body: "{}",
+    });
+    const policy = rows[0];
+    if (policy === undefined) {
+      throw new Error("Offer freshness policy is not configured");
+    }
+    return {
+      staleAfterMs: policy.stale_after_ms,
+      veryStaleAfterMs: policy.very_stale_after_ms,
+    };
   }
 
   async startSyncRun(input: StartSyncRunInput): Promise<string> {

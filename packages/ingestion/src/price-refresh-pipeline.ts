@@ -3,9 +3,8 @@ import type { ProviderHealth } from "@shopping-app/domain";
 import { silentLogger } from "./logger.js";
 import { IngestionPersistenceCore } from "./persistence-core.js";
 import {
-  DEFAULT_PRICE_REFRESH_CONFIG,
+  DEFAULT_RECENT_USAGE_WINDOW_MS,
   PriceRefreshSelectionPolicy,
-  type PriceRefreshSelectionConfig,
 } from "./price-refresh-policy.js";
 import { PriceRefreshIngestionStrategy } from "./price-refresh-strategy.js";
 import {
@@ -22,16 +21,13 @@ import type {
   PriceRefreshStore,
 } from "./types.js";
 
-export interface PriceRefreshPipelineOptions extends IngestionOptions {
-  freshness?: Partial<PriceRefreshSelectionConfig>;
-}
+export type PriceRefreshPipelineOptions = IngestionOptions;
 
 export class PriceRefreshPipeline {
   private readonly logger;
   private readonly now;
   private readonly executor: ProviderExecutor;
   private readonly persistence: IngestionPersistenceCore;
-  private readonly selection: PriceRefreshSelectionPolicy;
 
   constructor(
     private readonly strategy: PriceRefreshIngestionStrategy,
@@ -56,10 +52,6 @@ export class PriceRefreshPipeline {
       this.logger,
       this.now,
     );
-    this.selection = new PriceRefreshSelectionPolicy(
-      { ...DEFAULT_PRICE_REFRESH_CONFIG, ...options.freshness },
-      this.now,
-    );
   }
 
   async refresh(request: PriceRefreshRequest): Promise<PriceRefreshResult> {
@@ -67,6 +59,14 @@ export class PriceRefreshPipeline {
       this.strategy.provider.resolveMarket(request.postalCode),
     );
     const retailerId = await this.store.resolveRetailer(market.retailer);
+    const databaseFreshness = await this.store.getOfferFreshnessConfig();
+    const selection = new PriceRefreshSelectionPolicy(
+      {
+        ...databaseFreshness,
+        recentUsageWindowMs: DEFAULT_RECENT_USAGE_WINDOW_MS,
+      },
+      this.now,
+    );
 
     if (request.dryRun === true) {
       const marketId = await this.store.findMarketId(retailerId, market);
@@ -77,7 +77,7 @@ export class PriceRefreshPipeline {
               retailerId,
               marketId,
             });
-      const selected = this.selection.select(candidates, request.productIds);
+      const selected = selection.select(candidates, request.productIds);
       return {
         retailer: market.retailer,
         marketExternalId: market.externalId,
@@ -98,7 +98,7 @@ export class PriceRefreshPipeline {
     });
     try {
       const candidates = await this.store.listPriceRefreshCandidates(session);
-      const selected = this.selection.select(candidates, request.productIds);
+      const selected = selection.select(candidates, request.productIds);
       const outcomes = await Promise.all(
         selected.map(async (candidate) => {
           try {

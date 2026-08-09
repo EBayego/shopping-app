@@ -96,6 +96,15 @@ class FakeRefreshStore implements PriceRefreshStore {
   listPriceRefreshCandidates(): Promise<readonly PriceRefreshCandidate[]> {
     return Promise.resolve(this.candidates);
   }
+  getOfferFreshnessConfig(): Promise<{
+    staleAfterMs: number;
+    veryStaleAfterMs: number;
+  }> {
+    return Promise.resolve({
+      staleAfterMs: 6 * 60 * 60 * 1_000,
+      veryStaleAfterMs: 24 * 60 * 60 * 1_000,
+    });
+  }
   startSyncRun(_input: StartSyncRunInput): Promise<string> {
     void _input;
     this.starts += 1;

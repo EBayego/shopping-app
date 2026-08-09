@@ -125,16 +125,27 @@ export async function generateGroupInvite(groupId: string): Promise<string> {
 
 export async function addShoppingIntent(
   shoppingListId: string,
-  input: { rawText: string; normalizedName: string },
+  input: {
+    rawText: string;
+    normalizedName: string;
+    canonicalProductId?: string | null;
+  },
   operationId: string,
 ): Promise<ShoppingIntent> {
-  return applyIntentOperation({
-    action: "add",
-    operationId,
-    shoppingListId,
-    rawText: input.rawText,
-    normalizedName: input.normalizedName,
-  });
+  const { data, error } = await getSupabaseClient().rpc(
+    "add_shopping_product_operation",
+    {
+      operation_id: operationId,
+      shopping_list_id: shoppingListId,
+      raw_text: input.rawText,
+      normalized_name: input.normalizedName,
+      ...(input.canonicalProductId == null
+        ? {}
+        : { canonical_product_id: input.canonicalProductId }),
+    },
+  );
+  if (error) throw error;
+  return data as unknown as ShoppingIntent;
 }
 
 type IntentOperation =
@@ -257,6 +268,7 @@ export const shoppingSyncBackend: ShoppingSyncBackend = {
           {
             rawText: operation.localIntent.raw_text,
             normalizedName: operation.localIntent.normalized_name,
+            canonicalProductId: operation.localIntent.canonical_product_id,
           },
           operation.operationId,
         );

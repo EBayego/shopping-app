@@ -67,11 +67,13 @@ export function useAddIntentMutation(groupId: string) {
       shoppingListId,
       rawText,
       normalizedName,
+      canonicalProductId,
       operationId,
     }: {
       shoppingListId: string;
       rawText: string;
       normalizedName: string;
+      canonicalProductId?: string | null;
       operationId: string;
     }) => {
       const localIntent = createLocalIntent({
@@ -79,6 +81,7 @@ export function useAddIntentMutation(groupId: string) {
         shoppingListId,
         rawText,
         normalizedName,
+        ...(canonicalProductId === undefined ? {} : { canonicalProductId }),
       });
       return enqueueShoppingOperation({
         kind: "add_intent",

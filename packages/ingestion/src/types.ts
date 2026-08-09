@@ -9,6 +9,7 @@ import type {
   RetailerObservationSet,
   RetailerProvider,
 } from "@shopping-app/retailer-contracts";
+import type { OfferFreshnessConfig } from "./price-refresh-policy.js";
 
 export interface IngestionScope {
   retailerId: string;
@@ -130,6 +131,7 @@ export interface PriceRefreshCandidate {
 }
 
 export interface PriceRefreshCandidateSource {
+  getOfferFreshnessConfig(): Promise<OfferFreshnessConfig>;
   findMarketId(retailerId: string, market: Market): Promise<string | undefined>;
   listPriceRefreshCandidates(
     scope: IngestionScope,

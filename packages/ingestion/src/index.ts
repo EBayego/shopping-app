@@ -4,7 +4,7 @@ export { IngestionPersistenceCore } from "./persistence-core.js";
 export { PriceRefreshPipeline } from "./price-refresh-pipeline.js";
 export type { PriceRefreshPipelineOptions } from "./price-refresh-pipeline.js";
 export {
-  DEFAULT_PRICE_REFRESH_CONFIG,
+  DEFAULT_RECENT_USAGE_WINDOW_MS,
   PriceRefreshSelectionPolicy,
   getOfferFreshness,
 } from "./price-refresh-policy.js";

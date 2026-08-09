@@ -66,6 +66,7 @@ export function createLocalIntent(input: {
   shoppingListId: string;
   rawText: string;
   normalizedName: string;
+  canonicalProductId?: string | null;
 }): ShoppingIntent {
   const now = new Date().toISOString();
   return {
@@ -81,7 +82,7 @@ export function createLocalIntent(input: {
     total_amount: null,
     brand_preference: null,
     variant: null,
-    canonical_product_id: null,
+    canonical_product_id: input.canonicalProductId ?? null,
     checked: false,
     created_by: null,
     created_at: now,

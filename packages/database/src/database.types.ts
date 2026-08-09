@@ -823,6 +823,16 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      add_shopping_product_operation: {
+        Args: {
+          canonical_product_id?: string
+          normalized_name: string
+          operation_id: string
+          raw_text: string
+          shopping_list_id: string
+        }
+        Returns: Json
+      }
       apply_shopping_intent_operation: {
         Args: {
           action: string
@@ -891,6 +901,13 @@ export type Database = {
           target_group_id: string
         }
         Returns: string
+      }
+      get_offer_freshness_policy: {
+        Args: never
+        Returns: {
+          stale_after_ms: number
+          very_stale_after_ms: number
+        }[]
       }
       ingest_product_offers_batch: {
         Args: {
@@ -983,6 +1000,10 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      search_products_for_list: {
+        Args: { query: string; result_limit?: number; shopping_list_id: string }
+        Returns: Json
       }
     }
     Enums: {

@@ -11,11 +11,7 @@ export interface PriceRefreshSelectionConfig extends OfferFreshnessConfig {
   recentUsageWindowMs: number;
 }
 
-export const DEFAULT_PRICE_REFRESH_CONFIG: PriceRefreshSelectionConfig = {
-  staleAfterMs: 6 * 60 * 60 * 1_000,
-  veryStaleAfterMs: 24 * 60 * 60 * 1_000,
-  recentUsageWindowMs: 30 * 24 * 60 * 60 * 1_000,
-};
+export const DEFAULT_RECENT_USAGE_WINDOW_MS = 30 * 24 * 60 * 60 * 1_000;
 
 export type PriceRefreshReason =
   "MANUAL" | "ACTIVE_LIST" | "RECENT_USAGE" | "STALE" | "VERY_STALE";
@@ -28,7 +24,7 @@ export interface SelectedPriceRefreshProduct extends PriceRefreshCandidate {
 export function getOfferFreshness(
   observedAt: Date | undefined,
   now: Date,
-  config: OfferFreshnessConfig = DEFAULT_PRICE_REFRESH_CONFIG,
+  config: OfferFreshnessConfig,
 ): OfferFreshness {
   validateFreshnessConfig(config);
   if (observedAt === undefined) return "VERY_STALE";
@@ -42,10 +38,10 @@ export class PriceRefreshSelectionPolicy {
   private readonly config: PriceRefreshSelectionConfig;
 
   constructor(
-    config: Partial<PriceRefreshSelectionConfig> = {},
+    config: PriceRefreshSelectionConfig,
     private readonly now: () => Date = () => new Date(),
   ) {
-    this.config = { ...DEFAULT_PRICE_REFRESH_CONFIG, ...config };
+    this.config = config;
     validateFreshnessConfig(this.config);
     if (this.config.recentUsageWindowMs < 0) {
       throw new RangeError("recentUsageWindowMs must be non-negative");
