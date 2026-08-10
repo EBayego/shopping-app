@@ -521,6 +521,7 @@ export type Database = {
       }
       provider_sync_runs: {
         Row: {
+          catalog_miss_evidence_recorded_at: string | null
           created_at: string
           error_message: string | null
           finished_at: string | null
@@ -536,6 +537,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          catalog_miss_evidence_recorded_at?: string | null
           created_at?: string
           error_message?: string | null
           finished_at?: string | null
@@ -551,6 +553,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          catalog_miss_evidence_recorded_at?: string | null
           created_at?: string
           error_message?: string | null
           finished_at?: string | null
@@ -1359,6 +1362,16 @@ export type Database = {
           seen_external_ids: string[]
           target_market_id: string
           target_retailer_id: string
+        }
+        Returns: number
+      }
+      record_catalog_product_misses_for_run: {
+        Args: {
+          required_misses?: number
+          seen_external_ids: string[]
+          target_market_id: string
+          target_retailer_id: string
+          target_sync_run_id: string
         }
         Returns: number
       }

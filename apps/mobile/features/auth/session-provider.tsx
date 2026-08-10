@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import { AppState } from "react-native";
@@ -31,28 +32,38 @@ type SessionContextValue = SessionState & {
 const SessionContext = createContext<SessionContextValue | null>(null);
 
 export function SessionProvider({ children }: PropsWithChildren) {
+  const restoreInFlight = useRef<Promise<void> | null>(null);
   const [state, setState] = useState<SessionState>({
     status: "loading",
     session: null,
     error: null,
   });
 
-  const restoreOrCreateSession = useCallback(async () => {
-    setState({ status: "loading", session: null, error: null });
-    try {
-      const { session } = await restoreOrCreateAnonymousSession();
-      setState({
-        status: "ready",
-        session,
-        error: null,
-      });
-    } catch (error) {
-      setState({
-        status: "error",
-        session: null,
-        error: getErrorMessage(error),
-      });
-    }
+  const restoreOrCreateSession = useCallback((): Promise<void> => {
+    if (restoreInFlight.current) return restoreInFlight.current;
+    const task = (async () => {
+      setState({ status: "loading", session: null, error: null });
+      try {
+        const { session } = await restoreOrCreateAnonymousSession();
+        setState({ status: "ready", session, error: null });
+      } catch (error) {
+        setState({
+          status: "error",
+          session: null,
+          error: getErrorMessage(error),
+        });
+      }
+    })();
+    restoreInFlight.current = task;
+    void task.then(
+      () => {
+        if (restoreInFlight.current === task) restoreInFlight.current = null;
+      },
+      () => {
+        if (restoreInFlight.current === task) restoreInFlight.current = null;
+      },
+    );
+    return task;
   }, []);
 
   useEffect(() => {
@@ -66,7 +77,12 @@ export function SessionProvider({ children }: PropsWithChildren) {
     }
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) setState({ status: "ready", session, error: null });
+      if (session) {
+        setState({ status: "ready", session, error: null });
+      } else {
+        queryClient.clear();
+        void restoreOrCreateSession();
+      }
     });
     const appStateSubscription = AppState.addEventListener(
       "change",

@@ -26,3 +26,14 @@ pnpm-debug.log*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Browser/network captures may contain cookies, sessions, or WAF tokens
+*.har
+*.http
+*.httpie
+*.pcap
+*.pcapng
+.browser-profile/
+browser-profile/
+playwright-report/
+test-results/

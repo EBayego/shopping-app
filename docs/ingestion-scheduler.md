@@ -3,7 +3,8 @@
 ## Scheduler elegido
 
 La automatización usa un workflow efímero de GitHub Actions
-(`.github/workflows/ingestion-scheduler.yml`) cada 15 minutos. Cada invocación
+(`.github/workflows/ingestion-scheduler.yml`) cada 30 minutos, en los minutos 7
+y 37 de cada hora. Cada invocación
 ejecuta `pnpm ingest:scheduler`, pide a Supabase que encole únicamente los
 trabajos vencidos y drena la cola hasta el límite configurado. No existe un
 servidor o worker residente.

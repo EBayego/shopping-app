@@ -188,6 +188,23 @@ export class SupabaseIngestionStore implements PriceRefreshStore {
     });
   }
 
+  async recordCatalogProductMisses(
+    scope: IngestionScope,
+    syncRunId: string,
+    seenExternalIds: readonly string[],
+  ): Promise<void> {
+    await this.request("/rest/v1/rpc/record_catalog_product_misses_for_run", {
+      method: "POST",
+      body: JSON.stringify({
+        target_retailer_id: scope.retailerId,
+        target_market_id: scope.marketId,
+        target_sync_run_id: syncRunId,
+        seen_external_ids: seenExternalIds,
+        required_misses: 3,
+      }),
+    });
+  }
+
   async finishSyncRun(input: FinishSyncRunInput): Promise<void> {
     await this.request(
       `/rest/v1/provider_sync_runs?id=eq.${encodeURIComponent(input.runId)}`,

@@ -114,6 +114,7 @@ describe("PipelineRefreshExecutor observability", () => {
       startSyncRun: vi.fn(),
       upsertProducts: vi.fn(),
       upsertOffers: vi.fn(),
+      recordCatalogProductMisses: vi.fn(),
       finishSyncRun: vi.fn(),
       updateProviderHealth: vi.fn(),
       listPriceRefreshCandidates: vi.fn(),

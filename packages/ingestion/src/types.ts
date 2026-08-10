@@ -44,6 +44,11 @@ export interface IngestionStore {
     scope: IngestionScope,
     offers: readonly ProductOffer[],
   ): Promise<void>;
+  recordCatalogProductMisses(
+    scope: IngestionScope,
+    syncRunId: string,
+    seenExternalIds: readonly string[],
+  ): Promise<void>;
   finishSyncRun(input: FinishSyncRunInput): Promise<void>;
   updateProviderHealth(
     scope: IngestionScope,

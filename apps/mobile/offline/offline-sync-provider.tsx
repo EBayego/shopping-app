@@ -18,6 +18,7 @@ import { AppState } from "react-native";
 
 import { useSession } from "../features/auth/session-provider";
 import { groupKeys } from "../features/groups/queries";
+import { getErrorMessage } from "../lib/errors";
 import { setNetworkOnline } from "./network-state";
 import { shoppingSyncEngine } from "./offline-shopping-repository";
 import { sqliteShoppingStore } from "./sqlite-shopping-store";
@@ -66,6 +67,18 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
       .then(async () => {
         await refreshStatus();
         await queryClient.invalidateQueries({ queryKey: groupKeys.all });
+      })
+      .catch(async (error: unknown) => {
+        const message = getErrorMessage(error);
+        try {
+          await sqliteShoppingStore.recordSyncError(message);
+          await refreshStatus();
+        } catch (statusError) {
+          setStatus((current) => ({
+            ...current,
+            lastError: getErrorMessage(statusError),
+          }));
+        }
       })
       .finally(() => {
         running.current = null;

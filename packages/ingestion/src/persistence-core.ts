@@ -60,6 +60,7 @@ export class IngestionPersistenceCore {
     session: IngestionSession,
     observations: PreparedObservationSet,
     health: ProviderHealth,
+    recordCatalogMisses = false,
   ): Promise<void> {
     const scope = {
       retailerId: session.retailerId,
@@ -67,6 +68,13 @@ export class IngestionPersistenceCore {
     };
     for (const batch of batches(observations.products, this.batchSize)) {
       await this.store.upsertProducts(scope, batch);
+    }
+    if (recordCatalogMisses) {
+      await this.store.recordCatalogProductMisses(
+        scope,
+        session.runId,
+        observations.products.map((product) => product.externalId),
+      );
     }
     await this.persistOffers(
       session,

@@ -80,7 +80,12 @@ export class RetailerIngestionPipeline<TRequest extends IngestionRequest> {
         offers: observations.offers.length,
       };
       const health = await this.readHealth(market.retailer);
-      await this.persistence.persist(session, observations, health);
+      await this.persistence.persist(
+        session,
+        observations,
+        health,
+        isCompleteCatalogRequest(this.strategy.kind, request),
+      );
       this.logger.info("ingestion.succeeded", {
         strategy: this.strategy.kind,
         retailer: market.retailer,
@@ -116,6 +121,13 @@ export class RetailerIngestionPipeline<TRequest extends IngestionRequest> {
       };
     }
   }
+}
+
+function isCompleteCatalogRequest<TRequest extends IngestionRequest>(
+  strategy: IngestionStrategy<TRequest>["kind"],
+  request: TRequest,
+): boolean {
+  return strategy === "CATALOG_SYNC" && !("categoryIds" in request);
 }
 
 function result(

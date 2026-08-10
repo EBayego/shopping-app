@@ -120,6 +120,9 @@ class FakeRefreshStore implements PriceRefreshStore {
     this.persistedOffers.push(...offers);
     return Promise.resolve();
   }
+  recordCatalogProductMisses(): Promise<void> {
+    return Promise.resolve();
+  }
   finishSyncRun(input: FinishSyncRunInput): Promise<void> {
     this.finished.push(input);
     return Promise.resolve();

@@ -115,8 +115,8 @@ export class EroskiHttpClient {
   private retryAfter(value: string | null): number | undefined {
     if (value === null) return undefined;
     const seconds = Number(value);
-    return Number.isFinite(seconds) && seconds >= 0
-      ? seconds * 1_000
-      : undefined;
+    if (Number.isFinite(seconds) && seconds >= 0) return seconds * 1_000;
+    const date = Date.parse(value);
+    return Number.isNaN(date) ? undefined : Math.max(0, date - Date.now());
   }
 }

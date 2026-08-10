@@ -137,6 +137,7 @@ class FakeStore implements IngestionStore {
   readonly finished: FinishSyncRunInput[] = [];
   productBatches = 0;
   offerBatches = 0;
+  readonly catalogMissRuns: string[] = [];
 
   resolveRetailer(): Promise<string> {
     return Promise.resolve("retailer-id");
@@ -174,6 +175,13 @@ class FakeStore implements IngestionStore {
       }
       this.offers.set(key, item);
     }
+    return Promise.resolve();
+  }
+  recordCatalogProductMisses(
+    _scope: IngestionScope,
+    syncRunId: string,
+  ): Promise<void> {
+    this.catalogMissRuns.push(syncRunId);
     return Promise.resolve();
   }
   finishSyncRun(input: FinishSyncRunInput): Promise<void> {
@@ -227,8 +235,20 @@ describe("RetailerIngestionPipeline", () => {
     expect(catalogResult.productsSeen).toBe(1);
     expect(store.products.has("milk-1")).toBe(true);
     expect(store.products.has("catalog-milk-1")).toBe(true);
+    expect(store.catalogMissRuns).toEqual(["run-catalog_sync"]);
     expect(persistSpy).toHaveBeenCalledTimes(2);
     persistSpy.mockRestore();
+  });
+
+  it("does not record catalog misses for a partial category scan", async () => {
+    const store = new FakeStore();
+    const catalogProvider = new FakeCatalogProvider();
+    await new RetailerIngestionPipeline(
+      new CatalogIngestionStrategy(catalogProvider),
+      store,
+    ).ingest({ postalCode: "50009", categoryIds: ["dairy"] });
+
+    expect(store.catalogMissRuns).toEqual([]);
   });
 
   it("does not persist a dry-run", async () => {
