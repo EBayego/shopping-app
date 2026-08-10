@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "shopping-app",
+    "slug": "shopping-app",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Permite que shopping-app use el micrófono para añadir productos por voz.",
+          "speechRecognitionPermission": "Permite que shopping-app convierta tu voz en texto para añadir productos."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {},
+    "extra": {
+      "appEnvironment": "development",
+      "router": {},
+      "eas": {
+        "projectId": "dfe46aad-92dd-4963-9b91-781ef1410263"
+      }
+    },
+    "owner": "ebia"
+  }
+}

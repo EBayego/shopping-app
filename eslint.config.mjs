@@ -3,12 +3,23 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["**/dist/**", "**/coverage/**", "**/node_modules/**"],
+    ignores: [
+      "**/dist/**",
+      "**/coverage/**",
+      "**/node_modules/**",
+      "packages/database/src/database.types.ts",
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
   {
-    files: ["packages/**/*.ts", "providers/**/*.ts", "tooling/**/*.ts"],
+    files: [
+      "apps/**/*.ts",
+      "apps/**/*.tsx",
+      "packages/**/*.ts",
+      "providers/**/*.ts",
+      "tooling/**/*.ts",
+    ],
     languageOptions: {
       parserOptions: {
         projectService: true,

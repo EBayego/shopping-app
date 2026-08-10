@@ -1,0 +1,14 @@
+{
+  "name": "@shopping-app/ingestion",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@shopping-app/domain": "workspace:*",
+    "@shopping-app/retailer-contracts": "workspace:*"
+  }
+}

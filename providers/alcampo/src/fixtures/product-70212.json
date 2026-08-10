@@ -1,0 +1,35 @@
+{
+  "productId": "70212",
+  "retailerProductId": "70212",
+  "type": "CATCHWEIGHT",
+  "name": "ALCAMPO CULTIVAMOS LO BUENO Solomillo de cerdo Duroc, envasado al vacío.",
+  "brand": "ALCAMPO CULTIVAMOS LO BUENO",
+  "packSizeDescription": "400g Aprox",
+  "price": {
+    "amount": "4.78",
+    "currency": "EUR"
+  },
+  "unitPrice": {
+    "amount": "11.95",
+    "currency": "EUR",
+    "unit": "kg"
+  },
+  "available": true,
+  "catchweight": {
+    "min": {
+      "amount": 300,
+      "unit": "g"
+    },
+    "typical": {
+      "amount": 400,
+      "unit": "g"
+    },
+    "max": {
+      "amount": 500,
+      "unit": "g"
+    }
+  },
+  "categoryPath": ["Frescos", "Carne", "Cerdo"],
+  "images": [],
+  "promotions": []
+}

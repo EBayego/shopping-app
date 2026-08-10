@@ -1,0 +1,15 @@
+{
+  "productId": "70212",
+  "retailerProductId": "70212",
+  "type": "CATCHWEIGHT",
+  "name": "Producto incompatible",
+  "brand": "ALCAMPO",
+  "packSizeDescription": "400g Aprox",
+  "price": { "amount": "not-a-price", "currency": "EUR" },
+  "unitPrice": { "amount": "11.95", "currency": "EUR", "unit": "kg" },
+  "available": true,
+  "catchweight": null,
+  "categoryPath": [],
+  "images": [],
+  "promotions": []
+}

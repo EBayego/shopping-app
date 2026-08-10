@@ -6,5 +6,9 @@
   "exports": "./src/index.ts",
   "scripts": {
     "typecheck": "tsc --project tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@shopping-app/domain": "workspace:*",
+    "@shopping-app/retailer-contracts": "workspace:*"
   }
 }

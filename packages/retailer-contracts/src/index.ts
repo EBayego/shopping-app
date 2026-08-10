@@ -8,4 +8,16 @@ export {
   RateLimitedError,
 } from "./errors.js";
 export type { ProviderErrorOptions } from "./errors.js";
-export type { RetailerProvider } from "./retailer-provider.js";
+export type {
+  CatalogRetailerProvider,
+  PriceRefreshRetailerProvider,
+  RetailerObservationSet,
+  RetailerProvider,
+  RetailerSearchResult,
+  SearchRetailerProvider,
+} from "./retailer-provider.js";
+export {
+  supportsCatalog,
+  supportsPriceRefresh,
+  supportsSearch,
+} from "./retailer-provider.js";

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isRetailer, RETAILERS } from "./retailer.js";
+import { isRetailer, RETAILERS } from "./retailer.ts";
 
 describe("isRetailer", () => {
   it.each(RETAILERS)("acepta el retailer %s", (retailer) => {

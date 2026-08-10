@@ -1,0 +1,15 @@
+{
+  "initial_datalayer": {
+    "page_language": "es",
+    "page_type": "pdp",
+    "shop_id": "3423"
+  },
+  "page_product_analytics": {
+    "261354": {
+      "item_id": "261354",
+      "item_name": "solomillos de pollo seleccion de dia 550 g aprox",
+      "price": 3.82,
+      "stock_availability": true
+    }
+  }
+}

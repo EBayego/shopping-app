@@ -6,7 +6,32 @@ interface ProviderPocBaseArguments {
 }
 
 export type ProviderPocArguments = ProviderPocBaseArguments &
-  ({ query: string; product?: never } | { product: string; query?: never });
+  (
+    | {
+        query: string;
+        product?: never;
+        category?: never;
+        categories?: never;
+      }
+    | {
+        product: string;
+        query?: never;
+        category?: never;
+        categories?: never;
+      }
+    | {
+        category: string;
+        query?: never;
+        product?: never;
+        categories?: never;
+      }
+    | {
+        categories: true;
+        query?: never;
+        product?: never;
+        category?: never;
+      }
+  );
 
 function requireValue(
   args: readonly string[],
@@ -25,6 +50,8 @@ export function parseArguments(args: readonly string[]): ProviderPocArguments {
   let postalCode: string | undefined;
   let query: string | undefined;
   let product: string | undefined;
+  let category: string | undefined;
+  let categories = false;
 
   for (let index = 0; index < args.length; index += 1) {
     const flag = args[index];
@@ -49,6 +76,13 @@ export function parseArguments(args: readonly string[]): ProviderPocArguments {
         product = requireValue(args, index, flag);
         index += 1;
         break;
+      case "--category":
+        category = requireValue(args, index, flag);
+        index += 1;
+        break;
+      case "--categories":
+        categories = true;
+        break;
       default:
         throw new Error(`Unknown argument: ${flag}`);
     }
@@ -61,8 +95,16 @@ export function parseArguments(args: readonly string[]): ProviderPocArguments {
   if (postalCode === undefined || postalCode.trim() === "") {
     throw new Error("Missing postal code");
   }
-  if ((query === undefined) === (product === undefined)) {
-    throw new Error("Provide exactly one of --query or --product");
+  const selectedCapabilities = [
+    query !== undefined,
+    product !== undefined,
+    category !== undefined,
+    categories,
+  ].filter(Boolean).length;
+  if (selectedCapabilities !== 1) {
+    throw new Error(
+      "Provide exactly one of --query, --product, --category or --categories",
+    );
   }
 
   if (query !== undefined) {
@@ -71,6 +113,12 @@ export function parseArguments(args: readonly string[]): ProviderPocArguments {
   if (product !== undefined) {
     return { provider: normalizedProvider, postalCode, product };
   }
+  if (category !== undefined) {
+    return { provider: normalizedProvider, postalCode, category };
+  }
+  if (categories) {
+    return { provider: normalizedProvider, postalCode, categories: true };
+  }
 
-  throw new Error("Provide exactly one of --query or --product");
+  throw new Error("No provider capability selected");
 }
