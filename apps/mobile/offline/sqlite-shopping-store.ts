@@ -313,6 +313,13 @@ async function writeGroupDetail(database: Database, detail: GroupDetail) {
     new Date().toISOString(),
   );
   await database.runAsync(
+    `delete from cached_shopping_intents
+     where shopping_list_id in (
+       select id from cached_lists where group_id = ?
+     )`,
+    detail.group.id,
+  );
+  await database.runAsync(
     "delete from cached_lists where group_id = ?",
     detail.group.id,
   );
