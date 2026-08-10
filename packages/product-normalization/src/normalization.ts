@@ -1,8 +1,8 @@
 import type { ProductUnit, RetailerProduct } from "@shopping-app/domain";
 
-import { isValidGtin } from "./gtin.js";
-import type { NormalizedPackaging, NormalizedProduct } from "./types.js";
-import { normalizeQuantity, parsePackagingFromName } from "./units.js";
+import { isValidGtin } from "./gtin.ts";
+import type { NormalizedPackaging, NormalizedProduct } from "./types.ts";
+import { normalizeQuantity, parsePackagingFromName } from "./units.ts";
 
 const PACKAGING_WORDS = new Set([
   "pack",

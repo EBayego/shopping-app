@@ -1,5 +1,5 @@
-import { ADJACENT_STAPLES, UNIT_ALIASES } from "./lexicon.js";
-import { isNumberStart } from "./numbers.js";
+import { ADJACENT_STAPLES, UNIT_ALIASES } from "./lexicon.ts";
+import { isNumberStart } from "./numbers.ts";
 
 export function splitTranscript(rawText: string): string[] {
   const commaSafe = rawText.replace(/(?<!\d)[,;](?!\d)/g, "|");

@@ -1,6 +1,6 @@
-export { parseShoppingIntents } from "./parser.js";
+export { parseShoppingIntents } from "./parser.ts";
 export type {
   ShoppingIntentConfidence,
   ShoppingIntentDraft,
   ShoppingIntentUnit,
-} from "./types.js";
+} from "./types.ts";

@@ -5,8 +5,8 @@ import type {
 } from "@shopping-app/domain";
 import { describe, expect, it, vi } from "vitest";
 
-import { ProductMatchingService } from "./service.js";
-import type { ProductMatchingRepository, StoredProductMatch } from "./types.js";
+import { ProductMatchingService } from "./service.ts";
+import type { ProductMatchingRepository, StoredProductMatch } from "./types.ts";
 
 describe("ProductMatchingService", () => {
   it("normalizes a retailer product and asks the repository for a bounded candidate pool", async () => {

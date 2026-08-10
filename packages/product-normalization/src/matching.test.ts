@@ -1,8 +1,8 @@
 import type { CanonicalProduct, RetailerProduct } from "@shopping-app/domain";
 import { describe, expect, it } from "vitest";
 
-import { isValidGtin } from "./gtin.js";
-import { generateMatchCandidates, scoreProductMatch } from "./matching.js";
+import { isValidGtin } from "./gtin.ts";
+import { generateMatchCandidates, scoreProductMatch } from "./matching.ts";
 
 describe("GTIN identity", () => {
   it.each(["4006381333931", "96385074"])(

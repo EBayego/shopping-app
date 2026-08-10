@@ -7,6 +7,7 @@
     "typecheck": "pnpm --recursive --if-present typecheck",
     "lint": "eslint \"apps/**/*.ts\" \"apps/**/*.tsx\" \"packages/**/*.ts\" \"providers/**/*.ts\" \"tooling/**/*.ts\"",
     "test": "vitest run --passWithNoTests --exclude **/*.live.test.ts",
+    "mobile:bundle-check": "pnpm --filter @shopping-app/mobile bundle:check",
     "test:live": "vitest run providers/dia/src/dia-provider.live.test.ts providers/mercadona/src/mercadona-provider.live.test.ts providers/eroski/src/eroski-provider.live.test.ts",
     "format": "prettier --write .",
     "provider-poc": "tsx tooling/provider-poc/src/cli.ts",

@@ -1,4 +1,4 @@
-import type { Retailer } from "./retailer.js";
+import type { Retailer } from "./retailer.ts";
 
 export type ProductUnit = "unit" | "g" | "kg" | "ml" | "l";
 

@@ -1,5 +1,5 @@
-import type { ProductMatchConfidence, ProductUnit } from "./models.js";
-import type { Retailer } from "./retailer.js";
+import type { ProductMatchConfidence, ProductUnit } from "./models.ts";
+import type { Retailer } from "./retailer.ts";
 
 export type OfferFreshness = "FRESH" | "STALE" | "VERY_STALE";
 export type BasketLineStatus =

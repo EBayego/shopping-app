@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import type {
   BasketIntent,
   BasketOfferCandidate,
-} from "./basket-comparison.js";
-import { compareBaskets } from "./basket-comparison.js";
+} from "./basket-comparison.ts";
+import { compareBaskets } from "./basket-comparison.ts";
 
 const freshOffer = (
   intentId: string,

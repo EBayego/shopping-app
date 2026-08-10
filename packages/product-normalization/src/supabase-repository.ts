@@ -9,15 +9,15 @@ import type {
   RetailerProduct,
 } from "@shopping-app/domain";
 
-import { isValidGtin } from "./gtin.js";
-import { normalizeProduct, normalizeText } from "./normalization.js";
+import { isValidGtin } from "./gtin.ts";
+import { normalizeProduct, normalizeText } from "./normalization.ts";
 import type {
   CanonicalProductInput,
   MatchDecisionInput,
   NormalizedProduct,
   ProductMatchingRepository,
   StoredProductMatch,
-} from "./types.js";
+} from "./types.ts";
 
 export interface SupabaseProductMatchingRepositoryOptions {
   url: string;

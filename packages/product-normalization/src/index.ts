@@ -1,17 +1,17 @@
-export { isValidGtin } from "./gtin.js";
+export { isValidGtin } from "./gtin.ts";
 export {
   DEFAULT_MATCH_THRESHOLDS,
   generateMatchCandidates,
   scoreProductMatch,
-} from "./matching.js";
-export { normalizeProduct, normalizeText } from "./normalization.js";
-export { ProductMatchingService } from "./service.js";
-export { SupabaseProductMatchingRepository } from "./supabase-repository.js";
+} from "./matching.ts";
+export { normalizeProduct, normalizeText } from "./normalization.ts";
+export { ProductMatchingService } from "./service.ts";
+export { SupabaseProductMatchingRepository } from "./supabase-repository.ts";
 export {
   normalizeQuantity,
   parsePackagingFromName,
   quantitiesCompatible,
-} from "./units.js";
+} from "./units.ts";
 export type {
   CanonicalProductInput,
   MatchDecisionInput,
@@ -21,4 +21,4 @@ export type {
   NormalizedQuantity,
   ProductMatchingRepository,
   StoredProductMatch,
-} from "./types.js";
+} from "./types.ts";

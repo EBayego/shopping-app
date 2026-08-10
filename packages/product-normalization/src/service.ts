@@ -3,14 +3,14 @@ import type {
   RetailerProduct,
 } from "@shopping-app/domain";
 
-import { generateMatchCandidates } from "./matching.js";
-import { normalizeProduct } from "./normalization.js";
+import { generateMatchCandidates } from "./matching.ts";
+import { normalizeProduct } from "./normalization.ts";
 import type {
   CanonicalProductInput,
   MatchDecisionInput,
   ProductMatchingRepository,
   StoredProductMatch,
-} from "./types.js";
+} from "./types.ts";
 
 export class ProductMatchingService {
   constructor(private readonly repository: ProductMatchingRepository) {}

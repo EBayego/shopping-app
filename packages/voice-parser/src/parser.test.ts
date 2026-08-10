@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseShoppingIntents } from "./index.js";
+import { parseShoppingIntents } from "./index.ts";
 
 describe("parseShoppingIntents", () => {
   describe("numbers and measured quantities", () => {

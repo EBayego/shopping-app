@@ -6,10 +6,10 @@ import type {
   RetailerProduct,
 } from "@shopping-app/domain";
 
-import { isValidGtin } from "./gtin.js";
-import { normalizeProduct, normalizeText } from "./normalization.js";
-import type { MatchThresholds, NormalizedProduct } from "./types.js";
-import { normalizeQuantity, quantitiesCompatible } from "./units.js";
+import { isValidGtin } from "./gtin.ts";
+import { normalizeProduct, normalizeText } from "./normalization.ts";
+import type { MatchThresholds, NormalizedProduct } from "./types.ts";
+import { normalizeQuantity, quantitiesCompatible } from "./units.ts";
 
 export const DEFAULT_MATCH_THRESHOLDS: Readonly<MatchThresholds> =
   Object.freeze({

@@ -1,4 +1,4 @@
-import type { ShoppingIntentConfidence } from "./types.js";
+import type { ShoppingIntentConfidence } from "./types.ts";
 
 export interface ConfidenceEvidence {
   hasProduct: boolean;

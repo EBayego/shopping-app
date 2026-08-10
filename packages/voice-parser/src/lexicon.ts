@@ -1,4 +1,4 @@
-import type { ShoppingIntentUnit } from "./types.js";
+import type { ShoppingIntentUnit } from "./types.ts";
 
 export const UNIT_ALIASES: Readonly<Record<string, ShoppingIntentUnit>> = {
   g: "g",

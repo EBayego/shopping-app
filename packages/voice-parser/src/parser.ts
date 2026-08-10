@@ -1,4 +1,4 @@
-import { classifyConfidence } from "./confidence.js";
+import { classifyConfidence } from "./confidence.ts";
 import {
   CONTAINER_ALIASES,
   findBrand,
@@ -6,10 +6,10 @@ import {
   KNOWN_BARE_PRODUCTS,
   removeSequence,
   UNIT_ALIASES,
-} from "./lexicon.js";
-import { parseNumberAt } from "./numbers.js";
-import { splitTranscript } from "./splitter.js";
-import type { ShoppingIntentDraft, ShoppingIntentUnit } from "./types.js";
+} from "./lexicon.ts";
+import { parseNumberAt } from "./numbers.ts";
+import { splitTranscript } from "./splitter.ts";
+import type { ShoppingIntentDraft, ShoppingIntentUnit } from "./types.ts";
 
 const LEADING_FILLERS = new Set([
   "quiero",

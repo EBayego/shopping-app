@@ -1,6 +1,6 @@
 import type { ProductUnit } from "@shopping-app/domain";
 
-import type { NormalizedPackaging, NormalizedQuantity } from "./types.js";
+import type { NormalizedPackaging, NormalizedQuantity } from "./types.ts";
 
 const UNIT_ALIASES: Readonly<Record<string, ProductUnit>> = {
   mg: "g",

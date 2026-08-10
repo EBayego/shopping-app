@@ -13,10 +13,10 @@ export type {
   ProviderHealthStatus,
   RetailerCategory,
   RetailerProduct,
-} from "./models.js";
-export { isRetailer, RETAILERS } from "./retailer.js";
-export type { Retailer } from "./retailer.js";
-export { compareBasketRanking, compareBaskets } from "./basket-comparison.js";
+} from "./models.ts";
+export { isRetailer, RETAILERS } from "./retailer.ts";
+export type { Retailer } from "./retailer.ts";
+export { compareBasketRanking, compareBaskets } from "./basket-comparison.ts";
 export type {
   BasketComparison,
   BasketComparisonLine,
@@ -26,4 +26,4 @@ export type {
   BasketOfferCandidate,
   BasketUnavailableItem,
   OfferFreshness,
-} from "./basket-comparison.js";
+} from "./basket-comparison.ts";

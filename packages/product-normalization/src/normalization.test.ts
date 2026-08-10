@@ -1,12 +1,12 @@
 import type { RetailerProduct } from "@shopping-app/domain";
 import { describe, expect, it } from "vitest";
 
-import { normalizeProduct, normalizeText } from "./normalization.js";
+import { normalizeProduct, normalizeText } from "./normalization.ts";
 import {
   normalizeQuantity,
   parsePackagingFromName,
   quantitiesCompatible,
-} from "./units.js";
+} from "./units.ts";
 
 describe("text normalization", () => {
   it("normalizes accents, casing, punctuation and repeated whitespace", () => {
