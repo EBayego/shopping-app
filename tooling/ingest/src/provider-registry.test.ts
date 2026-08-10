@@ -25,9 +25,10 @@ describe("search provider registry", () => {
     expect(createPriceRefreshStrategy("MERCADONA").kind).toBe("PRICE_REFRESH");
   });
 
-  it("rejects a provider without registered PRICE_REFRESH before execution", () => {
-    expect(() => createPriceRefreshStrategy("EROSKI")).toThrow(
-      "does not support PRICE_REFRESH",
-    );
+  it("registers targeted price refresh for Alcampo and Eroski", () => {
+    expect(getIngestionCapabilities("EROSKI")).toEqual(["PRICE_REFRESH"]);
+    expect(getIngestionCapabilities("ALCAMPO")).toEqual(["PRICE_REFRESH"]);
+    expect(createPriceRefreshStrategy("EROSKI").kind).toBe("PRICE_REFRESH");
+    expect(createPriceRefreshStrategy("ALCAMPO").kind).toBe("PRICE_REFRESH");
   });
 });

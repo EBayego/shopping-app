@@ -1,6 +1,7 @@
 import type { ProviderHealth } from "@shopping-app/domain";
 
 import { silentLogger } from "./logger.js";
+import { ObservedIngestionError } from "./observed-ingestion-error.js";
 import { IngestionPersistenceCore } from "./persistence-core.js";
 import {
   DEFAULT_RECENT_USAGE_WINDOW_MS,
@@ -192,7 +193,7 @@ export class PriceRefreshPipeline {
       };
     } catch (error) {
       await this.persistence.fail(session, error, { products: 0, offers: 0 });
-      throw error;
+      throw new ObservedIngestionError(error);
     }
   }
 

@@ -36,6 +36,8 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@24.13.3)(lightningcss@1.33.0)(supports-color@7.2.0)(terser@5.49.2)(tsx@4.23.11)(yaml@2.9.0)
 
+  apps/admin: {}
+
   apps/mobile:
     dependencies:
       '@react-native-community/netinfo':
@@ -192,9 +194,15 @@ importers:
       '@shopping-app/ingestion':
         specifier: workspace:*
         version: link:../../packages/ingestion
+      '@shopping-app/provider-alcampo':
+        specifier: workspace:*
+        version: link:../../providers/alcampo
       '@shopping-app/provider-dia':
         specifier: workspace:*
         version: link:../../providers/dia
+      '@shopping-app/provider-eroski':
+        specifier: workspace:*
+        version: link:../../providers/eroski
       '@shopping-app/provider-mercadona':
         specifier: workspace:*
         version: link:../../providers/mercadona

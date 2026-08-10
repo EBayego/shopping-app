@@ -1,5 +1,6 @@
 export { RetailerIngestionPipeline } from "./ingestion-pipeline.js";
-export { JsonConsoleLogger } from "./logger.js";
+export { JsonConsoleLogger, silentLogger } from "./logger.js";
+export { ObservedIngestionError } from "./observed-ingestion-error.js";
 export { IngestionPersistenceCore } from "./persistence-core.js";
 export { PriceRefreshPipeline } from "./price-refresh-pipeline.js";
 export type { PriceRefreshPipelineOptions } from "./price-refresh-pipeline.js";
@@ -46,6 +47,7 @@ export type {
   PriceRefreshRequest,
   PriceRefreshResult,
   PriceRefreshStore,
+  PreflightFailureInput,
   ProviderOperationRunner,
   RetryOptions,
   SearchIngestionRequest,

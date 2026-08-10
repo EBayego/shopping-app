@@ -9,6 +9,39 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_audit_log: {
+        Row: {
+          action: string
+          actor: string
+          after_data: Json | null
+          before_data: Json | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: number
+        }
+        Insert: {
+          action: string
+          actor: string
+          after_data?: Json | null
+          before_data?: Json | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: never
+        }
+        Update: {
+          action?: string
+          actor?: string
+          after_data?: Json | null
+          before_data?: Json | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: never
+        }
+        Relationships: []
+      }
       canonical_products: {
         Row: {
           base_name: string
@@ -143,6 +176,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ingestion_runtime_config: {
+        Row: {
+          catalog_sync_interval_minutes: number
+          max_jobs_per_tick: number
+          price_refresh_interval_minutes: number
+          refresh_request_max_attempts: number
+          refresh_request_retry_delay_minutes: number
+          running_timeout_minutes: number
+          singleton: boolean
+          updated_at: string
+        }
+        Insert: {
+          catalog_sync_interval_minutes?: number
+          max_jobs_per_tick?: number
+          price_refresh_interval_minutes?: number
+          refresh_request_max_attempts?: number
+          refresh_request_retry_delay_minutes?: number
+          running_timeout_minutes?: number
+          singleton?: boolean
+          updated_at?: string
+        }
+        Update: {
+          catalog_sync_interval_minutes?: number
+          max_jobs_per_tick?: number
+          price_refresh_interval_minutes?: number
+          refresh_request_max_attempts?: number
+          refresh_request_retry_delay_minutes?: number
+          running_timeout_minutes?: number
+          singleton?: boolean
+          updated_at?: string
+        }
+        Relationships: []
       }
       price_history: {
         Row: {
@@ -409,6 +475,50 @@ export type Database = {
           },
         ]
       }
+      provider_job_schedules: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          id: string
+          last_dispatched_at: string | null
+          next_run_at: string
+          postal_code: string
+          request_type: Database["public"]["Enums"]["refresh_request_type"]
+          retailer_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_dispatched_at?: string | null
+          next_run_at?: string
+          postal_code: string
+          request_type: Database["public"]["Enums"]["refresh_request_type"]
+          retailer_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          last_dispatched_at?: string | null
+          next_run_at?: string
+          postal_code?: string
+          request_type?: Database["public"]["Enums"]["refresh_request_type"]
+          retailer_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_job_schedules_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       provider_sync_runs: {
         Row: {
           created_at: string
@@ -465,6 +575,68 @@ export type Database = {
           },
           {
             foreignKeyName: "provider_sync_runs_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      refresh_requests: {
+        Row: {
+          attempt_count: number
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          metadata: Json
+          next_attempt_at: string
+          postal_code: string
+          product_ids: string[]
+          request_type: Database["public"]["Enums"]["refresh_request_type"]
+          requested_at: string
+          requested_by: string
+          retailer_id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["refresh_request_status"]
+          worker_id: string | null
+        }
+        Insert: {
+          attempt_count?: number
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          metadata?: Json
+          next_attempt_at?: string
+          postal_code: string
+          product_ids?: string[]
+          request_type: Database["public"]["Enums"]["refresh_request_type"]
+          requested_at?: string
+          requested_by: string
+          retailer_id: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["refresh_request_status"]
+          worker_id?: string | null
+        }
+        Update: {
+          attempt_count?: number
+          error_message?: string | null
+          finished_at?: string | null
+          id?: string
+          metadata?: Json
+          next_attempt_at?: string
+          postal_code?: string
+          product_ids?: string[]
+          request_type?: Database["public"]["Enums"]["refresh_request_type"]
+          requested_at?: string
+          requested_by?: string
+          retailer_id?: string
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["refresh_request_status"]
+          worker_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refresh_requests_retailer_id_fkey"
             columns: ["retailer_id"]
             isOneToOne: false
             referencedRelation: "retailers"
@@ -642,26 +814,32 @@ export type Database = {
       retailers: {
         Row: {
           active: boolean
+          capabilities: string[]
           code: string
           created_at: string
           id: string
           name: string
+          operational_status: Database["public"]["Enums"]["provider_operational_status"]
           updated_at: string
         }
         Insert: {
           active?: boolean
+          capabilities?: string[]
           code: string
           created_at?: string
           id?: string
           name: string
+          operational_status?: Database["public"]["Enums"]["provider_operational_status"]
           updated_at?: string
         }
         Update: {
           active?: boolean
+          capabilities?: string[]
           code?: string
           created_at?: string
           id?: string
           name?: string
+          operational_status?: Database["public"]["Enums"]["provider_operational_status"]
           updated_at?: string
         }
         Relationships: []
@@ -841,6 +1019,171 @@ export type Database = {
         }
         Returns: Json
       }
+      admin_accept_product_match: {
+        Args: { actor: string; target_match_id: string }
+        Returns: {
+          canonical_product_id: string
+          confidence: string
+          created_at: string
+          id: string
+          match_type: string
+          matched_by: string | null
+          method: string
+          reasons: Json
+          retailer_product_id: string
+          reviewed: boolean
+          reviewed_at: string | null
+          score: number
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "product_matches"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_reassign_product_match: {
+        Args: {
+          actor: string
+          target_canonical_product_id: string
+          target_match_id: string
+        }
+        Returns: {
+          canonical_product_id: string
+          confidence: string
+          created_at: string
+          id: string
+          match_type: string
+          matched_by: string | null
+          method: string
+          reasons: Json
+          retailer_product_id: string
+          reviewed: boolean
+          reviewed_at: string | null
+          score: number
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "product_matches"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_reject_product_match: {
+        Args: { actor: string; target_match_id: string }
+        Returns: {
+          canonical_product_id: string
+          confidence: string
+          created_at: string
+          id: string
+          match_type: string
+          matched_by: string | null
+          method: string
+          reasons: Json
+          retailer_product_id: string
+          reviewed: boolean
+          reviewed_at: string | null
+          score: number
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "product_matches"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_request_refresh: {
+        Args: {
+          actor: string
+          target_postal_code: string
+          target_product_ids: string[]
+          target_request_type: Database["public"]["Enums"]["refresh_request_type"]
+          target_retailer_id: string
+        }
+        Returns: {
+          attempt_count: number
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          metadata: Json
+          next_attempt_at: string
+          postal_code: string
+          product_ids: string[]
+          request_type: Database["public"]["Enums"]["refresh_request_type"]
+          requested_at: string
+          requested_by: string
+          retailer_id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["refresh_request_status"]
+          worker_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "refresh_requests"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_set_provider_status: {
+        Args: {
+          actor: string
+          target_retailer_id: string
+          target_status: Database["public"]["Enums"]["provider_operational_status"]
+        }
+        Returns: {
+          active: boolean
+          capabilities: string[]
+          code: string
+          created_at: string
+          id: string
+          name: string
+          operational_status: Database["public"]["Enums"]["provider_operational_status"]
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "retailers"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      admin_update_canonical_product: {
+        Args: {
+          actor: string
+          changes: Json
+          target_canonical_product_id: string
+        }
+        Returns: {
+          base_name: string
+          brand: string | null
+          category: string | null
+          created_at: string
+          gtin: string | null
+          id: string
+          name: string
+          normalized_brand: string | null
+          normalized_category: string | null
+          normalized_name: string
+          package_count: number | null
+          package_size: number | null
+          package_unit: string | null
+          total_amount: number | null
+          updated_at: string
+          variant: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "canonical_products"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       apply_shopping_intent_operation: {
         Args: {
           action: string
@@ -895,11 +1238,74 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      claim_refresh_request: {
+        Args: { claiming_worker_id: string }
+        Returns: {
+          attempt_count: number
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          metadata: Json
+          next_attempt_at: string
+          postal_code: string
+          product_ids: string[]
+          request_type: Database["public"]["Enums"]["refresh_request_type"]
+          requested_at: string
+          requested_by: string
+          retailer_id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["refresh_request_status"]
+          worker_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "refresh_requests"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      complete_refresh_request: {
+        Args: {
+          completion_error?: string
+          succeeded: boolean
+          target_request_id: string
+        }
+        Returns: {
+          attempt_count: number
+          error_message: string | null
+          finished_at: string | null
+          id: string
+          metadata: Json
+          next_attempt_at: string
+          postal_code: string
+          product_ids: string[]
+          request_type: Database["public"]["Enums"]["refresh_request_type"]
+          requested_at: string
+          requested_by: string
+          retailer_id: string
+          started_at: string | null
+          status: Database["public"]["Enums"]["refresh_request_status"]
+          worker_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "refresh_requests"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       create_group_with_initial_list: {
         Args: { group_name: string; list_name: string; postal_code: string }
         Returns: {
           group_id: string
           shopping_list_id: string
+        }[]
+      }
+      dispatch_due_provider_jobs: {
+        Args: never
+        Returns: {
+          enqueued_count: number
+          max_jobs_per_tick: number
         }[]
       }
       generate_group_invite: {
@@ -910,16 +1316,16 @@ export type Database = {
         }
         Returns: string
       }
+      get_basket_comparison_inputs: {
+        Args: { shopping_list_id: string }
+        Returns: Json
+      }
       get_offer_freshness_policy: {
         Args: never
         Returns: {
           stale_after_ms: number
           very_stale_after_ms: number
         }[]
-      }
-      get_basket_comparison_inputs: {
-        Args: { shopping_list_id: string }
-        Returns: Json
       }
       ingest_product_offers_batch: {
         Args: {
@@ -1021,7 +1427,10 @@ export type Database = {
     Enums: {
       group_member_role: "owner" | "member"
       provider_health_status: "healthy" | "degraded" | "unavailable"
+      provider_operational_status: "ACTIVE" | "DEGRADED" | "DISABLED"
       provider_sync_status: "running" | "succeeded" | "partial" | "failed"
+      refresh_request_status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED"
+      refresh_request_type: "PRICE_REFRESH" | "CATALOG_SYNC"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1151,7 +1560,10 @@ export const Constants = {
     Enums: {
       group_member_role: ["owner", "member"],
       provider_health_status: ["healthy", "degraded", "unavailable"],
+      provider_operational_status: ["ACTIVE", "DEGRADED", "DISABLED"],
       provider_sync_status: ["running", "succeeded", "partial", "failed"],
+      refresh_request_status: ["PENDING", "RUNNING", "SUCCEEDED", "FAILED"],
+      refresh_request_type: ["PRICE_REFRESH", "CATALOG_SYNC"],
     },
   },
 } as const

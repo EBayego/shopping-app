@@ -8,6 +8,7 @@ mediante Supabase y los providers viven como módulos independientes.
 
 ```text
 apps/
+  admin/                    Herramienta web interna de operación.
   mobile/                   Aplicación React Native con Expo Router.
 packages/
   domain/                   Tipos de dominio compartidos.
@@ -43,6 +44,38 @@ pnpm format
 pnpm provider-poc --provider dia --postal-code 50009 --query "leche"
 ```
 
+## Admin interno
+
+`apps/admin` es una aplicación web server-rendered y de solo lectura. Todas las
+rutas requieren HTTP Basic Auth validada en el servidor. El navegador nunca
+recibe la service role de Supabase. Copia `apps/admin/.env.example` a un archivo
+de entorno privado, configura las variables y ejecuta:
+
+```bash
+pnpm admin
+```
+
+El proceso escucha en `127.0.0.1`. Para exponerlo fuera del equipo, colócalo
+detrás de HTTPS y de un proxy o túnel con control de acceso corporativo.
+
+Las acciones operativas del admin se ejecutan mediante RPCs reservadas a
+`service_role` y dejan trazabilidad en `admin_audit_log`. Los refreshes no llaman
+a supermercados desde el navegador: crean registros en `refresh_requests`.
+Ejecuta el consumidor una vez desde un scheduler o job runner con:
+
+```bash
+pnpm ingest:worker
+```
+
+Cada ejecución reclama como máximo una solicitud mediante bloqueo
+`FOR UPDATE SKIP LOCKED`, ejecuta el pipeline registrado y persiste el resultado.
+`REFRESH_WORKER_ID` es opcional y permite identificar el worker en la auditoría.
+
+La actualización periódica se ejecuta sin servidor residente mediante un tick
+efímero de GitHub Actions. La configuración, operación local, locking, retries y
+pausa de providers están documentados en
+[`docs/ingestion-scheduler.md`](docs/ingestion-scheduler.md).
+
 ## Aplicación móvil
 
 La app usa Expo SDK 57, Expo Router, TanStack Query y el cliente público de Supabase.
@@ -53,8 +86,9 @@ EXPO_PUBLIC_SUPABASE_URL=...
 EXPO_PUBLIC_SUPABASE_ANON_KEY=...
 ```
 
-Nunca uses `SUPABASE_SERVICE_ROLE_KEY` en este archivo. Para iniciar el servidor de
-desarrollo:
+Nunca uses `SUPABASE_SECRET_KEY` ni una legacy `SUPABASE_SERVICE_ROLE_KEY` en
+este archivo. Ambas son credenciales backend con acceso elevado. Para iniciar
+el servidor de desarrollo:
 
 ```bash
 pnpm --filter @shopping-app/mobile start
@@ -64,7 +98,7 @@ Si pruebas contra Supabase local desde un dispositivo o emulador, utiliza una UR
 alcanzable desde ese dispositivo en vez de asumir que `127.0.0.1` apunta al equipo host.
 
 La ingesta persistente requiere credenciales backend de Supabase en
-`SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY`:
+`SUPABASE_URL` y `SUPABASE_SECRET_KEY` (`sb_secret_...`):
 
 ```bash
 pnpm ingest --provider dia --postal-code 50009 --query "leche"

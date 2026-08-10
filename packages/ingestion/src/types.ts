@@ -50,6 +50,15 @@ export interface IngestionStore {
     health: ProviderHealth,
     metadata?: Readonly<Record<string, unknown>>,
   ): Promise<void>;
+  recordPreflightFailure?(input: PreflightFailureInput): Promise<void>;
+}
+
+export interface PreflightFailureInput {
+  retailer: Retailer;
+  syncType: IngestionStrategyKind;
+  startedAt: Date;
+  finishedAt: Date;
+  errorMessage: string;
 }
 
 export interface StructuredLogger {

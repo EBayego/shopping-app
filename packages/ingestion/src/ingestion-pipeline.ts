@@ -1,6 +1,7 @@
 import type { ProviderHealth } from "@shopping-app/domain";
 
 import { silentLogger } from "./logger.js";
+import { ObservedIngestionError } from "./observed-ingestion-error.js";
 import { IngestionPersistenceCore } from "./persistence-core.js";
 import { createProviderExecutor, type ProviderExecutor } from "./resilience.js";
 import type {
@@ -93,7 +94,7 @@ export class RetailerIngestionPipeline<TRequest extends IngestionRequest> {
       };
     } catch (error) {
       await this.persistence.fail(session, error, counts);
-      throw error;
+      throw new ObservedIngestionError(error);
     }
   }
 

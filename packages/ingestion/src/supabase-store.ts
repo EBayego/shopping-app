@@ -9,6 +9,7 @@ import type {
 import type {
   FinishSyncRunInput,
   IngestionScope,
+  PreflightFailureInput,
   PriceRefreshCandidate,
   PriceRefreshStore,
   StartSyncRunInput,
@@ -16,7 +17,7 @@ import type {
 
 export interface SupabaseIngestionStoreOptions {
   url: string;
-  serviceRoleKey: string;
+  secretKey: string;
   fetch?: typeof globalThis.fetch;
 }
 
@@ -26,12 +27,12 @@ interface IdRow {
 
 export class SupabaseIngestionStore implements PriceRefreshStore {
   private readonly baseUrl: string;
-  private readonly serviceRoleKey: string;
+  private readonly secretKey: string;
   private readonly fetch: typeof globalThis.fetch;
 
   constructor(options: SupabaseIngestionStoreOptions) {
     this.baseUrl = options.url.replace(/\/$/, "");
-    this.serviceRoleKey = options.serviceRoleKey;
+    this.secretKey = options.secretKey;
     this.fetch = options.fetch ?? globalThis.fetch;
   }
 
@@ -228,6 +229,46 @@ export class SupabaseIngestionStore implements PriceRefreshStore {
     );
   }
 
+  async recordPreflightFailure(input: PreflightFailureInput): Promise<void> {
+    const retailerId = await this.resolveRetailer(input.retailer);
+    const rows = await this.request<IdRow[]>(
+      "/rest/v1/provider_sync_runs?select=id",
+      {
+        method: "POST",
+        headers: { Prefer: "return=representation" },
+        body: JSON.stringify({
+          retailer_id: retailerId,
+          market_id: null,
+          status: "failed",
+          sync_type: input.syncType.toLowerCase(),
+          started_at: input.startedAt.toISOString(),
+          finished_at: input.finishedAt.toISOString(),
+          error_message: input.errorMessage,
+          metadata: { phase: "preflight" },
+        }),
+      },
+    );
+    const run = rows[0];
+    if (run === undefined) {
+      throw new Error("Preflight sync run insert returned no row");
+    }
+    await this.request(
+      "/rest/v1/provider_health?on_conflict=retailer_id%2Cmarket_id",
+      {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify({
+          retailer_id: retailerId,
+          market_id: null,
+          status: "unavailable",
+          checked_at: input.finishedAt.toISOString(),
+          message: input.errorMessage,
+          metadata: { phase: "preflight", syncRunId: run.id },
+        }),
+      },
+    );
+  }
+
   private async request<T = undefined>(
     path: string,
     init: RequestInit = {},
@@ -235,8 +276,7 @@ export class SupabaseIngestionStore implements PriceRefreshStore {
     const response = await this.fetch(`${this.baseUrl}${path}`, {
       ...init,
       headers: {
-        apikey: this.serviceRoleKey,
-        Authorization: `Bearer ${this.serviceRoleKey}`,
+        apikey: this.secretKey,
         "Content-Type": "application/json",
         ...init.headers,
       },

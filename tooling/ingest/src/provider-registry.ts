@@ -7,7 +7,9 @@ import {
   type IngestionStrategy,
   type SearchIngestionRequest,
 } from "@shopping-app/ingestion";
+import { AlcampoProvider } from "@shopping-app/provider-alcampo";
 import { DiaProvider } from "@shopping-app/provider-dia";
+import { EroskiProvider } from "@shopping-app/provider-eroski";
 import { MercadonaProvider } from "@shopping-app/provider-mercadona";
 
 export type RegisteredIngestionCapability =
@@ -18,6 +20,13 @@ interface ProviderRegistration {
   createSearch?: () => IngestionStrategy<SearchIngestionRequest>;
   createCatalog?: () => IngestionStrategy<CatalogIngestionRequest>;
   createPriceRefresh?: () => PriceRefreshIngestionStrategy;
+}
+
+export function supportsIngestionCapability(
+  retailer: Retailer,
+  capability: RegisteredIngestionCapability,
+): boolean {
+  return getIngestionCapabilities(retailer).includes(capability);
 }
 
 const REGISTRY: Partial<Record<Retailer, ProviderRegistration>> = {
@@ -32,6 +41,16 @@ const REGISTRY: Partial<Record<Retailer, ProviderRegistration>> = {
     createCatalog: () => new CatalogIngestionStrategy(new MercadonaProvider()),
     createPriceRefresh: () =>
       new PriceRefreshIngestionStrategy(new MercadonaProvider()),
+  },
+  ALCAMPO: {
+    capabilities: ["PRICE_REFRESH"],
+    createPriceRefresh: () =>
+      new PriceRefreshIngestionStrategy(new AlcampoProvider()),
+  },
+  EROSKI: {
+    capabilities: ["PRICE_REFRESH"],
+    createPriceRefresh: () =>
+      new PriceRefreshIngestionStrategy(new EroskiProvider()),
   },
 };
 

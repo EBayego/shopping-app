@@ -51,13 +51,13 @@ export async function main(args: readonly string[]): Promise<void> {
 
 function createStoreFromEnvironment(): SupabaseIngestionStore {
   const url = process.env.SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (url === undefined || serviceRoleKey === undefined) {
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
+  if (url === undefined || secretKey === undefined) {
     throw new Error(
-      "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for persistence and refresh selection",
+      "SUPABASE_URL and SUPABASE_SECRET_KEY are required for persistence and refresh selection",
     );
   }
-  return new SupabaseIngestionStore({ url, serviceRoleKey });
+  return new SupabaseIngestionStore({ url, secretKey });
 }
 
 const executedFile = process.argv[1];
