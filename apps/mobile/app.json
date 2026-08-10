@@ -2,7 +2,6 @@
   "expo": {
     "name": "shopping-app",
     "slug": "shopping-app",
-    "scheme": "shopping-app",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -21,11 +20,8 @@
       "typedRoutes": true
     },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.shoppingapp.mobile"
+      "supportsTablet": true
     },
-    "android": {
-      "package": "com.shoppingapp.mobile"
-    }
+    "android": {}
   }
 }

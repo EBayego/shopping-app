@@ -37,8 +37,8 @@ select public.ingest_product_offers_batch(
 );
 
 select is((select count(*)::integer from public.retailer_products where external_id = 'milk-1'), 1, 'first ingestion creates one product');
-select is((select count(*)::integer from public.product_offers), 1, 'first ingestion creates one offer');
-select is((select count(*)::integer from public.price_history), 1, 'first offer creates one price history row');
+select is((select count(*)::integer from public.product_offers offer join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), 1, 'first ingestion creates one offer');
+select is((select count(*)::integer from public.price_history history join public.product_offers offer on offer.id = history.product_offer_id join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), 1, 'first offer creates one price history row');
 
 insert into public.groups (id, name)
 values ('20000000-0000-4000-8000-000000000001', 'Refresh test group');
@@ -100,8 +100,8 @@ select public.ingest_product_offers_batch(
 );
 
 select is((select count(*)::integer from public.retailer_products where external_id = 'milk-1'), 1, 'identical ingestion does not duplicate product');
-select is((select count(*)::integer from public.product_offers), 1, 'identical ingestion does not duplicate offer');
-select is((select count(*)::integer from public.price_history), 1, 'identical price does not duplicate history');
+select is((select count(*)::integer from public.product_offers offer join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), 1, 'identical ingestion does not duplicate offer');
+select is((select count(*)::integer from public.price_history history join public.product_offers offer on offer.id = history.product_offer_id join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), 1, 'identical price does not duplicate history');
 
 select public.ingest_product_offers_batch(
   '00000000-0000-4000-8000-000000000001',
@@ -109,8 +109,8 @@ select public.ingest_product_offers_batch(
   '[{"retailer_product_external_id":"milk-1","normal_price":1.35,"available":false,"observed_at":"2026-08-09T11:00:00Z"}]'
 );
 
-select is((select count(*)::integer from public.price_history), 2, 'real price change appends history');
-select is((select available from public.product_offers limit 1), false, 'availability is updated');
+select is((select count(*)::integer from public.price_history history join public.product_offers offer on offer.id = history.product_offer_id join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), 2, 'real price change appends history');
+select is((select offer.available from public.product_offers offer join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), false, 'availability is updated');
 select is((select active from public.retailer_products where external_id = 'milk-1'), true, 'unavailable offer does not deactivate its retailer product');
 
 select public.ingest_product_offers_batch(
@@ -118,35 +118,35 @@ select public.ingest_product_offers_batch(
   '10000000-0000-4000-8000-000000000001',
   '[{"retailer_product_external_id":"milk-1","normal_price":1.35,"available":true,"observed_at":"2026-08-09T12:00:00Z"}]'
 );
-select is((select count(*)::integer from public.price_history), 2, 'availability-only change does not append price history');
-select is((select available from public.product_offers limit 1), true, 'availability-only change is persisted');
+select is((select count(*)::integer from public.price_history history join public.product_offers offer on offer.id = history.product_offer_id join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), 2, 'availability-only change does not append price history');
+select is((select offer.available from public.product_offers offer join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), true, 'availability-only change is persisted');
 
 select public.ingest_product_offers_batch(
   '00000000-0000-4000-8000-000000000001',
   '10000000-0000-4000-8000-000000000001',
   '[{"retailer_product_external_id":"milk-1","normal_price":1.35,"promo_price":1.10,"available":true,"observed_at":"2026-08-09T13:00:00Z"}]'
 );
-select is((select count(*)::integer from public.price_history), 3, 'new promotion appends price history');
-select is((select promo_price from public.product_offers limit 1), 1.10::numeric, 'new promotion is persisted');
+select is((select count(*)::integer from public.price_history history join public.product_offers offer on offer.id = history.product_offer_id join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), 3, 'new promotion appends price history');
+select is((select offer.promo_price from public.product_offers offer join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), 1.10::numeric, 'new promotion is persisted');
 
 select public.ingest_product_offers_batch(
   '00000000-0000-4000-8000-000000000001',
   '10000000-0000-4000-8000-000000000001',
   '[{"retailer_product_external_id":"milk-1","normal_price":1.35,"available":true,"observed_at":"2026-08-09T14:00:00Z"}]'
 );
-select is((select count(*)::integer from public.price_history), 4, 'promotion removal appends price history');
-select ok((select promo_price is null from public.product_offers limit 1), 'promotion removal persists null');
+select is((select count(*)::integer from public.price_history history join public.product_offers offer on offer.id = history.product_offer_id join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), 4, 'promotion removal appends price history');
+select ok((select offer.promo_price is null from public.product_offers offer join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), 'promotion removal persists null');
 
 select public.ingest_product_offers_batch(
   '00000000-0000-4000-8000-000000000001',
   '10000000-0000-4000-8000-000000000001',
   '[{"retailer_product_external_id":"milk-1","normal_price":9.99,"promo_price":0.50,"available":false,"observed_at":"2026-08-09T13:00:00Z"}]'
 );
-select is((select normal_price from public.product_offers limit 1), 1.35::numeric, 'older observation cannot overwrite price');
-select ok((select promo_price is null from public.product_offers limit 1), 'older observation cannot restore a removed promotion');
-select is((select available from public.product_offers limit 1), true, 'older observation cannot overwrite availability');
-select is((select observed_at from public.product_offers limit 1), '2026-08-09T14:00:00Z'::timestamptz, 'older observation cannot overwrite observed_at');
-select is((select count(*)::integer from public.price_history), 4, 'ignored old observation does not append history');
+select is((select offer.normal_price from public.product_offers offer join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), 1.35::numeric, 'older observation cannot overwrite price');
+select ok((select offer.promo_price is null from public.product_offers offer join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), 'older observation cannot restore a removed promotion');
+select is((select offer.available from public.product_offers offer join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), true, 'older observation cannot overwrite availability');
+select is((select offer.observed_at from public.product_offers offer join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), '2026-08-09T14:00:00Z'::timestamptz, 'older observation cannot overwrite observed_at');
+select is((select count(*)::integer from public.price_history history join public.product_offers offer on offer.id = history.product_offer_id join public.retailer_products product on product.id = offer.retailer_product_id where product.external_id = 'milk-1'), 4, 'ignored old observation does not append history');
 
 select public.record_catalog_product_misses(
   '00000000-0000-4000-8000-000000000001',

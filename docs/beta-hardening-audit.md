@@ -68,6 +68,20 @@ usaron credenciales reales.
 - Se verificaron SecureStore con `WHEN_UNLOCKED_THIS_DEVICE_ONLY`, outbox SQLite
   idempotente, replay ordenado, reconciliación tras Realtime, recuperación al
   volver online, deep link de invitación y permisos/timeout/cancelación de voz.
+- Se añadieron variantes Expo development/staging/production con identifiers y
+  schemes independientes, perfiles EAS, permisos y placeholders técnicos.
+- El enlace compartido usa el scheme de la variante instalada.
+
+### Demo y validación end-to-end
+
+- El seed local incluye un catálogo aislado para `50009` con búsqueda de leche
+  semidesnatada, cuatro retailers, promoción, indisponibilidad y precios
+  FRESH/STALE/VERY_STALE. No se aplica mediante `db push`.
+- Un test pgTAP valida el seed a través de las RPC reales de búsqueda y
+  comparación. Las aserciones de ingesta quedaron acotadas a su propio SKU para
+  seguir siendo válidas con datos precargados.
+- `docs/beta-e2e-checklist.md` cubre dos identidades, invitación, Realtime,
+  concurrencia, offline/outbox, catálogo, comparación y voz en dispositivo.
 
 ## Riesgos pendientes
 
@@ -110,9 +124,9 @@ usaron credenciales reales.
 
 - `pnpm typecheck`
 - `pnpm lint`
-- `pnpm test` (261 tests offline; cero live incluidos)
+- `pnpm test` (263 tests offline; cero live incluidos)
 - `pnpm exec supabase db reset --local` (migraciones desde cero + seed)
-- `pnpm exec supabase test db` (192 assertions pgTAP)
+- `pnpm exec supabase test db` (202 assertions pgTAP)
 - `pnpm exec supabase db lint --local --level warning` (cero hallazgos)
 - `pnpm audit --audit-level=moderate` (los tres advisories transitivos
   documentados arriba)

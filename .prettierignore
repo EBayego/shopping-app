@@ -2,3 +2,5 @@ node_modules
 dist
 coverage
 pnpm-lock.yaml
+packages/database/src/database.types.ts
+supabase/.temp/
