@@ -1,64 +1,86 @@
 import { readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
-
 import { parseAlcampoProduct } from "./alcampo-dtos.js";
 import { AlcampoMapper } from "./alcampo-mapper.js";
 
 const OBSERVED_AT = new Date("2026-08-09T09:00:00.000Z");
 const MARKET = {
   retailer: "ALCAMPO",
-  externalId: "configured:test",
+  externalId: "region-fixture",
   postalCode: "50009",
 } as const;
-
-function productFixture() {
-  const payload: unknown = JSON.parse(
-    readFileSync(
-      new URL("./fixtures/product-70212.json", import.meta.url),
-      "utf8",
-    ),
+function dto(name: string) {
+  const parsed = parseAlcampoProduct(
+    JSON.parse(
+      readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8"),
+    ) as unknown,
   );
-  const dto = parseAlcampoProduct(payload);
-  if (dto === undefined) throw new Error("Invalid test fixture");
-  return dto;
+  if (parsed === undefined) throw new Error("Invalid fixture");
+  return parsed;
 }
 
 describe("AlcampoMapper", () => {
-  it("usa el peso típico de CATCHWEIGHT y conserva la clasificación", () => {
+  it("mapea REGULAR, formato múltiple, imagen y URL", () => {
     const product = new AlcampoMapper().toProduct(
-      productFixture(),
+      {
+        ...dto("product-54180.json"),
+        productUrl:
+          "https://www.compraonline.alcampo.es/products/example/54180",
+      },
       MARKET,
       OBSERVED_AT,
     );
     expect(product).toMatchObject({
-      retailer: "ALCAMPO",
-      externalId: "70212",
-      packageSize: 400,
-      packageUnit: "g",
-      variableWeight: true,
-      category: "Frescos",
-      subcategory: "Cerdo",
-      marketId: "configured:test",
-      observedAt: OBSERVED_AT,
+      externalId: "54180",
+      packageSize: 1,
+      packageUnit: "l",
+      packageCount: 6,
+      totalAmount: 6,
+      variableWeight: false,
+      imageUrl: "https://cdn.example.test/54180.jpg",
+      productUrl: "https://www.compraonline.alcampo.es/products/example/54180",
     });
   });
 
-  it("normaliza el precio y el precio por kilogramo", () => {
-    const offer = new AlcampoMapper().toOffer(
-      productFixture(),
+  it("conserva peso típico y €/kg sin tratar el estimado como peso fijo", () => {
+    const product = new AlcampoMapper().toProduct(
+      dto("product-70212.json"),
       MARKET,
       OBSERVED_AT,
     );
-    expect(offer).toEqual({
-      retailerProductId: "70212",
-      marketId: "configured:test",
+    const offer = new AlcampoMapper().toOffer(
+      dto("product-70212.json"),
+      MARKET,
+      OBSERVED_AT,
+    );
+    expect(product).toMatchObject({
+      packageSize: 400,
+      packageUnit: "g",
+      variableWeight: true,
+    });
+    expect(offer).toMatchObject({
       normalPrice: 4.78,
       pricePerUnit: 11.95,
       referenceUnit: "kg",
-      requiresMembership: false,
-      available: true,
-      observedAt: OBSERVED_AT,
     });
+  });
+
+  it("conserva promoción no calculable y availability", () => {
+    const promotion = new AlcampoMapper().toOffer(
+      dto("product-54178-promotion.json"),
+      MARKET,
+      OBSERVED_AT,
+    );
+    const unavailable = new AlcampoMapper().toOffer(
+      dto("product-unavailable.json"),
+      MARKET,
+      OBSERVED_AT,
+    );
+    expect(promotion).toMatchObject({
+      promotionText: "Producto en folleto",
+      promotionType: "other",
+    });
+    expect(promotion.promoPrice).toBeUndefined();
+    expect(unavailable.available).toBe(false);
   });
 });

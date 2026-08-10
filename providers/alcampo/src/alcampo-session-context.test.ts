@@ -2,34 +2,57 @@ import { describe, expect, it } from "vitest";
 
 import { AlcampoSessionContext } from "./alcampo-session-context.js";
 
+const VALUES = {
+  postalCode: "50009",
+  regionId: "region-fixture",
+  deliveryDestinationId: "destination-fixture",
+  visitorId: "visitor-fixture",
+  cartId: "cart-fixture",
+  csrfToken: "csrf-fixture",
+  globalSid: "sid-fixture",
+  awsWafToken: "waf-fixture",
+} as const;
+
 describe("AlcampoSessionContext", () => {
-  it("sólo se crea desde entorno cuando todo el contexto explícito está presente", () => {
-    expect(
-      AlcampoSessionContext.fromEnvironment({ ALCAMPO_GLOBAL_SID: "sid-test" }),
-    ).toBeUndefined();
-    const context = AlcampoSessionContext.fromEnvironment({
-      ALCAMPO_GLOBAL_SID: "sid-test",
-      ALCAMPO_AWS_WAF_TOKEN: "waf-test",
-      ALCAMPO_CSRF_TOKEN: "csrf-test",
-      ALCAMPO_MARKET_ID: "configured:test",
-      ALCAMPO_POSTAL_CODE: "50009",
+  it("conserva el contexto resuelto y genera cabeceras sin exponerlo en logs", () => {
+    const context = new AlcampoSessionContext(VALUES);
+    expect(context.marketExternalId).toBe("region-fixture");
+    expect(context.requestHeaders()).toMatchObject({
+      "visitor-id": "visitor-fixture",
+      visitorid: "visitor-fixture",
+      "x-csrf-token": "csrf-fixture",
+      cookie: "global_sid=sid-fixture; aws-waf-token=waf-fixture",
     });
-    expect(context?.requestHeaders()).toEqual({
-      accept: "application/json",
-      cookie: "global_sid=sid-test; aws-waf-token=waf-test",
-      "x-csrf-token": "csrf-test",
-    });
+    expect(Object.isFrozen(context)).toBe(true);
   });
 
-  it("rechaza caracteres capaces de inyectar cabeceras o cookies", () => {
+  it("sólo carga del entorno un contexto resuelto completo", () => {
+    expect(
+      AlcampoSessionContext.fromEnvironment({ ALCAMPO_REGION_ID: "region" }),
+    ).toBeUndefined();
+    expect(
+      AlcampoSessionContext.fromEnvironment({
+        ALCAMPO_POSTAL_CODE: "50009",
+        ALCAMPO_REGION_ID: "region-fixture",
+        ALCAMPO_DELIVERY_DESTINATION_ID: "destination-fixture",
+        ALCAMPO_VISITOR_ID: "visitor-fixture",
+      }),
+    ).toMatchObject({ regionId: "region-fixture", postalCode: "50009" });
+  });
+
+  it("rechaza inyección de cabeceras o cookies", () => {
     expect(
       () =>
         new AlcampoSessionContext({
+          ...VALUES,
           globalSid: "sid; injected=true",
-          awsWafToken: "waf-test",
-          csrfToken: "csrf-test",
-          marketExternalId: "configured:test",
-          postalCode: "50009",
+        }),
+    ).toThrow(TypeError);
+    expect(
+      () =>
+        new AlcampoSessionContext({
+          ...VALUES,
+          visitorId: "visitor\r\ninjected",
         }),
     ).toThrow(TypeError);
   });

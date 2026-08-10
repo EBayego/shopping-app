@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { getSupabaseClient } from "../services/supabase";
-import { addShoppingIntent, createGroup, joinGroup } from "./groups-repository";
+import {
+  addShoppingIntent,
+  createGroup,
+  generateGroupInvite,
+  joinGroup,
+} from "./groups-repository";
 
 vi.mock("../services/supabase", () => ({ getSupabaseClient: vi.fn() }));
 
@@ -69,6 +74,23 @@ describe("groups repository RPCs", () => {
     useClient({ from: vi.fn().mockReturnValue({ select }), rpc });
 
     await expect(joinGroup("INVALID")).rejects.toBe(invalidInvite);
+  });
+
+  it("genera invitaciones reutilizables para compartir con un grupo", async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: "ABCD-EF01-2345-6789-ABCD-EF01",
+      error: null,
+    });
+    useClient({ rpc });
+
+    await expect(generateGroupInvite("group-1")).resolves.toBe(
+      "ABCD-EF01-2345-6789-ABCD-EF01",
+    );
+    expect(rpc).toHaveBeenCalledWith("generate_group_invite", {
+      target_group_id: "group-1",
+      expires_in: "7 days",
+      allowed_uses: 100,
+    });
   });
 
   it("asocia un resultado seleccionado con el producto canónico", async () => {

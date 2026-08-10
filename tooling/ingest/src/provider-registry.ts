@@ -43,7 +43,8 @@ const REGISTRY: Partial<Record<Retailer, ProviderRegistration>> = {
       new PriceRefreshIngestionStrategy(new MercadonaProvider()),
   },
   ALCAMPO: {
-    capabilities: ["PRICE_REFRESH"],
+    capabilities: ["CATALOG", "PRICE_REFRESH"],
+    createCatalog: () => new CatalogIngestionStrategy(new AlcampoProvider()),
     createPriceRefresh: () =>
       new PriceRefreshIngestionStrategy(new AlcampoProvider()),
   },

@@ -116,7 +116,7 @@ export async function generateGroupInvite(groupId: string): Promise<string> {
     {
       target_group_id: groupId,
       expires_in: "7 days",
-      allowed_uses: 1,
+      allowed_uses: 100,
     },
   );
   if (error) throw error;

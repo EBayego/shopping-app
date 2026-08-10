@@ -12,6 +12,7 @@ import {
   type RetailerProvider,
 } from "@shopping-app/retailer-contracts";
 import { DiaProvider } from "@shopping-app/provider-dia";
+import { AlcampoProvider } from "@shopping-app/provider-alcampo";
 import { MercadonaProvider } from "@shopping-app/provider-mercadona";
 
 import type { ProviderPocArguments } from "./arguments.js";
@@ -22,6 +23,7 @@ function createProvider(
 ): RetailerProvider {
   if (provider === "DIA") return new DiaProvider();
   if (provider === "MERCADONA") return new MercadonaProvider();
+  if (provider === "ALCAMPO") return new AlcampoProvider();
   return createMockProvider(provider);
 }
 

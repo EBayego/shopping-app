@@ -38,6 +38,10 @@ export default function RootLayout() {
                   options={{ title: "Lista compartida" }}
                 />
                 <Stack.Screen
+                  name="groups/settings/[groupId]"
+                  options={{ title: "Ajustes del grupo" }}
+                />
+                <Stack.Screen
                   name="comparison/[listId]"
                   options={{ title: "Comparar cesta" }}
                 />

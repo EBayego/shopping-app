@@ -150,6 +150,22 @@ describe("ProductSearchPanel interactions", () => {
     expect(onAddFreeItem).toHaveBeenCalledWith("regalo para Marta");
   });
 
+  it("offers voice entry from the end of the search field", async () => {
+    const onVoicePress = vi.fn();
+    const renderer = await renderPanel({ onVoicePress, onClose: undefined });
+
+    await act(() => {
+      press(
+        renderer.root.findByProps({
+          accessibilityLabel: "Añadir productos por voz",
+        }),
+      );
+    });
+
+    expect(onVoicePress).toHaveBeenCalledOnce();
+    expect(screenText(renderer)).not.toContain("Añadir producto");
+  });
+
   it("renders retailer offer details without claiming real-time pricing", async () => {
     mocks.state.data = [result];
     const renderer = await searchedPanel("leche");

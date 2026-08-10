@@ -10,6 +10,7 @@ import {
 
 import { parseIngestArguments } from "./arguments.js";
 import {
+  createCatalogStrategy,
   createPriceRefreshStrategy,
   createSearchStrategy,
 } from "./provider-registry.js";
@@ -37,15 +38,27 @@ export async function main(args: readonly string[]): Promise<void> {
             ? {}
             : { productIds: options.productIds }),
         })
-      : await new RetailerIngestionPipeline(
-          createSearchStrategy(options.provider),
-          options.dryRun ? unavailableStore : createStoreFromEnvironment(),
-          { logger },
-        ).ingest({
-          postalCode: options.postalCode,
-          query: options.query,
-          dryRun: options.dryRun,
-        });
+      : options.operation === "catalog"
+        ? await new RetailerIngestionPipeline(
+            createCatalogStrategy(options.provider),
+            options.dryRun ? unavailableStore : createStoreFromEnvironment(),
+            { logger },
+          ).ingest({
+            postalCode: options.postalCode,
+            dryRun: options.dryRun,
+            ...(options.categoryIds === undefined
+              ? {}
+              : { categoryIds: options.categoryIds }),
+          })
+        : await new RetailerIngestionPipeline(
+            createSearchStrategy(options.provider),
+            options.dryRun ? unavailableStore : createStoreFromEnvironment(),
+            { logger },
+          ).ingest({
+            postalCode: options.postalCode,
+            query: options.query,
+            dryRun: options.dryRun,
+          });
   console.log(JSON.stringify({ event: "ingestion.result", ...result }));
 }
 

@@ -1,0 +1,27 @@
+{
+  "productId": "d2c07eab-3750-4e33-906c-e07639ceec53",
+  "retailerProductId": "54178",
+  "type": "REGULAR",
+  "name": "AUCHAN Leche entera de vaca 6 x 1 l Producto Alcampo.",
+  "brand": "AUCHAN",
+  "packSizeDescription": "6 x 1 l",
+  "price": { "amount": 5.76, "currency": "EUR" },
+  "unitPrice": {
+    "price": { "amount": "0.96", "currency": "EUR" },
+    "unit": "l",
+    "unitName": "litro"
+  },
+  "available": true,
+  "categoryPath": ["Leche, huevos y lácteos", "Leche"],
+  "images": [],
+  "promotions": [
+    {
+      "promoId": "promo-fixture",
+      "retailerPromotionId": "retailer-promo-fixture",
+      "description": "Producto en folleto",
+      "type": "OFFER",
+      "presentationMode": "DEFAULT",
+      "limitReached": false
+    }
+  ]
+}

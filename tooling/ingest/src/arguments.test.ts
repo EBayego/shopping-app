@@ -46,6 +46,27 @@ describe("parseIngestArguments", () => {
     });
   });
 
+  it("parses catalog ingestion", () => {
+    expect(
+      parseIngestArguments([
+        "catalog",
+        "--provider",
+        "alcampo",
+        "--postal-code",
+        "50009",
+        "--category-id",
+        "OC1603",
+        "--dry-run",
+      ]),
+    ).toEqual({
+      operation: "catalog",
+      provider: "ALCAMPO",
+      postalCode: "50009",
+      categoryIds: ["OC1603"],
+      dryRun: true,
+    });
+  });
+
   it("rejects missing required arguments", () => {
     expect(() => parseIngestArguments(["--provider", "dia"])).toThrow(
       "Missing postal code",

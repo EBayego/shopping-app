@@ -1,0 +1,24 @@
+{
+  "products": [
+    {
+      "productId": "f4a76c09-e523-4667-99fb-a390a581a78c",
+      "retailerProductId": "54180",
+      "type": "REGULAR",
+      "name": "AUCHAN Leche semidesnatada de vaca 6 x 1l Producto Alcampo.",
+      "brand": "AUCHAN",
+      "packSizeDescription": "6 x 1 l",
+      "price": { "amount": "5.28", "currency": "EUR" },
+      "unitPrice": {
+        "price": { "amount": "0.88", "currency": "EUR" },
+        "unit": "l",
+        "unitName": "litro"
+      },
+      "available": true,
+      "categoryPath": ["Leche", "Semidesnatada"],
+      "images": [],
+      "promotions": []
+    }
+  ],
+  "missedPromotions": [],
+  "restrictedGroups": []
+}

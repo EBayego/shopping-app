@@ -28,7 +28,8 @@ interface ProductSearchPanelProps {
   shoppingListId: string;
   adding: boolean;
   onAddFreeItem: (text: string) => void;
-  onClose: () => void;
+  onClose?: (() => void) | undefined;
+  onVoicePress?: (() => void) | undefined;
   onRefreshOffers?: (result: ProductSearchResult) => void;
   onSelectProduct: (result: ProductSearchResult) => void;
 }
@@ -38,6 +39,7 @@ export function ProductSearchPanel({
   adding,
   onAddFreeItem,
   onClose,
+  onVoicePress,
   onRefreshOffers,
   onSelectProduct,
 }: ProductSearchPanelProps) {
@@ -47,17 +49,31 @@ export function ProductSearchPanel({
 
   return (
     <View style={styles.panel}>
-      <View style={styles.panelHeading}>
-        <Text style={styles.title}>Añadir producto</Text>
-        <Pressable accessibilityRole="button" onPress={onClose}>
-          <Text style={styles.action}>Cerrar</Text>
-        </Pressable>
-      </View>
+      {onClose ? (
+        <View style={styles.panelHeading}>
+          <Text style={styles.title}>Añadir producto</Text>
+          <Pressable accessibilityRole="button" onPress={onClose}>
+            <Text style={styles.action}>Cerrar</Text>
+          </Pressable>
+        </View>
+      ) : null}
       <AppInput
-        autoFocus
         label="Buscar producto"
         onChangeText={setQuery}
         placeholder="Leche semidesnatada"
+        rightAccessory={
+          onVoicePress ? (
+            <Pressable
+              accessibilityLabel="Añadir productos por voz"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={onVoicePress}
+              style={styles.microphoneButton}
+            >
+              <Text style={styles.microphone}>🎙️</Text>
+            </Pressable>
+          ) : null
+        }
         value={query}
       />
 
@@ -65,7 +81,10 @@ export function ProductSearchPanel({
         <AppButton
           disabled={adding}
           tone="secondary"
-          onPress={() => onAddFreeItem(query.trim())}
+          onPress={() => {
+            onAddFreeItem(query.trim());
+            setQuery("");
+          }}
         >
           Añadir “{query.trim()}” como item libre
         </AppButton>
@@ -104,7 +123,10 @@ export function ProductSearchPanel({
               }
               adding={adding}
               onRefreshOffers={onRefreshOffers}
-              onSelect={onSelectProduct}
+              onSelect={(selected) => {
+                onSelectProduct(selected);
+                setQuery("");
+              }}
               result={result}
             />
           ))}
@@ -229,6 +251,14 @@ const styles = StyleSheet.create({
   },
   title: { color: colors.text, fontSize: 18, fontWeight: "700" },
   action: { color: colors.primary, fontWeight: "700" },
+  microphoneButton: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+  },
+  microphone: { fontSize: 22 },
   hint: { color: colors.muted, lineHeight: 20 },
   error: { color: colors.danger, fontWeight: "700" },
   statusRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },

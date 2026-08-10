@@ -1,0 +1,17 @@
+{
+  "productId": "00000000-0000-4000-8000-000000000999",
+  "retailerProductId": "99999",
+  "type": "REGULAR",
+  "name": "Producto no disponible",
+  "packSizeDescription": "1 l",
+  "price": { "amount": 1.5, "currency": "EUR" },
+  "unitPrice": {
+    "price": { "amount": "1.5", "currency": "EUR" },
+    "unit": "l",
+    "unitName": "litro"
+  },
+  "available": false,
+  "categoryPath": ["Prueba"],
+  "images": [],
+  "promotions": []
+}

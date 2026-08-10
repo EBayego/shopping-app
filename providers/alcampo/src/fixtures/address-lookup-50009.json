@@ -1,0 +1,16 @@
+{
+  "language": "es",
+  "countryCode": "ES",
+  "addressDetails": {
+    "addressLine1": "Calle de prueba",
+    "streetNumber": "12",
+    "addressLine2": "",
+    "city": "Zaragoza",
+    "administrativeArea": "Aragón",
+    "postalCode": "50009",
+    "country": "España"
+  },
+  "formattedAddress": "Calle de prueba, 12, 50009 Zaragoza, España",
+  "location": { "latitude": 41.63989, "longitude": -0.9040223 },
+  "lookupId": "lookup-fixture"
+}

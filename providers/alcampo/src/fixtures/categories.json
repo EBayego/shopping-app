@@ -1,0 +1,15 @@
+[
+  {
+    "categoryId": "category-root-fixture",
+    "retailerCategoryId": "OCLAC",
+    "name": "Leche, huevos, lácteos, yogures y bebidas vegetales",
+    "childCategories": [
+      {
+        "categoryId": "category-leche-fixture",
+        "retailerCategoryId": "OC1603",
+        "name": "Leche",
+        "childCategories": []
+      }
+    ]
+  }
+]

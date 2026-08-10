@@ -1,118 +1,348 @@
 import { readFileSync } from "node:fs";
-
 import { describe, expect, it, vi } from "vitest";
-
 import {
-  ProviderCapabilityUnavailableError,
   ProviderContractChangedError,
   ProviderUnavailableError,
+  RateLimitedError,
+  supportsCatalog,
   supportsSearch,
 } from "@shopping-app/retailer-contracts";
-
 import { AlcampoProvider } from "./alcampo-provider.js";
 import { AlcampoSessionContext } from "./alcampo-session-context.js";
 
 const OBSERVED_AT = new Date("2026-08-09T09:00:00.000Z");
-
+const REGION = "96ad34dc-8555-4013-b6d7-91cd5bdca3fb";
 function fixture(name: string): unknown {
   return JSON.parse(
     readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8"),
   );
 }
-
 function context(): AlcampoSessionContext {
   return new AlcampoSessionContext({
-    globalSid: "sid-test",
-    awsWafToken: "waf-test",
-    csrfToken: "csrf-test",
-    marketExternalId: "configured:test",
     postalCode: "50009",
+    regionId: REGION,
+    deliveryDestinationId: "delivery-destination-fixture",
+    visitorId: "visitor-fixture",
+    cartId: "cart-fixture",
+    csrfToken: "csrf-fixture",
+    globalSid: "sid-fixture",
   });
 }
-
-function jsonResponse(payload: unknown, status = 200): Response {
+function json(
+  payload: unknown,
+  status = 200,
+  headers: Record<string, string> = {},
+): Response {
   return new Response(JSON.stringify(payload), {
     status,
-    headers: { "content-type": "application/json" },
+    headers: { "content-type": "application/json", ...headers },
   });
+}
+function html(payload: string): Response {
+  return new Response(payload, {
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+function requestUrl(input: string | URL | Request): string {
+  return typeof input === "string"
+    ? input
+    : input instanceof URL
+      ? input.href
+      : input.url;
+}
+function requestBody(
+  fetchMock: ReturnType<typeof vi.fn<typeof fetch>>,
+  index: number,
+): string {
+  const body = fetchMock.mock.calls[index]?.[1]?.body;
+  if (typeof body !== "string")
+    throw new Error("Expected a string request body");
+  return body;
 }
 
 describe("AlcampoProvider", () => {
-  it("mantiene deshabilitadas las requests live sin contexto legítimo explícito", async () => {
-    const fetchMock = vi.fn<typeof fetch>();
-    const provider = new AlcampoProvider({ fetch: fetchMock, environment: {} });
-    await expect(
-      provider.getProduct("70212", {
-        retailer: "ALCAMPO",
-        externalId: "configured:test",
-        postalCode: "50009",
-      }),
-    ).rejects.toBeInstanceOf(ProviderCapabilityUnavailableError);
-    expect(fetchMock).not.toHaveBeenCalled();
-    await expect(provider.healthCheck()).resolves.toMatchObject({
-      status: "unavailable",
+  it("resuelve 50009 mediante el flujo confirmado y mantiene regionId como identidad inmutable", async () => {
+    const responses = [
+      html(
+        readFileSync(
+          new URL("./fixtures/bootstrap-home.html", import.meta.url),
+          "utf8",
+        ),
+      ),
+      json(fixture("area-search-50009.json")),
+      json(fixture("area-detail-50009.json")),
+      json(fixture("address-lookup-50009.json")),
+      json(fixture("temporary-destination.json")),
+      json(fixture("delivery-address-50009.json")),
+      json(fixture("active-session.json")),
+      json(fixture("product-54180.json")),
+    ];
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockImplementation(() => Promise.resolve(responses.shift()!));
+    const provider = new AlcampoProvider({
+      fetch: fetchMock,
+      environment: {},
+      now: () => OBSERVED_AT,
+      uuid: () => "00000000-0000-4000-8000-000000000001",
+      maxRetries: 0,
+    });
+    const market = await provider.resolveMarket("50009");
+    expect(market).toEqual({
+      retailer: "ALCAMPO",
+      externalId: REGION,
+      postalCode: "50009",
+      name: "Alcampo 50009",
+      metadata: { regionId: REGION },
+    });
+    expect(Object.isFrozen(market)).toBe(true);
+    await provider.getProduct("54180", market);
+    expect(market.externalId).toBe(REGION);
+    const temporaryBody = JSON.parse(requestBody(fetchMock, 4)) as Record<
+      string,
+      unknown
+    >;
+    expect(temporaryBody).toMatchObject({
+      visitorId: "00000000-0000-4000-8000-000000000011",
+      latitude: 41.63989,
+      longitude: -0.9040223,
+      postalCode: "50009",
+      formattedAddress: "Calle de prueba, 12, 50009 Zaragoza, España",
+    });
+    expect(requestBody(fetchMock, 6)).toContain(REGION);
+  });
+
+  it("reutiliza la dirección confirmada del área cuando el geocodificador rechaza Node", async () => {
+    const responses = [
+      html(
+        readFileSync(
+          new URL("./fixtures/bootstrap-home.html", import.meta.url),
+          "utf8",
+        ),
+      ),
+      json(fixture("area-search-50009.json")),
+      json(fixture("area-detail-50009.json")),
+      json({ code: "webaddressws-3000" }, 400),
+      json(fixture("temporary-destination.json")),
+      json(fixture("delivery-address-50009.json")),
+      json(fixture("active-session.json")),
+    ];
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockImplementation(() => Promise.resolve(responses.shift()!));
+    const provider = new AlcampoProvider({
+      fetch: fetchMock,
+      environment: {},
+      maxRetries: 0,
+    });
+
+    const market = await provider.resolveMarket("50009");
+
+    expect(market.externalId).toBe(REGION);
+    expect(JSON.parse(requestBody(fetchMock, 4))).toMatchObject({
+      latitude: 41.640049,
+      longitude: -0.9032769,
+      postalCode: "50009",
+      formattedAddress: "50009 Zaragoza, España",
     });
   });
 
-  it("consulta únicamente el endpoint confirmado con el contexto suministrado", async () => {
+  it("recorre catálogo SSR, deduplica y produce observaciones separadas", async () => {
+    const categoryHtml = readFileSync(
+      new URL("./fixtures/category-oc1603.html", import.meta.url),
+      "utf8",
+    );
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation((input) => {
+      const url = requestUrl(input);
+      if (url.includes("categories?"))
+        return Promise.resolve(json(fixture("categories.json")));
+      if (url.includes("/categories/"))
+        return Promise.resolve(html(categoryHtml));
+      if (url.includes("/v6/products"))
+        return Promise.resolve(
+          json({
+            products: [
+              fixture("product-54180.json"),
+              fixture("product-54178-promotion.json"),
+            ],
+            missedPromotions: [],
+            restrictedGroups: [],
+          }),
+        );
+      if (url.includes("54180"))
+        return Promise.resolve(json(fixture("product-54180.json")));
+      if (url.includes("54178"))
+        return Promise.resolve(json(fixture("product-54178-promotion.json")));
+      throw new Error(`Unexpected ${url}`);
+    });
+    const provider = new AlcampoProvider({
+      fetch: fetchMock,
+      sessionContext: context(),
+      now: () => OBSERVED_AT,
+      maxRetries: 0,
+    });
+    const market = await provider.resolveMarket("50009");
+    const categories = await provider.getCategories(market);
+    const observations = await provider.getProductsByCategory("OC1603", market);
+    expect(categories).toEqual([
+      { externalId: "OC1603", name: "Leche", level: 1, order: 0 },
+    ]);
+    expect(observations.products.map((product) => product.externalId)).toEqual([
+      "54180",
+      "54178",
+    ]);
+    expect(observations.offers).toHaveLength(2);
+    expect(observations.products[0]).not.toHaveProperty("normalPrice");
+    expect(observations.products[0]?.productUrl).toContain("/54180");
+  });
+
+  it("materializa los 50 productos del ItemList aunque excedan un lote de viewport", async () => {
+    const ids = Array.from({ length: 50 }, (_, index) =>
+      String(54_000 + index),
+    );
+    const itemListElement = ids.map((id, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      item: { url: `/products/producto-${index + 1}/${id}` },
+    }));
+    const internalByRetailer = new Map(
+      ids.map((id, index) => [
+        id,
+        `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+      ]),
+    );
+    const productEntities = Object.fromEntries(
+      [...internalByRetailer].map(([retailerProductId, productId]) => [
+        productId,
+        { productId, retailerProductId },
+      ]),
+    );
+    const initialState = `<script data-test="initial-state-script">window.__INITIAL_STATE__=${JSON.stringify({ session: { csrf: { token: "csrf" }, metadata: { visitorId: "visitor" } }, data: { products: { productEntities } } })}</script>`;
+    const categoryHtml = `${initialState}<script data-test="product-listing-structured-data" type="application/ld+json">${JSON.stringify({ "@type": "ItemList", itemListElement })}</script>`;
+    let batchRequests = 0;
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation((input, init) => {
+      const url = requestUrl(input);
+      if (url.includes("categories?"))
+        return Promise.resolve(json(fixture("categories.json")));
+      if (url.includes("/categories/"))
+        return Promise.resolve(html(categoryHtml));
+      if (!url.includes("/v6/products") || typeof init?.body !== "string")
+        throw new Error(`Unexpected ${url}`);
+      batchRequests += 1;
+      const requested = JSON.parse(init.body) as string[];
+      const products = requested.map((productId) => {
+        const retailerProductId = [...internalByRetailer].find(
+          ([, internalId]) => internalId === productId,
+        )?.[0];
+        if (retailerProductId === undefined)
+          throw new Error("Unknown internal product id");
+        return {
+          ...(fixture("product-54180.json") as Record<string, unknown>),
+          productId,
+          retailerProductId,
+        };
+      });
+      return Promise.resolve(
+        json({ products, missedPromotions: [], restrictedGroups: [] }),
+      );
+    });
+    const provider = new AlcampoProvider({
+      fetch: fetchMock,
+      sessionContext: context(),
+      maxRetries: 0,
+      concurrency: 6,
+    });
+    const market = await provider.resolveMarket("50009");
+    const observations = await provider.getProductsByCategory("OC1603", market);
+    expect(observations.products).toHaveLength(50);
+    expect(observations.offers).toHaveLength(50);
+    expect(batchRequests).toBe(3);
+  });
+
+  it("getProduct admite ID numérico y refreshPrices conserva éxitos parciales y observación nueva", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
-      .mockImplementation(() =>
-        Promise.resolve(jsonResponse(fixture("product-70212.json"))),
+      .mockImplementation((input) =>
+        requestUrl(input).includes("99999")
+          ? Promise.resolve(new Response("missing", { status: 404 }))
+          : Promise.resolve(json(fixture("product-54180.json"))),
       );
     const provider = new AlcampoProvider({
       fetch: fetchMock,
       sessionContext: context(),
       now: () => OBSERVED_AT,
+      maxRetries: 0,
     });
-    const market = provider.configuredMarket();
-    const product = await provider.getProduct(" 70212 ", market);
-    const offers = await provider.refreshPrices(["70212"], market);
-    expect(product).toMatchObject({
-      externalId: "70212",
-      variableWeight: true,
-    });
-    expect(offers[0]).toMatchObject({ normalPrice: 4.78, pricePerUnit: 11.95 });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect((fetchMock.mock.calls[0]?.[0] as URL).href).toBe(
-      "https://www.compraonline.alcampo.es/api/webproductpagews/v5/products/bop?retailerProductId=70212",
-    );
-    const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
-    expect(headers.get("x-csrf-token")).toBe("csrf-test");
-    expect(headers.get("cookie")).toBe(
-      "global_sid=sid-test; aws-waf-token=waf-test",
-    );
-  });
-
-  it("no finge SEARCH y declara resolución de mercado no disponible", async () => {
-    const provider = new AlcampoProvider({ sessionContext: context() });
-    await expect(provider.resolveMarket("50009")).rejects.toBeInstanceOf(
-      ProviderCapabilityUnavailableError,
-    );
-    expect(supportsSearch(provider)).toBe(false);
-  });
-
-  it("mapea 403 sin reintentar y detecta respuestas incompatibles", async () => {
-    const forbiddenFetch = vi
-      .fn<typeof fetch>()
-      .mockResolvedValue(new Response("Forbidden", { status: 403 }));
-    const forbidden = new AlcampoProvider({
-      fetch: forbiddenFetch,
-      sessionContext: context(),
+    const market = await provider.resolveMarket("50009");
+    await expect(provider.getProduct("54180", market)).resolves.toMatchObject({
+      externalId: "54180",
+      observedAt: OBSERVED_AT,
     });
     await expect(
-      forbidden.getProduct("70212", forbidden.configuredMarket()),
-    ).rejects.toBeInstanceOf(ProviderUnavailableError);
-    expect(forbiddenFetch).toHaveBeenCalledTimes(1);
+      provider.refreshPrices(["54180", "99999"], market),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        retailerProductId: "54180",
+        observedAt: OBSERVED_AT,
+      }),
+    ]);
+    expect(market.externalId).toBe(REGION);
+  });
 
-    const invalid = new AlcampoProvider({
+  it("no presenta una observación anterior como resultado de un refresh nuevo", async () => {
+    const times = [
+      new Date("2026-08-09T09:00:00.000Z"),
+      new Date("2026-08-10T09:00:00.000Z"),
+    ];
+    const provider = new AlcampoProvider({
       fetch: vi
         .fn<typeof fetch>()
-        .mockResolvedValue(jsonResponse(fixture("product-invalid.json"))),
+        .mockImplementation(() =>
+          Promise.resolve(json(fixture("product-54180.json"))),
+        ),
       sessionContext: context(),
+      now: () => times.shift() ?? new Date("2026-08-10T09:00:00.000Z"),
+      maxRetries: 0,
     });
+    const market = await provider.resolveMarket("50009");
+    const first = await provider.refreshPrices(["54180"], market);
+    const second = await provider.refreshPrices(["54180"], market);
+    expect(second[0]?.observedAt.getTime()).toBeGreaterThan(
+      first[0]?.observedAt.getTime() ?? 0,
+    );
+  });
+
+  it("mapea contrato roto, 429 y 5xx", async () => {
+    const marketProvider = (response: Response) =>
+      new AlcampoProvider({
+        fetch: vi.fn<typeof fetch>().mockResolvedValue(response),
+        sessionContext: context(),
+        maxRetries: 0,
+      });
+    const invalid = marketProvider(json(fixture("product-invalid.json")));
     await expect(
-      invalid.getProduct("70212", invalid.configuredMarket()),
+      invalid.getProduct("70212", await invalid.resolveMarket("50009")),
     ).rejects.toBeInstanceOf(ProviderContractChangedError);
+    const limited = marketProvider(
+      new Response("limited", { status: 429, headers: { "retry-after": "2" } }),
+    );
+    await expect(
+      limited.getProduct("54180", await limited.resolveMarket("50009")),
+    ).rejects.toMatchObject({
+      name: "RateLimitedError",
+      retryAfterMs: 2000,
+    } satisfies Partial<RateLimitedError>);
+    const unavailable = marketProvider(
+      new Response("failure", { status: 503 }),
+    );
+    await expect(
+      unavailable.getProduct("54180", await unavailable.resolveMarket("50009")),
+    ).rejects.toBeInstanceOf(ProviderUnavailableError);
+  });
+
+  it("declara CATALOG y no finge SEARCH", () => {
+    const provider = new AlcampoProvider({ sessionContext: context() });
+    expect(supportsCatalog(provider)).toBe(true);
+    expect(supportsSearch(provider)).toBe(false);
   });
 });

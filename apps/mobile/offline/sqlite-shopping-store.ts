@@ -23,6 +23,7 @@ type PendingRow = {
 
 export class SQLiteShoppingStore implements LocalShoppingStore {
   private databasePromise: Promise<Database> | null = null;
+  private writeQueue: Promise<void> = Promise.resolve();
 
   async initialize(): Promise<void> {
     await this.database();
@@ -44,8 +45,7 @@ export class SQLiteShoppingStore implements LocalShoppingStore {
   }
 
   async replaceWithServerSnapshot(detail: GroupDetail): Promise<void> {
-    const database = await this.database();
-    await database.withExclusiveTransactionAsync(async (transaction) => {
+    await this.withExclusiveTransaction(async (transaction) => {
       const pending = await transaction.getAllAsync<PendingRow>(
         "select sequence,payload,status,attempts,last_error from pending_operations where group_id = ? and status = 'pending' order by sequence",
         detail.group.id,
@@ -68,8 +68,7 @@ export class SQLiteShoppingStore implements LocalShoppingStore {
   }
 
   async enqueue(operation: ShoppingOperation): Promise<void> {
-    const database = await this.database();
-    await database.withExclusiveTransactionAsync(async (transaction) => {
+    await this.withExclusiveTransaction(async (transaction) => {
       const existing = await transaction.getFirstAsync<{
         operation_id: string;
       }>(
@@ -113,8 +112,7 @@ export class SQLiteShoppingStore implements LocalShoppingStore {
     operation: ShoppingOperation,
     serverIntent?: ShoppingIntent,
   ): Promise<void> {
-    const database = await this.database();
-    await database.withExclusiveTransactionAsync(async (transaction) => {
+    await this.withExclusiveTransaction(async (transaction) => {
       if (operation.kind === "add_intent" && serverIntent) {
         const localId = operation.localIntent.id;
         const localRow = await transaction.getFirstAsync<JsonRow>(
@@ -163,22 +161,24 @@ export class SQLiteShoppingStore implements LocalShoppingStore {
   }
 
   async markConflict(operationId: string, error: string): Promise<void> {
-    const database = await this.database();
-    await database.runAsync(
-      "update pending_operations set status = 'conflict', attempts = attempts + 1, last_error = ? where operation_id = ?",
-      error,
-      operationId,
-    );
-    await setMetadata(database, "last_sync_error", error);
+    await this.withExclusiveTransaction(async (transaction) => {
+      await transaction.runAsync(
+        "update pending_operations set status = 'conflict', attempts = attempts + 1, last_error = ? where operation_id = ?",
+        error,
+        operationId,
+      );
+      await setMetadata(transaction, "last_sync_error", error);
+    });
   }
 
   async recordSyncError(error: string): Promise<void> {
-    const database = await this.database();
-    await database.runAsync(
-      "update pending_operations set attempts = attempts + 1, last_error = ? where operation_id = (select operation_id from pending_operations where status = 'pending' order by sequence limit 1)",
-      error,
-    );
-    await setMetadata(database, "last_sync_error", error);
+    await this.withExclusiveTransaction(async (transaction) => {
+      await transaction.runAsync(
+        "update pending_operations set attempts = attempts + 1, last_error = ? where operation_id = (select operation_id from pending_operations where status = 'pending' order by sequence limit 1)",
+        error,
+      );
+      await setMetadata(transaction, "last_sync_error", error);
+    });
   }
 
   async getSyncStatus(): Promise<LocalSyncStatus> {
@@ -207,6 +207,17 @@ export class SQLiteShoppingStore implements LocalShoppingStore {
   private database(): Promise<Database> {
     this.databasePromise ??= openDatabase();
     return this.databasePromise;
+  }
+
+  private withExclusiveTransaction(
+    operation: (transaction: Database) => Promise<void>,
+  ): Promise<void> {
+    const result = this.writeQueue.then(async () => {
+      const database = await this.database();
+      await database.withExclusiveTransactionAsync(operation);
+    });
+    this.writeQueue = result.catch(() => undefined);
+    return result;
   }
 }
 

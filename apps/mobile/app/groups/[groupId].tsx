@@ -1,8 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import type { ShoppingIntentDraft } from "@shopping-app/voice-parser";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
-import { Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "../../components/app-button";
 import { AppInput } from "../../components/app-input";
@@ -14,22 +14,17 @@ import {
   useChangeIntentQuantityMutation,
   useDeleteIntentMutation,
   useEditIntentMutation,
-  useGenerateInviteMutation,
   useGroupDetailQuery,
   useToggleIntentMutation,
-  useUpdatePostalCodeMutation,
 } from "../../features/groups/queries";
 import { useGroupRealtime } from "../../features/groups/realtime";
-import { createInviteLink } from "../../features/groups/invites";
 import { resultName } from "../../features/search/formatting";
 import { ProductSearchPanel } from "../../features/search/product-search-panel";
 import type { ProductSearchResult } from "../../features/search/types";
 import { voiceDraftToIntentInput } from "../../features/voice/voice-intent-input";
 import { VoiceShoppingPanel } from "../../features/voice/voice-shopping-panel";
-import {
-  isValidSpanishPostalCode,
-  normalizeShoppingItemInput,
-} from "../../features/groups/validation";
+import { VoiceDiscoveryModal } from "../../features/voice/voice-discovery-modal";
+import { normalizeShoppingItemInput } from "../../features/groups/validation";
 import { getErrorMessage } from "../../lib/errors";
 import { createOperationId } from "../../lib/operation-id";
 import { colors, spacing } from "../../lib/theme";
@@ -57,15 +52,9 @@ export default function GroupDetailScreen() {
   const editIntent = useEditIntentMutation(groupId);
   const changeQuantity = useChangeIntentQuantityMutation(groupId);
   const deleteIntent = useDeleteIntentMutation(groupId);
-  const generateInvite = useGenerateInviteMutation();
-  const updatePostalCode = useUpdatePostalCodeMutation(groupId);
-  const [searchOpen, setSearchOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
-  const [postalCode, setPostalCode] = useState("");
-  const [postalCodeError, setPostalCodeError] = useState<string | null>(null);
-  const [shareError, setShareError] = useState<string | null>(null);
   const [editingIntentId, setEditingIntentId] = useState<string | null>(null);
   const [editingText, setEditingText] = useState("");
   const [editingError, setEditingError] = useState<string | null>(null);
@@ -88,11 +77,6 @@ export default function GroupDetailScreen() {
     (list) => list.id === activeListId,
   );
 
-  useEffect(() => {
-    setPostalCode(activeList?.postal_code ?? "");
-    setPostalCodeError(null);
-  }, [activeList?.id, activeList?.postal_code]);
-
   if (detail.isLoading) {
     return (
       <Screen scroll={false}>
@@ -113,27 +97,16 @@ export default function GroupDetailScreen() {
   }
   if (!detail.data) return null;
 
-  const isOwner =
-    session.status === "ready" &&
-    detail.data.members.some(
-      (member) =>
-        member.profile_id === session.session.user.id &&
-        member.role === "owner",
-    );
-
   const addFreeItem = (text: string) => {
     if (!activeListId) return;
     try {
       const normalized = normalizeShoppingItemInput(text);
       setInputError(null);
-      addIntent.mutate(
-        {
-          shoppingListId: activeListId,
-          operationId: createOperationId(),
-          ...normalized,
-        },
-        { onSuccess: () => setSearchOpen(false) },
-      );
+      addIntent.mutate({
+        shoppingListId: activeListId,
+        operationId: createOperationId(),
+        ...normalized,
+      });
     } catch (error) {
       setInputError(getErrorMessage(error));
     }
@@ -150,15 +123,12 @@ export default function GroupDetailScreen() {
           }
         : normalizeShoppingItemInput(name);
       setInputError(null);
-      addIntent.mutate(
-        {
-          shoppingListId: activeListId,
-          operationId: createOperationId(),
-          ...normalized,
-          canonicalProductId: result.canonicalProduct?.id ?? null,
-        },
-        { onSuccess: () => setSearchOpen(false) },
-      );
+      addIntent.mutate({
+        shoppingListId: activeListId,
+        operationId: createOperationId(),
+        ...normalized,
+        canonicalProductId: result.canonicalProduct?.id ?? null,
+      });
     } catch (error) {
       setInputError(getErrorMessage(error));
     }
@@ -177,20 +147,6 @@ export default function GroupDetailScreen() {
       });
     }
     setVoiceOpen(false);
-  };
-
-  const submitPostalCode = () => {
-    if (!activeListId) return;
-    if (!isValidSpanishPostalCode(postalCode)) {
-      setPostalCodeError("El código postal debe tener cinco dígitos.");
-      return;
-    }
-    setPostalCodeError(null);
-    updatePostalCode.mutate({
-      shoppingListId: activeListId,
-      postalCode,
-      operationId: createOperationId(),
-    });
   };
 
   const submitIntentEdit = (intentId: string) => {
@@ -212,27 +168,27 @@ export default function GroupDetailScreen() {
     changeQuantity.error ??
     deleteIntent.error;
 
-  const shareInvite = async () => {
-    const inviteCode = generateInvite.data;
-    if (!inviteCode) return;
-    setShareError(null);
-    try {
-      await Share.share({
-        title: `Invitación a ${detail.data.group.name}`,
-        message: `Únete a ${detail.data.group.name} en shopping-app.\nCódigo: ${inviteCode}\n${createInviteLink(inviteCode)}`,
-      });
-    } catch (error) {
-      setShareError(getErrorMessage(error));
-    }
-  };
-
   return (
     <Screen>
+      <VoiceDiscoveryModal />
       <View style={styles.heading}>
-        <Text style={styles.title}>{detail.data.group.name}</Text>
-        <Text style={styles.muted}>
-          {detail.data.members.length} miembro(s)
-        </Text>
+        <View style={styles.headingCopy}>
+          <Text style={styles.title}>{detail.data.group.name}</Text>
+          <Text style={styles.muted}>
+            {detail.data.members.length} miembro(s)
+          </Text>
+        </View>
+        <AppButton
+          tone="secondary"
+          onPress={() =>
+            router.push({
+              pathname: "/groups/settings/[groupId]",
+              params: { groupId },
+            })
+          }
+        >
+          Ajustes del grupo
+        </AppButton>
       </View>
 
       {joinOutcome ? (
@@ -272,16 +228,6 @@ export default function GroupDetailScreen() {
         </View>
       ) : null}
 
-      <View style={styles.membersBox}>
-        <Text style={styles.sectionTitle}>Miembros</Text>
-        {detail.data.members.map((member) => (
-          <Text key={member.profile_id} style={styles.muted}>
-            {member.displayName ?? "Miembro sin nombre"} ·{" "}
-            {member.role === "owner" ? "propietario" : "miembro"}
-          </Text>
-        ))}
-      </View>
-
       {detail.data.lists.length === 0 ? (
         <ScreenState
           title="Este grupo no tiene listas"
@@ -315,29 +261,6 @@ export default function GroupDetailScreen() {
           ) : null}
 
           <Text style={styles.sectionTitle}>{activeList?.name}</Text>
-          <View style={styles.postalBox}>
-            <AppInput
-              error={postalCodeError ?? undefined}
-              keyboardType="number-pad"
-              label="Código postal para precios"
-              maxLength={5}
-              onChangeText={setPostalCode}
-              value={postalCode}
-            />
-            {updatePostalCode.error ? (
-              <Text style={styles.error}>
-                {getErrorMessage(updatePostalCode.error)}
-              </Text>
-            ) : null}
-            <AppButton
-              loading={updatePostalCode.isPending}
-              tone="secondary"
-              onPress={submitPostalCode}
-            >
-              Actualizar código postal
-            </AppButton>
-          </View>
-
           {activeListId && activeIntents.length > 0 ? (
             <AppButton
               tone="secondary"
@@ -348,12 +271,12 @@ export default function GroupDetailScreen() {
           ) : null}
 
           <View style={styles.addBox}>
-            {searchOpen && activeListId ? (
+            {!voiceOpen && activeListId ? (
               <ProductSearchPanel
                 adding={addIntent.isPending}
                 onAddFreeItem={addFreeItem}
-                onClose={() => setSearchOpen(false)}
                 onSelectProduct={addSearchResult}
+                onVoicePress={() => setVoiceOpen(true)}
                 shoppingListId={activeListId}
               />
             ) : voiceOpen ? (
@@ -363,29 +286,7 @@ export default function GroupDetailScreen() {
                 onConfirm={addVoiceDrafts}
                 service={speechRecognitionService}
               />
-            ) : (
-              <View style={styles.addActions}>
-                <AppButton
-                  style={styles.addAction}
-                  onPress={() => {
-                    setVoiceOpen(false);
-                    setSearchOpen(true);
-                  }}
-                >
-                  Añadir producto
-                </AppButton>
-                <AppButton
-                  style={styles.addAction}
-                  tone="secondary"
-                  onPress={() => {
-                    setSearchOpen(false);
-                    setVoiceOpen(true);
-                  }}
-                >
-                  🎙 Añadir por voz
-                </AppButton>
-              </View>
-            )}
+            ) : null}
             {inputError ? <Text style={styles.error}>{inputError}</Text> : null}
             {addIntent.error ? (
               <Text style={styles.error}>
@@ -529,49 +430,13 @@ export default function GroupDetailScreen() {
           ) : null}
         </>
       )}
-
-      {isOwner ? (
-        <View style={styles.inviteBox}>
-          <Text style={styles.sectionTitle}>Invitar a alguien</Text>
-          <Text style={styles.muted}>
-            El código caduca en 7 días y solo admite un uso.
-          </Text>
-          <AppButton
-            loading={generateInvite.isPending}
-            tone="secondary"
-            onPress={() => generateInvite.mutate(groupId)}
-          >
-            Generar código
-          </AppButton>
-          {generateInvite.data ? (
-            <>
-              <Text selectable style={styles.code}>
-                {generateInvite.data}
-              </Text>
-              <Text selectable style={styles.link}>
-                {createInviteLink(generateInvite.data)}
-              </Text>
-              <AppButton tone="secondary" onPress={() => void shareInvite()}>
-                Compartir código y enlace
-              </AppButton>
-            </>
-          ) : null}
-          {generateInvite.error ? (
-            <Text style={styles.error}>
-              {getErrorMessage(generateInvite.error)}
-            </Text>
-          ) : null}
-          {shareError ? <Text style={styles.error}>{shareError}</Text> : null}
-        </View>
-      ) : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  heading: { gap: spacing.xs },
-  addActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  addAction: { flexGrow: 1 },
+  heading: { gap: spacing.sm },
+  headingCopy: { gap: spacing.xs },
   successBanner: {
     color: colors.text,
     backgroundColor: colors.successBackground,
@@ -591,7 +456,6 @@ const styles = StyleSheet.create({
   },
   syncErrorBanner: { borderColor: colors.danger },
   syncText: { color: colors.muted, flex: 1 },
-  membersBox: { gap: spacing.xs },
   title: { color: colors.text, fontSize: 28, fontWeight: "800" },
   sectionTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
   muted: { color: colors.muted, lineHeight: 21 },
@@ -607,7 +471,6 @@ const styles = StyleSheet.create({
   tabText: { color: colors.text },
   activeTabText: { color: "#FFFFFF", fontWeight: "700" },
   addBox: { gap: spacing.sm, marginVertical: spacing.sm },
-  postalBox: { gap: spacing.sm, marginVertical: spacing.sm },
   empty: {
     backgroundColor: colors.surface,
     borderRadius: 14,
@@ -670,20 +533,5 @@ const styles = StyleSheet.create({
   actionText: { color: colors.primary, fontWeight: "700", padding: spacing.xs },
   deleteText: { color: colors.danger, fontWeight: "700", padding: spacing.xs },
   smallButton: { minHeight: 40, flexGrow: 1 },
-  inviteBox: {
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.lg,
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  code: {
-    backgroundColor: colors.successBackground,
-    color: colors.text,
-    padding: spacing.md,
-    borderRadius: 10,
-    fontFamily: "monospace",
-  },
-  link: { color: colors.primary, lineHeight: 20 },
   error: { color: colors.danger, lineHeight: 20 },
 });

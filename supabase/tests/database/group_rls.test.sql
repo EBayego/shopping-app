@@ -129,12 +129,12 @@ select
   public.generate_group_invite(
     (select value::uuid from rls_test_values where key = 'group_id'),
     interval '1 day',
-    1
+    100
   );
 
 select extensions.ok(
-  length((select value from rls_test_values where key = 'invite_code')) = 48,
-  'owner receives a 192-bit invite code'
+  (select value from rls_test_values where key = 'invite_code') ~ '^[0-9A-F]{4}(-[0-9A-F]{4}){5}$',
+  'owner receives a human-readable 96-bit invite code'
 );
 
 reset role;
@@ -282,20 +282,16 @@ select extensions.throws_ok(
   'non-owner cannot generate an invite for another group'
 );
 
-select extensions.throws_ok(
-  format(
-    'select public.join_group_by_invite(%L)',
-    (select value from rls_test_values where key = 'invite_code')
-  ),
-  '22023',
-  'Invite code is invalid or expired',
-  'a consumed single-use invite cannot be reused by an outsider'
+select extensions.is(
+  public.join_group_by_invite((select value from rls_test_values where key = 'invite_code')),
+  (select value::uuid from rls_test_values where key = 'group_id'),
+  'a reusable invite lets another recipient join the group'
 );
 
 select extensions.is(
   (select count(*) from public.group_members),
-  0::bigint,
-  'non-member cannot inspect another group membership'
+  3::bigint,
+  'the new member can inspect the complete group membership'
 );
 
 select extensions.throws_ok(

@@ -164,6 +164,9 @@ importers:
       '@shopping-app/retailer-contracts':
         specifier: workspace:*
         version: link:../../packages/retailer-contracts
+      cheerio:
+        specifier: ^1.1.2
+        version: 1.2.0
 
   providers/dia:
     dependencies:
@@ -224,6 +227,9 @@ importers:
       '@shopping-app/domain':
         specifier: workspace:*
         version: link:../../packages/domain
+      '@shopping-app/provider-alcampo':
+        specifier: workspace:*
+        version: link:../../providers/alcampo
       '@shopping-app/provider-dia':
         specifier: workspace:*
         version: link:../../providers/dia

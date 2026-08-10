@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupDetail, ShoppingIntent } from "../features/groups/types";
 
-const { database, intentIds } = vi.hoisted(() => {
+const { database, intentIds, transactionState } = vi.hoisted(() => {
   const ids = new Set<string>();
+  const state = { active: 0, maximumActive: 0 };
   const fakeDatabase = {
     execAsync: vi.fn(() => Promise.resolve()),
     getAllAsync: vi.fn(() => Promise.resolve([])),
@@ -17,18 +18,29 @@ const { database, intentIds } = vi.hoisted(() => {
           throw new Error("Expected a string intent id");
         }
         if (ids.has(id)) {
-          throw new Error("UNIQUE constraint failed: cached_shopping_intents.id");
+          throw new Error(
+            "UNIQUE constraint failed: cached_shopping_intents.id",
+          );
         }
         ids.add(id);
       }
       return Promise.resolve();
     }),
     withExclusiveTransactionAsync: vi.fn(
-      (callback: (transaction: typeof fakeDatabase) => Promise<void>) =>
-        callback(fakeDatabase),
+      async (callback: (transaction: typeof fakeDatabase) => Promise<void>) => {
+        if (state.active > 0) throw new Error("database is locked");
+        state.active += 1;
+        state.maximumActive = Math.max(state.maximumActive, state.active);
+        try {
+          await Promise.resolve();
+          await callback(fakeDatabase);
+        } finally {
+          state.active -= 1;
+        }
+      },
     ),
   };
-  return { database: fakeDatabase, intentIds: ids };
+  return { database: fakeDatabase, intentIds: ids, transactionState: state };
 });
 
 vi.mock("expo-sqlite", () => ({
@@ -40,6 +52,8 @@ import { SQLiteShoppingStore } from "./sqlite-shopping-store";
 describe("SQLiteShoppingStore", () => {
   beforeEach(() => {
     intentIds.clear();
+    transactionState.active = 0;
+    transactionState.maximumActive = 0;
     vi.clearAllMocks();
   });
 
@@ -60,6 +74,20 @@ describe("SQLiteShoppingStore", () => {
       expect.stringContaining("delete from cached_shopping_intents"),
       "group-1",
     );
+  });
+
+  it("serializes concurrent cache transactions", async () => {
+    const store = new SQLiteShoppingStore();
+    const detail = detailFixture();
+
+    await expect(
+      Promise.all([
+        store.replaceWithServerSnapshot(detail),
+        store.replaceWithServerSnapshot(detail),
+      ]),
+    ).resolves.toEqual([undefined, undefined]);
+
+    expect(transactionState.maximumActive).toBe(1);
   });
 });
 

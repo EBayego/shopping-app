@@ -25,9 +25,13 @@ describe("search provider registry", () => {
     expect(createPriceRefreshStrategy("MERCADONA").kind).toBe("PRICE_REFRESH");
   });
 
-  it("registers targeted price refresh for Alcampo and Eroski", () => {
+  it("registers catalog and targeted price refresh for Alcampo", () => {
     expect(getIngestionCapabilities("EROSKI")).toEqual(["PRICE_REFRESH"]);
-    expect(getIngestionCapabilities("ALCAMPO")).toEqual(["PRICE_REFRESH"]);
+    expect(getIngestionCapabilities("ALCAMPO")).toEqual([
+      "CATALOG",
+      "PRICE_REFRESH",
+    ]);
+    expect(createCatalogStrategy("ALCAMPO").kind).toBe("CATALOG_SYNC");
     expect(createPriceRefreshStrategy("EROSKI").kind).toBe("PRICE_REFRESH");
     expect(createPriceRefreshStrategy("ALCAMPO").kind).toBe("PRICE_REFRESH");
   });

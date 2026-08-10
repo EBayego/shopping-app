@@ -1,0 +1,25 @@
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "item": {
+        "url": "/products/auchan-leche-semidesnatada-de-vaca-6-x-1l-producto-alcampo/54180"
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "item": {
+        "url": "/products/auchan-leche-entera-de-vaca-6-x-1-l-producto-alcampo/54178"
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "item": { "url": "/products/duplicado/54180" }
+    }
+  ]
+}
