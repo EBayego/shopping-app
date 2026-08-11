@@ -11,6 +11,7 @@ type Subscription = { remove(): void };
 
 export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
   private cancelCurrent: (() => void) | null = null;
+  private stopCurrent: (() => void) | null = null;
 
   async recognize(options: SpeechRecognitionOptions): Promise<string> {
     if (this.cancelCurrent !== null) {
@@ -31,11 +32,13 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
       cancelledBeforeStart = true;
     };
     this.cancelCurrent = cancelPermissionRequest;
+    this.stopCurrent = cancelPermissionRequest;
     try {
       await requestNativePermissions();
     } catch (error) {
       if (this.cancelCurrent === cancelPermissionRequest)
         this.cancelCurrent = null;
+      if (this.stopCurrent === cancelPermissionRequest) this.stopCurrent = null;
       if (cancelledBeforeStart) {
         throw new SpeechRecognitionError(
           "CANCELLED",
@@ -46,6 +49,7 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
     }
     if (cancelledBeforeStart) {
       this.cancelCurrent = null;
+      this.stopCurrent = null;
       throw new SpeechRecognitionError(
         "CANCELLED",
         "Reconocimiento cancelado.",
@@ -55,37 +59,51 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
     return new Promise<string>((resolve, reject) => {
       const subscriptions: Subscription[] = [];
       let settled = false;
-      let latestTranscript = "";
+      let committedTranscript = "";
+      let interimTranscript = "";
+      let stopRequested = false;
+
+      const transcript = (): string =>
+        joinTranscript(committedTranscript, interimTranscript);
 
       const finish = (result: { transcript?: string; error?: Error }): void => {
         if (settled) return;
         settled = true;
-        clearTimeout(timeout);
         subscriptions.forEach((subscription) => subscription.remove());
         this.cancelCurrent = null;
+        this.stopCurrent = null;
         if (result.error !== undefined) reject(result.error);
         else resolve(result.transcript ?? "");
       };
 
       subscriptions.push(
         ExpoSpeechRecognitionModule.addListener("result", (event) => {
-          const transcript = event.results[0]?.transcript.trim() ?? "";
-          if (transcript.length > 0) latestTranscript = transcript;
+          const recognized = event.results[0]?.transcript.trim() ?? "";
           if (event.isFinal) {
-            finish(
-              latestTranscript.length > 0
-                ? { transcript: latestTranscript }
-                : { error: emptyTranscriptError() },
+            committedTranscript = joinTranscript(
+              committedTranscript,
+              recognized,
             );
+            interimTranscript = "";
+          } else {
+            interimTranscript = recognized;
           }
         }),
-        ExpoSpeechRecognitionModule.addListener("nomatch", () => {
-          finish({ error: emptyTranscriptError() });
-        }),
+        ExpoSpeechRecognitionModule.addListener("nomatch", () => undefined),
         ExpoSpeechRecognitionModule.addListener("end", () => {
+          if (!stopRequested) {
+            committedTranscript = joinTranscript(
+              committedTranscript,
+              interimTranscript,
+            );
+            interimTranscript = "";
+            startNativeRecognition(options.locale, finish);
+            return;
+          }
+          const recognized = transcript();
           finish(
-            latestTranscript.length > 0
-              ? { transcript: latestTranscript }
+            recognized.length > 0
+              ? { transcript: recognized }
               : { error: emptyTranscriptError() },
           );
         }),
@@ -100,7 +118,9 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
             return;
           }
           if (event.error === "no-speech" || event.error === "speech-timeout") {
-            finish({ error: emptyTranscriptError() });
+            if (stopRequested && transcript().length === 0) {
+              finish({ error: emptyTranscriptError() });
+            }
             return;
           }
           if (event.error === "not-allowed") {
@@ -123,16 +143,6 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
         }),
       );
 
-      const timeout = setTimeout(() => {
-        ExpoSpeechRecognitionModule.abort();
-        finish({
-          error: new SpeechRecognitionError(
-            "TIMEOUT",
-            "No se detectó voz a tiempo.",
-          ),
-        });
-      }, options.timeoutMs);
-
       this.cancelCurrent = () => {
         ExpoSpeechRecognitionModule.abort();
         finish({
@@ -142,19 +152,21 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
           ),
         });
       };
+      this.stopCurrent = () => {
+        stopRequested = true;
+        try {
+          ExpoSpeechRecognitionModule.stop();
+        } catch (error) {
+          finish({ error: nativeError(error) });
+        }
+      };
 
-      try {
-        ExpoSpeechRecognitionModule.start({
-          lang: options.locale,
-          interimResults: true,
-          continuous: false,
-          maxAlternatives: 1,
-          recordingOptions: { persist: false },
-        });
-      } catch (error) {
-        finish({ error: nativeError(error) });
-      }
+      startNativeRecognition(options.locale, finish);
     });
+  }
+
+  stop(): void {
+    this.stopCurrent?.();
   }
 
   cancel(): void {
@@ -164,6 +176,32 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
   async openSettings(): Promise<void> {
     await Linking.openSettings();
   }
+}
+
+function startNativeRecognition(
+  locale: string,
+  finish: (result: { transcript?: string; error?: Error }) => void,
+): void {
+  try {
+    ExpoSpeechRecognitionModule.start({
+      lang: locale,
+      interimResults: true,
+      continuous: true,
+      maxAlternatives: 1,
+      recordingOptions: { persist: false },
+    });
+  } catch (error) {
+    finish({ error: nativeError(error) });
+  }
+}
+
+function joinTranscript(current: string, next: string): string {
+  const normalizedCurrent = current.trim();
+  const normalizedNext = next.trim();
+  if (!normalizedCurrent) return normalizedNext;
+  if (!normalizedNext) return normalizedCurrent;
+  if (normalizedNext.startsWith(normalizedCurrent)) return normalizedNext;
+  return `${normalizedCurrent} ${normalizedNext}`;
 }
 
 async function requestNativePermissions(): Promise<void> {

@@ -3,7 +3,7 @@ import {
   type ShoppingIntentDraft,
   type ShoppingIntentUnit,
 } from "@shopping-app/voice-parser";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "../../components/app-button";
@@ -59,14 +59,7 @@ export function VoiceShoppingPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [blockedPermission, setBlockedPermission] = useState(false);
 
-  useEffect(
-    () => () => {
-      service.cancel();
-    },
-    [service],
-  );
-
-  const startListening = async (): Promise<void> => {
+  const startListening = useCallback(async (): Promise<void> => {
     setListening(true);
     setMessage(null);
     setBlockedPermission(false);
@@ -76,7 +69,6 @@ export function VoiceShoppingPanel({
       const recognized = (
         await service.recognize({
           locale: "es-ES",
-          timeoutMs: 12_000,
         })
       ).trim();
       if (recognized.length === 0) {
@@ -106,7 +98,14 @@ export function VoiceShoppingPanel({
     } finally {
       setListening(false);
     }
-  };
+  }, [service]);
+
+  useEffect(() => {
+    void startListening();
+    return () => {
+      service.cancel();
+    };
+  }, [service, startListening]);
 
   const confirm = async (): Promise<void> => {
     setMessage(null);
@@ -152,10 +151,10 @@ export function VoiceShoppingPanel({
           <AppButton
             tone="secondary"
             onPress={() => {
-              service.cancel();
+              service.stop();
             }}
           >
-            Cancelar escucha
+            Parar escucha
           </AppButton>
         </View>
       ) : (
@@ -241,20 +240,20 @@ function VoiceDraftEditor({
         </View>
       </Pressable>
       <AppInput
-        label={`Producto ${index + 1}`}
+        label="Producto"
         onChangeText={(product) => onChange({ product })}
         value={draft.product}
       />
-      {draft.source.confidence !== "HIGH" || draft.variant ? (
+      {draft.variant.trim() ? (
         <AppInput
-          label={`Variante ${index + 1}`}
+          label="Variante"
           onChangeText={(variant) => onChange({ variant })}
           value={draft.variant}
         />
       ) : null}
-      {draft.source.confidence !== "HIGH" || draft.brandPreference ? (
+      {draft.brandPreference.trim() ? (
         <AppInput
-          label={`Marca ${index + 1}`}
+          label="Marca"
           onChangeText={(brandPreference) => onChange({ brandPreference })}
           value={draft.brandPreference}
         />
@@ -262,18 +261,20 @@ function VoiceDraftEditor({
       <View style={styles.fieldRow}>
         <AppInput
           keyboardType="decimal-pad"
-          label={`Cantidad ${index + 1}`}
+          label="Cantidad"
           onChangeText={(requestedQuantity) => onChange({ requestedQuantity })}
           style={styles.rowInput}
           value={draft.requestedQuantity}
         />
-        <AppInput
-          autoCapitalize="none"
-          label={`Unidad ${index + 1}`}
-          onChangeText={(requestedUnit) => onChange({ requestedUnit })}
-          style={styles.rowInput}
-          value={draft.requestedUnit}
-        />
+        {shouldShowUnit(draft.requestedUnit) ? (
+          <AppInput
+            autoCapitalize="none"
+            label="Unidad"
+            onChangeText={(requestedUnit) => onChange({ requestedUnit })}
+            style={styles.rowInput}
+            value={draft.requestedUnit}
+          />
+        ) : null}
       </View>
       {draft.packageCount || draft.packageSize || draft.packageUnit ? (
         <View style={styles.packageBox}>
@@ -281,25 +282,27 @@ function VoiceDraftEditor({
           <View style={styles.fieldRow}>
             <AppInput
               keyboardType="decimal-pad"
-              label={`Envases ${index + 1}`}
+              label="Envases"
               onChangeText={(packageCount) => onChange({ packageCount })}
               style={styles.rowInput}
               value={draft.packageCount}
             />
             <AppInput
               keyboardType="decimal-pad"
-              label={`Tamaño ${index + 1}`}
+              label="Tamaño"
               onChangeText={(packageSize) => onChange({ packageSize })}
               style={styles.rowInput}
               value={draft.packageSize}
             />
-            <AppInput
-              autoCapitalize="none"
-              label={`Unidad envase ${index + 1}`}
-              onChangeText={(packageUnit) => onChange({ packageUnit })}
-              style={styles.rowInput}
-              value={draft.packageUnit}
-            />
+            {shouldShowUnit(draft.packageUnit) ? (
+              <AppInput
+                autoCapitalize="none"
+                label="Unidad envase"
+                onChangeText={(packageUnit) => onChange({ packageUnit })}
+                style={styles.rowInput}
+                value={draft.packageUnit}
+              />
+            ) : null}
           </View>
         </View>
       ) : null}
@@ -315,14 +318,14 @@ function toEditableDraft(
     id: `${index}:${draft.rawText}`,
     source: draft,
     selected: draft.confidence === "HIGH",
-    product: draft.product ?? "",
+    product: capitalizeFirst(draft.product ?? ""),
     variant: draft.variant ?? "",
     brandPreference: draft.brandPreference ?? "",
     requestedQuantity: numberText(draft.requestedQuantity),
-    requestedUnit: draft.requestedUnit ?? "",
+    requestedUnit: capitalizeFirst(draft.requestedUnit ?? ""),
     packageCount: numberText(draft.packageCount),
     packageSize: numberText(draft.packageSize),
-    packageUnit: draft.packageUnit ?? "",
+    packageUnit: capitalizeFirst(draft.packageUnit ?? ""),
   };
 }
 
@@ -417,6 +420,15 @@ function optionalUnit(
 
 function numberText(value: number | undefined): string {
   return value === undefined ? "" : String(value);
+}
+
+function capitalizeFirst(value: string): string {
+  return value.length === 0 ? value : value[0]!.toUpperCase() + value.slice(1);
+}
+
+function shouldShowUnit(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 && normalized !== "unit";
 }
 
 function messageForError(error: SpeechRecognitionError): string {

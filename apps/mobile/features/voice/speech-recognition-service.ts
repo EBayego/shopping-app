@@ -19,11 +19,11 @@ export class SpeechRecognitionError extends Error {
 
 export interface SpeechRecognitionOptions {
   locale: string;
-  timeoutMs: number;
 }
 
 export interface SpeechRecognitionService {
   recognize(options: SpeechRecognitionOptions): Promise<string>;
+  stop(): void;
   cancel(): void;
   openSettings(): Promise<void>;
 }

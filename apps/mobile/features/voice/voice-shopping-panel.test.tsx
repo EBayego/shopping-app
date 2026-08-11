@@ -30,8 +30,6 @@ describe("VoiceShoppingPanel", () => {
     const onConfirm = vi.fn().mockResolvedValue(undefined);
     const renderer = await renderPanel(service, { onConfirm });
 
-    await listen(renderer);
-
     expect(screenText(renderer)).toContain("dos litros de leche semidesnatada");
     expect(screenText(renderer)).toContain("alta confianza, preseleccionado");
     expect(
@@ -43,7 +41,7 @@ describe("VoiceShoppingPanel", () => {
     await pressAndFlush(buttonByText(renderer, "Añadir seleccionados"));
     expect(onConfirm).toHaveBeenCalledWith([
       expect.objectContaining({
-        product: "leche",
+        product: "Leche",
         variant: "semidesnatada",
         requestedQuantity: 2,
         requestedUnit: "l",
@@ -51,30 +49,29 @@ describe("VoiceShoppingPanel", () => {
     ]);
   });
 
-  it("cancels an active recognition through the service", async () => {
-    let rejectRecognition: ((reason: Error) => void) | undefined;
-    const cancel = vi.fn(() =>
-      rejectRecognition?.(
-        new SpeechRecognitionError("CANCELLED", "Reconocimiento cancelado."),
-      ),
+  it("starts automatically and waits for the user to stop recognition", async () => {
+    let resolveRecognition: ((transcript: string) => void) | undefined;
+    const stop = vi.fn(() => resolveRecognition?.("pan y seis huevos"));
+    const recognize = vi.fn(
+      () =>
+        new Promise<string>((resolve) => {
+          resolveRecognition = resolve;
+        }),
     );
     const service: SpeechRecognitionService = {
-      recognize: vi.fn(
-        () =>
-          new Promise<string>((_resolve, reject) => {
-            rejectRecognition = reject;
-          }),
-      ),
-      cancel,
+      recognize,
+      stop,
+      cancel: vi.fn(),
       openSettings: vi.fn().mockResolvedValue(undefined),
     };
     const renderer = await renderPanel(service);
 
-    await pressAndFlush(buttonByText(renderer, "Empezar a escuchar"));
-    await pressAndFlush(buttonByText(renderer, "Cancelar escucha"));
+    expect(recognize).toHaveBeenCalledOnce();
+    expect(screenText(renderer)).toContain("Escuchando…");
+    await pressAndFlush(buttonByText(renderer, "Parar escucha"));
 
-    expect(cancel).toHaveBeenCalledOnce();
-    expect(screenText(renderer)).toContain("Escucha cancelada");
+    expect(stop).toHaveBeenCalledOnce();
+    expect(screenText(renderer)).toContain("pan y seis huevos");
   });
 
   it("shows native errors without producing a preview", async () => {
@@ -82,7 +79,6 @@ describe("VoiceShoppingPanel", () => {
       new SpeechRecognitionError("NATIVE_ERROR", "fallo del recognizer"),
     );
     const renderer = await renderPanel(service);
-    await listen(renderer);
     expect(screenText(renderer)).toContain("Error de reconocimiento");
     expect(screenText(renderer)).toContain("fallo del recognizer");
     expect(resultSelectors(renderer)).toHaveLength(0);
@@ -90,7 +86,6 @@ describe("VoiceShoppingPanel", () => {
 
   it("handles an empty transcript", async () => {
     const renderer = await renderPanel(serviceReturning("   "));
-    await listen(renderer);
     expect(screenText(renderer)).toContain(
       "No se ha reconocido ningún producto",
     );
@@ -101,14 +96,39 @@ describe("VoiceShoppingPanel", () => {
     const renderer = await renderPanel(
       serviceReturning("dos litros de leche, pan y seis huevos"),
     );
-    await listen(renderer);
     expect(resultSelectors(renderer)).toHaveLength(3);
     expect(resultSelectors(renderer).map(accessibilityState)).toEqual([
       { checked: true },
       { checked: false },
       { checked: false },
     ]);
-    expect(screenText(renderer)).toContain("Producto 3");
+    const text = normalizedScreenText(renderer);
+    expect(text).toContain("Resultado 3");
+    expect(text).not.toContain("Producto 3");
+    expect(inputsByLabel(renderer, "Producto")).toHaveLength(3);
+  });
+
+  it("capitalizes display values and omits empty optional fields and unit", async () => {
+    const renderer = await renderPanel(serviceReturning("dos leches"));
+
+    expect(inputByLabel(renderer, "Producto").props.value).toBe("Leche");
+    expect(inputsByLabel(renderer, "Variante")).toHaveLength(0);
+    expect(inputsByLabel(renderer, "Marca")).toHaveLength(0);
+    expect(inputsByLabel(renderer, "Unidad")).toHaveLength(0);
+    expect(screenText(renderer)).not.toContain("Producto 1");
+    expect(screenText(renderer)).not.toContain("Cantidad 1");
+  });
+
+  it("shows non-default units with an initial capital", async () => {
+    const renderer = await renderPanel(
+      serviceReturning("dos litros de leche semidesnatada"),
+    );
+
+    expect(inputByLabel(renderer, "Unidad").props.value).toBe("L");
+    expect(inputByLabel(renderer, "Variante").props.value).toBe(
+      "semidesnatada",
+    );
+    expect(inputsByLabel(renderer, "Marca")).toHaveLength(0);
   });
 
   it("makes LOW confidence explicit and requires selection", async () => {
@@ -116,7 +136,6 @@ describe("VoiceShoppingPanel", () => {
     const renderer = await renderPanel(serviceReturning("cuarto queso"), {
       onConfirm,
     });
-    await listen(renderer);
     expect(screenText(renderer)).toContain("No estamos seguros");
     expect(resultSelectors(renderer)[0]?.props.accessibilityState).toEqual({
       checked: false,
@@ -133,7 +152,6 @@ describe("VoiceShoppingPanel", () => {
       openSettings,
     );
     const renderer = await renderPanel(service);
-    await listen(renderer);
     expect(screenText(renderer)).toContain("permiso está bloqueado");
     await pressAndFlush(buttonByText(renderer, "Abrir Ajustes"));
     expect(openSettings).toHaveBeenCalledOnce();
@@ -153,7 +171,6 @@ describe("VoiceShoppingPanel", () => {
       const renderer = await renderPanel(
         serviceRejecting(new SpeechRecognitionError(code, message)),
       );
-      await listen(renderer);
       expect(screenText(renderer)).toContain(expected);
     },
   );
@@ -162,6 +179,7 @@ describe("VoiceShoppingPanel", () => {
 function serviceReturning(transcript: string): SpeechRecognitionService {
   return {
     recognize: vi.fn().mockResolvedValue(transcript),
+    stop: vi.fn(),
     cancel: vi.fn(),
     openSettings: vi.fn().mockResolvedValue(undefined),
   };
@@ -173,6 +191,7 @@ function serviceRejecting(
 ): SpeechRecognitionService {
   return {
     recognize: vi.fn().mockRejectedValue(error),
+    stop: vi.fn(),
     cancel: vi.fn(),
     openSettings,
   };
@@ -183,7 +202,7 @@ async function renderPanel(
   overrides: Partial<React.ComponentProps<typeof VoiceShoppingPanel>> = {},
 ): Promise<ReactTestRenderer> {
   let renderer: ReactTestRenderer | undefined;
-  await act(() => {
+  await act(async () => {
     renderer = create(
       <VoiceShoppingPanel
         adding={false}
@@ -193,12 +212,9 @@ async function renderPanel(
         {...overrides}
       />,
     );
+    await Promise.resolve();
   });
   return renderer!;
-}
-
-async function listen(renderer: ReactTestRenderer): Promise<void> {
-  await pressAndFlush(buttonByText(renderer, "Empezar a escuchar"));
 }
 
 async function pressAndFlush(node: ReactTestInstance): Promise<void> {
@@ -220,6 +236,20 @@ function resultSelectors(renderer: ReactTestRenderer): ReactTestInstance[] {
   );
 }
 
+function inputsByLabel(
+  renderer: ReactTestRenderer,
+  label: string,
+): ReactTestInstance[] {
+  return renderer.root.findAllByProps({ accessibilityLabel: label });
+}
+
+function inputByLabel(
+  renderer: ReactTestRenderer,
+  label: string,
+): ReactTestInstance {
+  return renderer.root.findByProps({ accessibilityLabel: label });
+}
+
 function buttonByText(
   renderer: ReactTestRenderer,
   expected: string,
@@ -239,6 +269,10 @@ function press(node: ReactTestInstance): void {
 
 function screenText(renderer: ReactTestRenderer): string {
   return textOf(renderer.root);
+}
+
+function normalizedScreenText(renderer: ReactTestRenderer): string {
+  return screenText(renderer).replace(/\s+/g, " ");
 }
 
 function textOf(node: ReactTestInstance): string {
