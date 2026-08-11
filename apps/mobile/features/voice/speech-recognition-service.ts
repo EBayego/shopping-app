@@ -21,8 +21,15 @@ export interface SpeechRecognitionOptions {
   locale: string;
 }
 
+export interface SpeechRecognitionResult {
+  transcript: string;
+  segments: readonly string[];
+}
+
 export interface SpeechRecognitionService {
-  recognize(options: SpeechRecognitionOptions): Promise<string>;
+  recognize(
+    options: SpeechRecognitionOptions,
+  ): Promise<SpeechRecognitionResult>;
   stop(): void;
   cancel(): void;
   openSettings(): Promise<void>;

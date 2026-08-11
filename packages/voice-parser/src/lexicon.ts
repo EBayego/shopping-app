@@ -34,6 +34,11 @@ export const CONTAINER_ALIASES: Readonly<Record<string, ShoppingIntentUnit>> = {
   paquetes: "pack",
 };
 
+export const COLLECTIVE_QUANTITIES: Readonly<Record<string, number>> = {
+  docena: 12,
+  docenas: 12,
+};
+
 export interface LexiconMatch {
   value: string;
   length: number;

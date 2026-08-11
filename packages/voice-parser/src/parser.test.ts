@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseShoppingIntents } from "./index.ts";
+import { parseShoppingIntents, parseShoppingIntentSegments } from "./index.ts";
 
 describe("parseShoppingIntents", () => {
   describe("numbers and measured quantities", () => {
@@ -208,6 +208,65 @@ describe("parseShoppingIntents", () => {
   });
 
   describe("multiple items", () => {
+    it("splits adjacent quantified items without punctuation", () => {
+      expect(
+        parseShoppingIntents("un kilo de judías verdes una docena de patatas"),
+      ).toEqual([
+        expect.objectContaining({
+          rawText: "un kilo de judías verdes",
+          product: "judias verdes",
+          requestedQuantity: 1,
+          requestedUnit: "kg",
+        }),
+        expect.objectContaining({
+          rawText: "una docena de patatas",
+          product: "patatas",
+          requestedQuantity: 12,
+          requestedUnit: "unit",
+        }),
+      ]);
+    });
+
+    it.each([
+      ["una docena de huevos", 12],
+      ["dos docenas de huevos", 24],
+      ["media docena de huevos", 6],
+    ])("parses collective quantity %s", (text, requestedQuantity) => {
+      expect(parseShoppingIntents(text)).toEqual([
+        expect.objectContaining({
+          product: "huevo",
+          requestedQuantity,
+          requestedUnit: "unit",
+        }),
+      ]);
+    });
+
+    it("uses native speech segments while merging an incomplete phrase", () => {
+      expect(
+        parseShoppingIntentSegments([
+          "un kilo de judías verdes",
+          "una docena de patatas",
+        ]).map((item) => item.product),
+      ).toEqual(["judias verdes", "patatas"]);
+      expect(
+        parseShoppingIntentSegments(["un kilo de", "judías verdes"]),
+      ).toEqual([
+        expect.objectContaining({
+          product: "judias verdes",
+          requestedQuantity: 1,
+          requestedUnit: "kg",
+        }),
+      ]);
+    });
+
+    it.each([
+      "un kilo y medio de tomates",
+      "dos botellas de agua de un litro",
+      "coca cola de dos litros",
+    ])("does not split an internal quantity in %s", (text) => {
+      expect(parseShoppingIntents(text)).toHaveLength(1);
+    });
+
     it("splits commas and a conjunction followed by a quantity", () => {
       expect(parseShoppingIntents("leche, pan y seis huevos")).toEqual([
         expect.objectContaining({ rawText: "leche", product: "leche" }),

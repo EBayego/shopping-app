@@ -1,5 +1,5 @@
 import {
-  parseShoppingIntents,
+  parseShoppingIntentSegments,
   type ShoppingIntentDraft,
   type ShoppingIntentUnit,
 } from "@shopping-app/voice-parser";
@@ -66,19 +66,17 @@ export function VoiceShoppingPanel({
     setTranscript("");
     setDrafts([]);
     try {
-      const recognized = (
-        await service.recognize({
-          locale: "es-ES",
-        })
-      ).trim();
-      if (recognized.length === 0) {
+      const recognized = await service.recognize({
+        locale: "es-ES",
+      });
+      if (recognized.transcript.trim().length === 0) {
         throw new SpeechRecognitionError(
           "EMPTY_TRANSCRIPT",
           "No se ha reconocido ningún producto.",
         );
       }
-      const parsed = parseShoppingIntents(recognized);
-      setTranscript(recognized);
+      const parsed = parseShoppingIntentSegments(recognized.segments);
+      setTranscript(recognized.transcript);
       setDrafts(parsed.map(toEditableDraft));
       if (parsed.length === 0) {
         setMessage("No hemos identificado productos. Prueba de nuevo.");

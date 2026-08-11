@@ -1,4 +1,4 @@
-export { parseShoppingIntents } from "./parser.ts";
+export { parseShoppingIntents, parseShoppingIntentSegments } from "./parser.ts";
 export type {
   ShoppingIntentConfidence,
   ShoppingIntentDraft,

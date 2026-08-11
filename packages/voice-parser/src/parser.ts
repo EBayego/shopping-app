@@ -1,5 +1,6 @@
 import { classifyConfidence } from "./confidence.ts";
 import {
+  COLLECTIVE_QUANTITIES,
   CONTAINER_ALIASES,
   findBrand,
   findVariant,
@@ -48,13 +49,44 @@ interface MutableDraft {
 }
 
 export function parseShoppingIntents(text: string): ShoppingIntentDraft[] {
+  return parseItems(text, false);
+}
+
+export function parseShoppingIntentSegments(
+  rawSegments: readonly string[],
+): ShoppingIntentDraft[] {
+  const segments = rawSegments.map((segment) => segment.trim()).filter(Boolean);
+  if (segments.length === 0) return [];
+  if (segments.length === 1) return parseShoppingIntents(segments[0] ?? "");
+
+  const merged: string[] = [];
+  let current = segments[0] ?? "";
+  for (const next of segments.slice(1)) {
+    if (isIncompleteSpeechSegment(current) || isContinuationSegment(next)) {
+      current = `${current} ${next}`;
+      continue;
+    }
+    merged.push(current);
+    current = next;
+  }
+  merged.push(current);
+  return merged.flatMap((segment) => parseItems(segment, true));
+}
+
+function parseItems(
+  text: string,
+  allowUnknownBareProduct: boolean,
+): ShoppingIntentDraft[] {
   if (text.trim() === "") return [];
   return splitTranscript(text)
-    .map(parseItem)
+    .map((item) => parseItem(item, allowUnknownBareProduct))
     .filter((draft): draft is ShoppingIntentDraft => draft !== undefined);
 }
 
-function parseItem(rawItem: string): ShoppingIntentDraft | undefined {
+function parseItem(
+  rawItem: string,
+  allowUnknownBareProduct: boolean,
+): ShoppingIntentDraft | undefined {
   const rawText = rawItem.trim();
   let tokens = tokenize(rawText);
   while (tokens[0] !== undefined && LEADING_FILLERS.has(tokens[0]))
@@ -68,6 +100,7 @@ function parseItem(rawItem: string): ShoppingIntentDraft | undefined {
   let hasMeasurement = false;
   let hasPackaging = false;
   let hasCount = false;
+  let hasCollective = false;
   let ambiguousFraction = false;
 
   const leadingNumber = parseNumberAt(tokens, cursor);
@@ -76,7 +109,16 @@ function parseItem(rawItem: string): ShoppingIntentDraft | undefined {
     if (tokens[cursor] === "de" && unitAt(tokens, cursor + 1) !== undefined)
       cursor += 1;
     const container = CONTAINER_ALIASES[tokens[cursor] ?? ""];
-    if (container !== undefined) {
+    const collective = COLLECTIVE_QUANTITIES[tokens[cursor] ?? ""];
+    if (collective !== undefined) {
+      draft.requestedQuantity = leadingNumber.value * collective;
+      draft.requestedUnit = "unit";
+      draft.totalAmount = draft.requestedQuantity;
+      hasCount = true;
+      hasCollective = true;
+      cursor += 1;
+      if (tokens[cursor] === "de" || tokens[cursor] === "del") cursor += 1;
+    } else if (container !== undefined) {
       draft.packageCount = leadingNumber.value;
       hasPackaging = true;
       cursor += 1;
@@ -106,7 +148,10 @@ function parseItem(rawItem: string): ShoppingIntentDraft | undefined {
       }
     }
     ambiguousFraction =
-      leadingNumber.fraction && !hasMeasurement && !hasPackaging;
+      leadingNumber.fraction &&
+      !hasMeasurement &&
+      !hasPackaging &&
+      !hasCollective;
   }
 
   let productTokens = tokens.slice(cursor);
@@ -174,9 +219,32 @@ function parseItem(rawItem: string): ShoppingIntentDraft | undefined {
 
   if (draft.product === undefined && leadingNumber === undefined)
     return undefined;
-  if (leadingNumber === undefined && !knownBareProduct && brand === undefined)
+  if (
+    leadingNumber === undefined &&
+    !knownBareProduct &&
+    brand === undefined &&
+    !allowUnknownBareProduct
+  )
     return undefined;
   return { ...draft, confidence };
+}
+
+function isIncompleteSpeechSegment(segment: string): boolean {
+  const normalized = tokenize(segment);
+  const last = normalized.at(-1);
+  if (last === "de" || last === "del" || last === "y") return true;
+  const drafts = parseItems(segment, true);
+  return (
+    drafts.length === 0 || drafts.some((draft) => draft.product === undefined)
+  );
+}
+
+function isContinuationSegment(segment: string): boolean {
+  const first = tokenize(segment)[0];
+  if (first === "de" || first === "del" || first === "con" || first === "sin") {
+    return true;
+  }
+  return parseItems(segment, true).length === 0;
 }
 
 function parseQuantity(

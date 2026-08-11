@@ -4,6 +4,7 @@ import { Linking, Platform } from "react-native";
 import {
   SpeechRecognitionError,
   type SpeechRecognitionOptions,
+  type SpeechRecognitionResult,
   type SpeechRecognitionService,
 } from "../features/voice/speech-recognition-service";
 
@@ -13,7 +14,9 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
   private cancelCurrent: (() => void) | null = null;
   private stopCurrent: (() => void) | null = null;
 
-  async recognize(options: SpeechRecognitionOptions): Promise<string> {
+  async recognize(
+    options: SpeechRecognitionOptions,
+  ): Promise<SpeechRecognitionResult> {
     if (this.cancelCurrent !== null) {
       throw new SpeechRecognitionError(
         "NATIVE_ERROR",
@@ -56,34 +59,39 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
       );
     }
 
-    return new Promise<string>((resolve, reject) => {
+    return new Promise<SpeechRecognitionResult>((resolve, reject) => {
       const subscriptions: Subscription[] = [];
       let settled = false;
-      let committedTranscript = "";
+      let committedSegments: string[] = [];
       let interimTranscript = "";
       let stopRequested = false;
 
       const transcript = (): string =>
-        joinTranscript(committedTranscript, interimTranscript);
+        joinTranscript(committedSegments.join(" "), interimTranscript);
 
-      const finish = (result: { transcript?: string; error?: Error }): void => {
+      const result = (): SpeechRecognitionResult => {
+        const segments = appendSegment(committedSegments, interimTranscript);
+        return { transcript: segments.join(" "), segments };
+      };
+
+      const finish = (outcome: {
+        result?: SpeechRecognitionResult;
+        error?: Error;
+      }): void => {
         if (settled) return;
         settled = true;
         subscriptions.forEach((subscription) => subscription.remove());
         this.cancelCurrent = null;
         this.stopCurrent = null;
-        if (result.error !== undefined) reject(result.error);
-        else resolve(result.transcript ?? "");
+        if (outcome.error !== undefined) reject(outcome.error);
+        else resolve(outcome.result ?? { transcript: "", segments: [] });
       };
 
       subscriptions.push(
         ExpoSpeechRecognitionModule.addListener("result", (event) => {
           const recognized = event.results[0]?.transcript.trim() ?? "";
           if (event.isFinal) {
-            committedTranscript = joinTranscript(
-              committedTranscript,
-              recognized,
-            );
+            committedSegments = appendSegment(committedSegments, recognized);
             interimTranscript = "";
           } else {
             interimTranscript = recognized;
@@ -92,18 +100,18 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
         ExpoSpeechRecognitionModule.addListener("nomatch", () => undefined),
         ExpoSpeechRecognitionModule.addListener("end", () => {
           if (!stopRequested) {
-            committedTranscript = joinTranscript(
-              committedTranscript,
+            committedSegments = appendSegment(
+              committedSegments,
               interimTranscript,
             );
             interimTranscript = "";
             startNativeRecognition(options.locale, finish);
             return;
           }
-          const recognized = transcript();
+          const recognized = result();
           finish(
-            recognized.length > 0
-              ? { transcript: recognized }
+            recognized.transcript.length > 0
+              ? { result: recognized }
               : { error: emptyTranscriptError() },
           );
         }),
@@ -180,7 +188,10 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
 
 function startNativeRecognition(
   locale: string,
-  finish: (result: { transcript?: string; error?: Error }) => void,
+  finish: (outcome: {
+    result?: SpeechRecognitionResult;
+    error?: Error;
+  }) => void,
 ): void {
   try {
     ExpoSpeechRecognitionModule.start({
@@ -202,6 +213,18 @@ function joinTranscript(current: string, next: string): string {
   if (!normalizedNext) return normalizedCurrent;
   if (normalizedNext.startsWith(normalizedCurrent)) return normalizedNext;
   return `${normalizedCurrent} ${normalizedNext}`;
+}
+
+function appendSegment(current: readonly string[], next: string): string[] {
+  const normalizedNext = next.trim();
+  if (!normalizedNext) return [...current];
+  const fullTranscript = current.join(" ");
+  if (normalizedNext === fullTranscript) return [...current];
+  if (fullTranscript && normalizedNext.startsWith(fullTranscript)) {
+    return [normalizedNext];
+  }
+  if (current.at(-1) === normalizedNext) return [...current];
+  return [...current, normalizedNext];
 }
 
 async function requestNativePermissions(): Promise<void> {

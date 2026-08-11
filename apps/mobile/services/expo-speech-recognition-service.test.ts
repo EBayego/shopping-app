@@ -85,7 +85,10 @@ describe("ExpoSpeechRecognitionService", () => {
     expect(mocks.native.stop).toHaveBeenCalledOnce();
     emit("end", undefined);
 
-    await expect(recognition).resolves.toBe("pan seis huevos");
+    await expect(recognition).resolves.toEqual({
+      transcript: "pan seis huevos",
+      segments: ["pan", "seis huevos"],
+    });
   });
 });
 

@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   SpeechRecognitionError,
+  type SpeechRecognitionResult,
   type SpeechRecognitionService,
 } from "./speech-recognition-service";
 import { VoiceShoppingPanel } from "./voice-shopping-panel";
@@ -50,11 +51,17 @@ describe("VoiceShoppingPanel", () => {
   });
 
   it("starts automatically and waits for the user to stop recognition", async () => {
-    let resolveRecognition: ((transcript: string) => void) | undefined;
-    const stop = vi.fn(() => resolveRecognition?.("pan y seis huevos"));
+    let resolveRecognition:
+      ((result: SpeechRecognitionResult) => void) | undefined;
+    const stop = vi.fn(() =>
+      resolveRecognition?.({
+        transcript: "pan y seis huevos",
+        segments: ["pan y seis huevos"],
+      }),
+    );
     const recognize = vi.fn(
       () =>
-        new Promise<string>((resolve) => {
+        new Promise<SpeechRecognitionResult>((resolve) => {
           resolveRecognition = resolve;
         }),
     );
@@ -106,6 +113,25 @@ describe("VoiceShoppingPanel", () => {
     expect(text).toContain("Resultado 3");
     expect(text).not.toContain("Producto 3");
     expect(inputsByLabel(renderer, "Producto")).toHaveLength(3);
+  });
+
+  it("keeps native pauses as product boundaries", async () => {
+    const renderer = await renderPanel(
+      serviceReturning("un kilo de judías verdes una docena de patatas", [
+        "un kilo de judías verdes",
+        "una docena de patatas",
+      ]),
+    );
+
+    expect(resultSelectors(renderer)).toHaveLength(2);
+    expect(inputsByLabel(renderer, "Producto").map(inputValue)).toEqual([
+      "Judias verdes",
+      "Patatas",
+    ]);
+    expect(inputsByLabel(renderer, "Cantidad").map(inputValue)).toEqual([
+      "1",
+      "12",
+    ]);
   });
 
   it("capitalizes display values and omits empty optional fields and unit", async () => {
@@ -176,9 +202,12 @@ describe("VoiceShoppingPanel", () => {
   );
 });
 
-function serviceReturning(transcript: string): SpeechRecognitionService {
+function serviceReturning(
+  transcript: string,
+  segments: readonly string[] = [transcript],
+): SpeechRecognitionService {
   return {
-    recognize: vi.fn().mockResolvedValue(transcript),
+    recognize: vi.fn().mockResolvedValue({ transcript, segments }),
     stop: vi.fn(),
     cancel: vi.fn(),
     openSettings: vi.fn().mockResolvedValue(undefined),
@@ -226,6 +255,10 @@ async function pressAndFlush(node: ReactTestInstance): Promise<void> {
 
 function accessibilityState(node: ReactTestInstance): unknown {
   return (node.props as { accessibilityState?: unknown }).accessibilityState;
+}
+
+function inputValue(node: ReactTestInstance): unknown {
+  return (node.props as { value?: unknown }).value;
 }
 
 function resultSelectors(renderer: ReactTestRenderer): ReactTestInstance[] {
