@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
@@ -191,6 +192,7 @@ export default function SettingsScreen() {
                   signingInProvider !== null
                 }
                 key={provider}
+                icon={<SocialProviderIcon provider={provider} />}
                 loading={linkingProvider === provider}
                 onPress={() => void linkIdentity(provider)}
                 tone="secondary"
@@ -211,6 +213,7 @@ export default function SettingsScreen() {
             <AppButton
               disabled={linkingProvider !== null || signingInProvider !== null}
               key={`sign-in-${provider}`}
+              icon={<SocialProviderIcon provider={provider} />}
               loading={signingInProvider === provider}
               onPress={() => confirmSignIn(provider)}
               tone="secondary"
@@ -221,6 +224,21 @@ export default function SettingsScreen() {
         )}
       </View>
     </Screen>
+  );
+}
+
+function SocialProviderIcon({
+  provider,
+}: {
+  provider: SocialIdentityProvider;
+}) {
+  const { colors } = useTheme();
+  return (
+    <Ionicons
+      color={provider === "google" ? "#4285F4" : colors.text}
+      name={provider === "google" ? "logo-google" : "logo-apple"}
+      size={21}
+    />
   );
 }
 

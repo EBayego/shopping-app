@@ -4,6 +4,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  View,
   type PressableProps,
 } from "react-native";
 
@@ -12,6 +13,7 @@ import { spacing, type ThemeColors } from "../lib/theme";
 
 type AppButtonProps = Omit<PressableProps, "children"> & {
   children: ReactNode;
+  icon?: ReactNode;
   loading?: boolean;
   tone?: "primary" | "secondary" | "danger";
 };
@@ -19,6 +21,7 @@ type AppButtonProps = Omit<PressableProps, "children"> & {
 export function AppButton({
   children,
   disabled,
+  icon,
   loading = false,
   tone = "primary",
   style,
@@ -46,11 +49,14 @@ export function AppButton({
           color={tone === "primary" ? "#FFFFFF" : colors.primary}
         />
       ) : (
-        <Text
-          style={[styles.label, tone !== "primary" && styles.secondaryLabel]}
-        >
-          {children}
-        </Text>
+        <View style={styles.content}>
+          {icon}
+          <Text
+            style={[styles.label, tone !== "primary" && styles.secondaryLabel]}
+          >
+            {children}
+          </Text>
+        </View>
       )}
     </Pressable>
   );
@@ -74,6 +80,12 @@ const createStyles = (colors: ThemeColors) =>
     },
     pressed: { opacity: 0.78 },
     disabled: { opacity: 0.5 },
+    content: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: spacing.sm,
+      justifyContent: "center",
+    },
     label: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
     secondaryLabel: { color: colors.text },
   });

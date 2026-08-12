@@ -91,7 +91,6 @@ export default function GroupsScreen() {
               style={({ pressed }) => [styles.card, pressed && styles.pressed]}
             >
               <Text style={styles.cardTitle}>{group.name}</Text>
-              <Text style={styles.muted}>Abrir listas →</Text>
             </Pressable>
           ))}
         </View>

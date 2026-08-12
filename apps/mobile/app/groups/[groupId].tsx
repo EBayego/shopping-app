@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ShoppingIntentDraft } from "@shopping-app/voice-parser";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -28,7 +29,7 @@ import { VoiceDiscoveryModal } from "../../features/voice/voice-discovery-modal"
 import { normalizeShoppingItemInput } from "../../features/groups/validation";
 import { getErrorMessage } from "../../lib/errors";
 import { createOperationId } from "../../lib/operation-id";
-import { useThemedStyles } from "../../features/theme/theme-context";
+import { useThemedStyles, useTheme } from "../../features/theme/theme-context";
 import { spacing, type ThemeColors } from "../../lib/theme";
 import { useOfflineSync } from "../../offline/offline-sync-provider";
 import { speechRecognitionService } from "../../services/expo-speech-recognition-service";
@@ -38,6 +39,7 @@ function firstParameter(value: string | string[] | undefined): string {
 }
 
 export default function GroupDetailScreen() {
+  const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const params = useLocalSearchParams<{
     groupId: string | string[];
@@ -373,7 +375,7 @@ export default function GroupDetailScreen() {
                           >
                             {display.title}
                           </Text>
-                          <View style={styles.itemActions}>
+                          <View style={styles.quantityControls}>
                             <Pressable
                               accessibilityLabel="Reducir cantidad"
                               onPress={() =>
@@ -408,31 +410,56 @@ export default function GroupDetailScreen() {
                                 {display.unit}
                               </Text>
                             ) : null}
-                            <Pressable
-                              accessibilityRole="button"
-                              onPress={() => {
-                                setEditingIntentId(intent.id);
-                                setEditingText(intent.raw_text);
-                                setEditingError(null);
-                              }}
-                            >
-                              <Text style={styles.actionText}>Editar</Text>
-                            </Pressable>
-                            <Pressable
-                              accessibilityRole="button"
-                              onPress={() =>
-                                deleteIntent.mutate({
-                                  intentId: intent.id,
-                                  operationId: createOperationId(),
-                                })
-                              }
-                            >
-                              <Text style={styles.deleteText}>Eliminar</Text>
-                            </Pressable>
                           </View>
                         </>
                       )}
                     </View>
+                    {editingIntentId !== intent.id ? (
+                      <View style={styles.itemIconActions}>
+                        <Pressable
+                          accessibilityLabel={`Editar ${display.title}`}
+                          accessibilityRole="button"
+                          hitSlop={6}
+                          onPress={() => {
+                            setEditingIntentId(intent.id);
+                            setEditingText(intent.raw_text);
+                            setEditingError(null);
+                          }}
+                          style={({ pressed }) => [
+                            styles.iconButton,
+                            pressed && styles.iconButtonPressed,
+                          ]}
+                        >
+                          <Ionicons
+                            color={colors.primary}
+                            name="create-outline"
+                            size={21}
+                          />
+                        </Pressable>
+                        <Pressable
+                          accessibilityLabel={`Eliminar ${display.title}`}
+                          accessibilityRole="button"
+                          hitSlop={6}
+                          onPress={() =>
+                            deleteIntent.mutate({
+                              intentId: intent.id,
+                              operationId: createOperationId(),
+                            })
+                          }
+                          style={({ pressed }) => [
+                            styles.iconButton,
+                            styles.deleteIconButton,
+                            pressed && styles.iconButtonPressed,
+                          ]}
+                        >
+                          <Ionicons
+                            color={colors.danger}
+                            name="trash-outline"
+                            size={21}
+                          />
+                        </Pressable>
+                      </View>
+                    ) : null}
                   </View>
                 );
               })}
@@ -510,6 +537,32 @@ const createStyles = (colors: ThemeColors) =>
       flexWrap: "wrap",
       gap: spacing.sm,
     },
+    quantityControls: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: spacing.sm,
+    },
+    itemIconActions: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: spacing.xs,
+    },
+    iconButton: {
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: 10,
+      borderWidth: 1,
+      height: 40,
+      justifyContent: "center",
+      width: 40,
+    },
+    deleteIconButton: {
+      backgroundColor: colors.dangerBackground,
+      borderColor: colors.danger,
+    },
+    iconButtonPressed: { opacity: 0.65 },
     checkbox: {
       width: 24,
       height: 24,
@@ -547,11 +600,6 @@ const createStyles = (colors: ThemeColors) =>
     quantityUnit: { color: colors.muted, fontWeight: "600" },
     actionText: {
       color: colors.primary,
-      fontWeight: "700",
-      padding: spacing.xs,
-    },
-    deleteText: {
-      color: colors.danger,
       fontWeight: "700",
       padding: spacing.xs,
     },
