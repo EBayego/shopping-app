@@ -55,12 +55,42 @@ select lives_ok(
 );
 select is(
   (select count(*) from public.refresh_requests where status = 'PENDING'),
-  5::bigint,
-  'one independent price job per capable provider plus the catalog job is queued'
+  (
+    select count(*)
+    from public.retailers retailer
+    cross join lateral (
+      select 'PRICE_REFRESH'
+      where 'PRICE_REFRESH' = any(retailer.capabilities)
+      union all
+      select 'CATALOG_SYNC'
+      where 'CATALOG' = any(retailer.capabilities)
+    ) request_kind
+    cross join (
+      select distinct postal_code from public.shopping_lists
+      union
+      select distinct postal_code from public.retailer_market_postal_codes
+    ) scope
+    where retailer.operational_status <> 'DISABLED'
+  ),
+  'one independent job per provider capability and postal scope is queued'
 );
-select is(
-  (select count(*) from public.refresh_requests where request_type = 'CATALOG_SYNC'),
-  1::bigint,
+select set_eq(
+  $$
+    select retailer_id, postal_code
+    from public.refresh_requests
+    where request_type = 'CATALOG_SYNC'
+  $$,
+  $$
+    select retailer.id, scope.postal_code
+    from public.retailers retailer
+    cross join (
+      select distinct postal_code from public.shopping_lists
+      union
+      select distinct postal_code from public.retailer_market_postal_codes
+    ) scope
+    where retailer.operational_status <> 'DISABLED'
+      and 'CATALOG' = any(retailer.capabilities)
+  $$,
   'catalog is only scheduled for providers with catalog capability'
 );
 
