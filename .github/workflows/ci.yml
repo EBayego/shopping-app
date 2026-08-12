@@ -15,9 +15,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  quality-and-database:
+  quality:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
     env:
       CI: true
     steps:
@@ -49,11 +49,39 @@ jobs:
         env:
           RUN_LIVE_PROVIDER_TESTS: "false"
 
-      - name: Start local Supabase
-        run: pnpm exec supabase start
+  database:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - name: Apply migrations from scratch
-        run: pnpm exec supabase db reset --local
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v2
+        with:
+          version: 2.110.0
+
+      - name: Start database and apply migrations
+        run: supabase db start
 
       - name: Supabase DB tests
-        run: pnpm exec supabase test db
+        run: supabase test db
+
+  quality-and-database:
+    needs:
+      - quality
+      - database
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require successful quality and database jobs
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          DATABASE_RESULT: ${{ needs.database.result }}
+        run: |
+          if [[ "$QUALITY_RESULT" != "success" || "$DATABASE_RESULT" != "success" ]]; then
+            echo "Quality result: $QUALITY_RESULT"
+            echo "Database result: $DATABASE_RESULT"
+            exit 1
+          fi
