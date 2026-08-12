@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select extensions.plan(4);
+select extensions.plan(5);
 
 insert into auth.users (
   instance_id, id, aud, role, raw_app_meta_data, raw_user_meta_data,
@@ -49,7 +49,7 @@ with voice_intent as (
     '80000000-0000-4000-8000-000000000014',
     '80000000-0000-4000-8000-000000000002',
     'dos botellas de leche de dos litros', 'leche', null,
-    null, null, 2, 2, 'l', 4, 'Pascual', 'semidesnatada'
+    2, 'unit', 2, 2, 'l', 4, 'Pascual', 'semidesnatada'
   ) as result
 )
 select extensions.is(
@@ -66,6 +66,27 @@ select extensions.is(
   'voice-parsed packaging, brand and variant are persisted'
 )
 from voice_intent;
+
+select public.apply_shopping_intent_operation(
+  '80000000-0000-4000-8000-000000000015',
+  'increment',
+  null,
+  (
+    select id
+    from public.shopping_intents
+    where raw_text = 'dos botellas de leche de dos litros'
+  )
+);
+
+select extensions.is(
+  (
+    select concat_ws('|', requested_quantity, package_count, total_amount)
+    from public.shopping_intents
+    where raw_text = 'dos botellas de leche de dos litros'
+  ),
+  '3|3|6',
+  'changing a packaged item keeps its visible quantity, package count and total aligned'
+);
 
 select set_config('request.jwt.claims', '{"sub":"82222222-2222-4222-8222-222222222222","role":"authenticated","is_anonymous":true}', true);
 select extensions.throws_ok(

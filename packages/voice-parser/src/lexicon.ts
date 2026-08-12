@@ -24,6 +24,8 @@ export const UNIT_ALIASES: Readonly<Record<string, ShoppingIntentUnit>> = {
 };
 
 export const CONTAINER_ALIASES: Readonly<Record<string, ShoppingIntentUnit>> = {
+  bote: "pack",
+  botes: "pack",
   botella: "bottle",
   botellas: "bottle",
   lata: "can",

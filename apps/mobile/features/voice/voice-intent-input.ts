@@ -12,8 +12,9 @@ export function voiceDraftToIntentInput(
   if (!draft.product) throw new TypeError("Falta el nombre del producto.");
   const normalized = normalizeShoppingItemInput(draft.product);
   const requested = normalizeAmount(
-    draft.requestedQuantity,
-    draft.requestedUnit,
+    draft.requestedQuantity ?? draft.packageCount,
+    draft.requestedUnit ??
+      (draft.packageCount === undefined ? undefined : "unit"),
   );
   const packaging = normalizeAmount(draft.packageSize, draft.packageUnit);
   const totalUnit = draft.packageUnit ?? draft.requestedUnit;

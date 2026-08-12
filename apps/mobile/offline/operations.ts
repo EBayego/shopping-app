@@ -22,15 +22,25 @@ export function applyOperationLocally(
         updated_at: operation.createdAt,
       });
     case "change_quantity": {
-      const current = detail.intents.find(
+      const intent = detail.intents.find(
         (item) => item.id === operation.intentId,
-      )?.requested_quantity;
-      const quantity = current ?? 1;
+      );
+      const quantity = intent?.package_count ?? intent?.requested_quantity ?? 1;
+      const nextQuantity =
+        operation.direction === "increment"
+          ? quantity + 1
+          : Math.max(quantity - 1, 1);
+      const packaged = intent !== undefined && intent.package_count !== null;
       return patchIntent(detail, operation.intentId, {
-        requested_quantity:
-          operation.direction === "increment"
-            ? quantity + 1
-            : Math.max(quantity - 1, 1),
+        requested_quantity: nextQuantity,
+        ...(packaged
+          ? {
+              package_count: nextQuantity,
+              ...(intent.package_size === null
+                ? {}
+                : { total_amount: nextQuantity * intent.package_size }),
+            }
+          : {}),
         updated_at: operation.createdAt,
       });
     }

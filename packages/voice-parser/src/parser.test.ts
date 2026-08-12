@@ -128,6 +128,19 @@ describe("parseShoppingIntents", () => {
       });
     });
 
+    it("parses generic jars with their individual weight", () => {
+      expect(
+        parseShoppingIntents("tres botes de dos kilos de tomate triturado")[0],
+      ).toMatchObject({
+        product: "tomate triturado",
+        packageCount: 3,
+        packageSize: 2,
+        packageUnit: "kg",
+        totalAmount: 6,
+        confidence: "HIGH",
+      });
+    });
+
     it("parses packs of units", () => {
       expect(
         parseShoppingIntents("dos packs de seis yogures")[0],
@@ -145,6 +158,7 @@ describe("parseShoppingIntents", () => {
       ["tres latas de cerveza de 330 ml", "can"],
       ["dos paquetes de arroz de 1 kg", "pack"],
       ["cuatro botellas de agua de medio litro", "bottle"],
+      ["tres botes de tomate de 2 kg", "pack"],
     ])("supports container phrasing: %s", (text) => {
       const result = parseShoppingIntents(text)[0];
       expect(result).toMatchObject({ confidence: "HIGH" });

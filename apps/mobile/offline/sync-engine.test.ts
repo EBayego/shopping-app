@@ -49,6 +49,35 @@ describe("ShoppingSyncEngine", () => {
     expect(backend.applied).toEqual(["first", "second", "third"]);
   });
 
+  it("changes package count and total together for packaged items", () => {
+    const fixture = detailFixture();
+    const detail: GroupDetail = {
+      ...fixture,
+      intents: [
+        {
+          ...fixture.intents[0]!,
+          raw_text: "tres botes de dos kilos de tomate triturado",
+          normalized_name: "tomate triturado",
+          requested_quantity: 3,
+          requested_unit: "unit",
+          package_count: 3,
+          package_size: 2,
+          package_unit: "kg",
+          total_amount: 6,
+        },
+      ],
+    };
+
+    expect(
+      applyOperationLocally(detail, quantity("package", "increment"))
+        .intents[0],
+    ).toMatchObject({
+      requested_quantity: 4,
+      package_count: 4,
+      total_amount: 8,
+    });
+  });
+
   it("syncs persisted changes when reconnect is triggered", async () => {
     const store = new MemoryStore(detailFixture());
     await store.enqueue(toggle("offline", true));

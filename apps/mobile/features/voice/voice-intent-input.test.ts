@@ -18,6 +18,8 @@ describe("voiceDraftToIntentInput", () => {
     ).toEqual({
       rawText: "dos botellas de coca cola de dos litros",
       normalizedName: "coca cola",
+      requestedQuantity: 2,
+      requestedUnit: "unit",
       packageCount: 2,
       packageSize: 2,
       packageUnit: "l",

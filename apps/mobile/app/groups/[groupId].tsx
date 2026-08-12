@@ -17,6 +17,7 @@ import {
   useGroupDetailQuery,
   useToggleIntentMutation,
 } from "../../features/groups/queries";
+import { formatShoppingIntent } from "../../features/groups/intent-formatting";
 import { useGroupRealtime } from "../../features/groups/realtime";
 import { resultName } from "../../features/search/formatting";
 import { ProductSearchPanel } from "../../features/search/product-search-panel";
@@ -304,125 +305,135 @@ export default function GroupDetailScreen() {
             </View>
           ) : (
             <View style={styles.items}>
-              {activeIntents.map((intent) => (
-                <View key={intent.id} style={styles.item}>
-                  <Pressable
-                    accessibilityLabel={
-                      intent.checked ? "Desmarcar producto" : "Marcar producto"
-                    }
-                    accessibilityRole="checkbox"
-                    accessibilityState={{ checked: intent.checked }}
-                    onPress={() =>
-                      toggleIntent.mutate({
-                        intentId: intent.id,
-                        checked: !intent.checked,
-                        operationId: createOperationId(),
-                      })
-                    }
-                    style={[
-                      styles.checkbox,
-                      intent.checked && styles.checkboxChecked,
-                    ]}
-                  >
-                    {intent.checked ? (
-                      <Text style={styles.checkmark}>✓</Text>
-                    ) : null}
-                  </Pressable>
-                  <View style={styles.itemBody}>
-                    {editingIntentId === intent.id ? (
-                      <>
-                        <AppInput
-                          autoFocus
-                          error={editingError ?? undefined}
-                          label="Nombre del producto"
-                          onChangeText={setEditingText}
-                          onSubmitEditing={() => submitIntentEdit(intent.id)}
-                          value={editingText}
-                        />
-                        <View style={styles.itemActions}>
-                          <AppButton
-                            loading={editIntent.isPending}
-                            style={styles.smallButton}
-                            onPress={() => submitIntentEdit(intent.id)}
+              {activeIntents.map((intent) => {
+                const display = formatShoppingIntent(intent);
+                return (
+                  <View key={intent.id} style={styles.item}>
+                    <Pressable
+                      accessibilityLabel={
+                        intent.checked
+                          ? "Desmarcar producto"
+                          : "Marcar producto"
+                      }
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: intent.checked }}
+                      onPress={() =>
+                        toggleIntent.mutate({
+                          intentId: intent.id,
+                          checked: !intent.checked,
+                          operationId: createOperationId(),
+                        })
+                      }
+                      style={[
+                        styles.checkbox,
+                        intent.checked && styles.checkboxChecked,
+                      ]}
+                    >
+                      {intent.checked ? (
+                        <Text style={styles.checkmark}>✓</Text>
+                      ) : null}
+                    </Pressable>
+                    <View style={styles.itemBody}>
+                      {editingIntentId === intent.id ? (
+                        <>
+                          <AppInput
+                            autoFocus
+                            error={editingError ?? undefined}
+                            label="Nombre del producto"
+                            onChangeText={setEditingText}
+                            onSubmitEditing={() => submitIntentEdit(intent.id)}
+                            value={editingText}
+                          />
+                          <View style={styles.itemActions}>
+                            <AppButton
+                              loading={editIntent.isPending}
+                              style={styles.smallButton}
+                              onPress={() => submitIntentEdit(intent.id)}
+                            >
+                              Guardar
+                            </AppButton>
+                            <AppButton
+                              style={styles.smallButton}
+                              tone="secondary"
+                              onPress={() => setEditingIntentId(null)}
+                            >
+                              Cancelar
+                            </AppButton>
+                          </View>
+                        </>
+                      ) : (
+                        <>
+                          <Text
+                            style={[
+                              styles.itemText,
+                              intent.checked && styles.itemChecked,
+                            ]}
                           >
-                            Guardar
-                          </AppButton>
-                          <AppButton
-                            style={styles.smallButton}
-                            tone="secondary"
-                            onPress={() => setEditingIntentId(null)}
-                          >
-                            Cancelar
-                          </AppButton>
-                        </View>
-                      </>
-                    ) : (
-                      <>
-                        <Text
-                          style={[
-                            styles.itemText,
-                            intent.checked && styles.itemChecked,
-                          ]}
-                        >
-                          {intent.raw_text}
-                        </Text>
-                        <View style={styles.itemActions}>
-                          <Pressable
-                            accessibilityLabel="Reducir cantidad"
-                            onPress={() =>
-                              changeQuantity.mutate({
-                                intentId: intent.id,
-                                direction: "decrement",
-                                operationId: createOperationId(),
-                              })
-                            }
-                            style={styles.quantityButton}
-                          >
-                            <Text style={styles.quantityButtonText}>−</Text>
-                          </Pressable>
-                          <Text style={styles.quantity}>
-                            {intent.requested_quantity ?? 1}
+                            {display.title}
                           </Text>
-                          <Pressable
-                            accessibilityLabel="Aumentar cantidad"
-                            onPress={() =>
-                              changeQuantity.mutate({
-                                intentId: intent.id,
-                                direction: "increment",
-                                operationId: createOperationId(),
-                              })
-                            }
-                            style={styles.quantityButton}
-                          >
-                            <Text style={styles.quantityButtonText}>+</Text>
-                          </Pressable>
-                          <Pressable
-                            accessibilityRole="button"
-                            onPress={() => {
-                              setEditingIntentId(intent.id);
-                              setEditingText(intent.raw_text);
-                              setEditingError(null);
-                            }}
-                          >
-                            <Text style={styles.actionText}>Editar</Text>
-                          </Pressable>
-                          <Pressable
-                            accessibilityRole="button"
-                            onPress={() =>
-                              deleteIntent.mutate({
-                                intentId: intent.id,
-                                operationId: createOperationId(),
-                              })
-                            }
-                          >
-                            <Text style={styles.deleteText}>Eliminar</Text>
-                          </Pressable>
-                        </View>
-                      </>
-                    )}
+                          <View style={styles.itemActions}>
+                            <Pressable
+                              accessibilityLabel="Reducir cantidad"
+                              onPress={() =>
+                                changeQuantity.mutate({
+                                  intentId: intent.id,
+                                  direction: "decrement",
+                                  operationId: createOperationId(),
+                                })
+                              }
+                              style={styles.quantityButton}
+                            >
+                              <Text style={styles.quantityButtonText}>−</Text>
+                            </Pressable>
+                            <Text style={styles.quantity}>
+                              {display.quantity}
+                            </Text>
+                            <Pressable
+                              accessibilityLabel="Aumentar cantidad"
+                              onPress={() =>
+                                changeQuantity.mutate({
+                                  intentId: intent.id,
+                                  direction: "increment",
+                                  operationId: createOperationId(),
+                                })
+                              }
+                              style={styles.quantityButton}
+                            >
+                              <Text style={styles.quantityButtonText}>+</Text>
+                            </Pressable>
+                            {display.unit ? (
+                              <Text style={styles.quantityUnit}>
+                                {display.unit}
+                              </Text>
+                            ) : null}
+                            <Pressable
+                              accessibilityRole="button"
+                              onPress={() => {
+                                setEditingIntentId(intent.id);
+                                setEditingText(intent.raw_text);
+                                setEditingError(null);
+                              }}
+                            >
+                              <Text style={styles.actionText}>Editar</Text>
+                            </Pressable>
+                            <Pressable
+                              accessibilityRole="button"
+                              onPress={() =>
+                                deleteIntent.mutate({
+                                  intentId: intent.id,
+                                  operationId: createOperationId(),
+                                })
+                              }
+                            >
+                              <Text style={styles.deleteText}>Eliminar</Text>
+                            </Pressable>
+                          </View>
+                        </>
+                      )}
+                    </View>
                   </View>
-                </View>
-              ))}
+                );
+              })}
             </View>
           )}
           {mutationError ? (
@@ -530,6 +541,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontWeight: "700",
   },
+  quantityUnit: { color: colors.muted, fontWeight: "600" },
   actionText: { color: colors.primary, fontWeight: "700", padding: spacing.xs },
   deleteText: { color: colors.danger, fontWeight: "700", padding: spacing.xs },
   smallButton: { minHeight: 40, flexGrow: 1 },
