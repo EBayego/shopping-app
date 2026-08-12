@@ -10,8 +10,9 @@ import {
 
 import { AppButton } from "../../components/app-button";
 import { AppInput } from "../../components/app-input";
+import { useThemedStyles, useTheme } from "../theme/theme-context";
 import { getErrorMessage } from "../../lib/errors";
-import { colors, spacing } from "../../lib/theme";
+import { spacing, type ThemeColors } from "../../lib/theme";
 import {
   formatObservedAge,
   formatPrice,
@@ -43,6 +44,8 @@ export function ProductSearchPanel({
   onRefreshOffers,
   onSelectProduct,
 }: ProductSearchPanelProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const [query, setQuery] = useState("");
   const debouncedQuery = useDebouncedValue(query.trim(), 350);
   const search = useProductSearchQuery(shoppingListId, debouncedQuery);
@@ -147,6 +150,7 @@ function ProductResultCard({
   onRefreshOffers?: ((result: ProductSearchResult) => void) | undefined;
   onSelect: (result: ProductSearchResult) => void;
 }) {
+  const styles = useThemedStyles(createStyles);
   const imageUrl = result.retailerProducts.find(
     (product) => product.imageUrl,
   )?.imageUrl;
@@ -205,6 +209,7 @@ function ProductResultCard({
 }
 
 function OfferRow({ offer }: { offer: ProductSearchOffer }) {
+  const styles = useThemedStyles(createStyles);
   const unitPrice = formatPricePerUnit(offer.pricePerUnit, offer.referenceUnit);
   const stale = freshnessLabel(offer.freshness);
   return (
@@ -242,78 +247,79 @@ function useDebouncedValue(value: string, delayMs: number): string {
   return debounced;
 }
 
-const styles = StyleSheet.create({
-  panel: { gap: spacing.md, marginVertical: spacing.sm },
-  panelHeading: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  title: { color: colors.text, fontSize: 18, fontWeight: "700" },
-  action: { color: colors.primary, fontWeight: "700" },
-  microphoneButton: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 20,
-  },
-  microphone: { fontSize: 22 },
-  hint: { color: colors.muted, lineHeight: 20 },
-  error: { color: colors.danger, fontWeight: "700" },
-  statusRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
-  stateBox: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  results: { gap: spacing.md },
-  card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: spacing.md,
-    gap: spacing.md,
-  },
-  productHeader: { flexDirection: "row", gap: spacing.md },
-  productCopy: { flex: 1, gap: spacing.xs },
-  productName: { color: colors.text, fontSize: 17, fontWeight: "700" },
-  meta: { color: colors.muted },
-  selectText: {
-    color: colors.primary,
-    fontWeight: "700",
-    marginTop: spacing.xs,
-  },
-  image: { width: 72, height: 72, borderRadius: 10 },
-  imagePlaceholder: {
-    backgroundColor: colors.background,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  imagePlaceholderText: { color: colors.muted, fontSize: 11 },
-  offers: { gap: spacing.sm },
-  offer: {
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-    paddingTop: spacing.sm,
-    gap: spacing.xs,
-  },
-  offerHeading: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "baseline",
-  },
-  retailer: { color: colors.text, fontWeight: "700" },
-  price: { color: colors.text, fontSize: 18, fontWeight: "800" },
-  unitPrice: { color: colors.text, fontWeight: "600" },
-  promotion: { color: colors.primary, fontWeight: "600" },
-  available: { color: colors.primary },
-  unavailable: { color: colors.danger },
-  freshnessRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  age: { color: colors.muted, fontSize: 12 },
-  stale: { color: colors.muted, fontSize: 12, fontWeight: "600" },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    panel: { gap: spacing.md, marginVertical: spacing.sm },
+    panelHeading: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    title: { color: colors.text, fontSize: 18, fontWeight: "700" },
+    action: { color: colors.primary, fontWeight: "700" },
+    microphoneButton: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 20,
+    },
+    microphone: { fontSize: 22 },
+    hint: { color: colors.muted, lineHeight: 20 },
+    error: { color: colors.danger, fontWeight: "700" },
+    statusRow: { flexDirection: "row", gap: spacing.sm, alignItems: "center" },
+    stateBox: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: spacing.md,
+      gap: spacing.sm,
+    },
+    results: { gap: spacing.md },
+    card: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 14,
+      padding: spacing.md,
+      gap: spacing.md,
+    },
+    productHeader: { flexDirection: "row", gap: spacing.md },
+    productCopy: { flex: 1, gap: spacing.xs },
+    productName: { color: colors.text, fontSize: 17, fontWeight: "700" },
+    meta: { color: colors.muted },
+    selectText: {
+      color: colors.primary,
+      fontWeight: "700",
+      marginTop: spacing.xs,
+    },
+    image: { width: 72, height: 72, borderRadius: 10 },
+    imagePlaceholder: {
+      backgroundColor: colors.background,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    imagePlaceholderText: { color: colors.muted, fontSize: 11 },
+    offers: { gap: spacing.sm },
+    offer: {
+      borderTopColor: colors.border,
+      borderTopWidth: 1,
+      paddingTop: spacing.sm,
+      gap: spacing.xs,
+    },
+    offerHeading: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "baseline",
+    },
+    retailer: { color: colors.text, fontWeight: "700" },
+    price: { color: colors.text, fontSize: 18, fontWeight: "800" },
+    unitPrice: { color: colors.text, fontWeight: "600" },
+    promotion: { color: colors.primary, fontWeight: "600" },
+    available: { color: colors.primary },
+    unavailable: { color: colors.danger },
+    freshnessRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+    age: { color: colors.muted, fontSize: 12 },
+    stale: { color: colors.muted, fontSize: 12, fontWeight: "600" },
+  });

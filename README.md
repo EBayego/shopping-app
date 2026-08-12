@@ -172,7 +172,23 @@ pausas: `docs/ingestion-scheduler.md`.
 icon/splash placeholder y permisos iOS/Android. Un enlace tiene forma
 `shopping-app-dev://join/CODE` (o scheme de staging/production). Anonymous Auth
 se restaura desde SecureStore; desinstalar la app puede perder esa identidad
-hasta que exista account linking.
+hasta que se vincule una cuenta.
+
+En Ajustes se puede vincular o iniciar sesión con Google y Apple mediante OAuth
+PKCE. La vinculación conserva la identidad anónima y sus datos; iniciar sesión
+con una cuenta existente sustituye la sesión local después de mostrar una
+advertencia. Para habilitarlo en cada proyecto Supabase remoto:
+
+1. Activa **Enable Manual Linking** en Authentication > Providers.
+2. Configura Google y Apple con sus credenciales propias del entorno.
+3. Añade `shopping-app-dev://auth/callback`,
+   `shopping-app-staging://auth/callback` o
+   `shopping-app://auth/callback` a las redirect URLs permitidas según la
+   variante desplegada.
+
+Los secretos de Google y Apple nunca forman parte del bundle móvil. La
+configuración local deja ambos proveedores desactivados hasta que existan
+credenciales válidas.
 
 Voz requiere development build y dispositivo con reconocimiento disponible.
 Solo solicita permisos al empezar, muestra transcript/preview y añade únicamente

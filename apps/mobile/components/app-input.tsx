@@ -7,7 +7,8 @@ import {
   type TextInputProps,
 } from "react-native";
 
-import { colors, spacing } from "../lib/theme";
+import { useThemedStyles, useTheme } from "../features/theme/theme-context";
+import { spacing, type ThemeColors } from "../lib/theme";
 
 interface AppInputProps extends TextInputProps {
   label: string;
@@ -22,6 +23,9 @@ export function AppInput({
   style,
   ...props
 }: AppInputProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
@@ -41,26 +45,27 @@ export function AppInput({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { gap: spacing.xs },
-  label: { color: colors.text, fontSize: 14, fontWeight: "600" },
-  inputRow: {
-    minHeight: 48,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  input: {
-    flex: 1,
-    minHeight: 46,
-    paddingHorizontal: spacing.md,
-    color: colors.text,
-    fontSize: 16,
-  },
-  rightAccessory: { paddingRight: spacing.sm },
-  inputError: { borderColor: colors.danger },
-  error: { color: colors.danger, fontSize: 13 },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: { gap: spacing.xs },
+    label: { color: colors.text, fontSize: 14, fontWeight: "600" },
+    inputRow: {
+      minHeight: 48,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      backgroundColor: colors.surface,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+    input: {
+      flex: 1,
+      minHeight: 46,
+      paddingHorizontal: spacing.md,
+      color: colors.text,
+      fontSize: 16,
+    },
+    rightAccessory: { paddingRight: spacing.sm },
+    inputError: { borderColor: colors.danger },
+    error: { color: colors.danger, fontSize: 13 },
+  });

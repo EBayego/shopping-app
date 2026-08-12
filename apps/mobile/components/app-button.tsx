@@ -7,7 +7,8 @@ import {
   type PressableProps,
 } from "react-native";
 
-import { colors, spacing } from "../lib/theme";
+import { useThemedStyles, useTheme } from "../features/theme/theme-context";
+import { spacing, type ThemeColors } from "../lib/theme";
 
 type AppButtonProps = Omit<PressableProps, "children"> & {
   children: ReactNode;
@@ -23,6 +24,8 @@ export function AppButton({
   style,
   ...props
 }: AppButtonProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
   const isDisabled = disabled === true || loading;
 
   return (
@@ -53,23 +56,24 @@ export function AppButton({
   );
 }
 
-const styles = StyleSheet.create({
-  base: {
-    minHeight: 48,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  primary: { backgroundColor: colors.primary, borderColor: colors.primary },
-  secondary: { backgroundColor: colors.surface, borderColor: colors.border },
-  danger: {
-    backgroundColor: colors.dangerBackground,
-    borderColor: colors.danger,
-  },
-  pressed: { opacity: 0.78 },
-  disabled: { opacity: 0.5 },
-  label: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
-  secondaryLabel: { color: colors.text },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    base: {
+      minHeight: 48,
+      borderRadius: 12,
+      paddingHorizontal: spacing.md,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+    },
+    primary: { backgroundColor: colors.primary, borderColor: colors.primary },
+    secondary: { backgroundColor: colors.surface, borderColor: colors.border },
+    danger: {
+      backgroundColor: colors.dangerBackground,
+      borderColor: colors.danger,
+    },
+    pressed: { opacity: 0.78 },
+    disabled: { opacity: 0.5 },
+    label: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+    secondaryLabel: { color: colors.text },
+  });

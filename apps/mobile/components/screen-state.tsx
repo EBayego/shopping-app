@@ -1,6 +1,7 @@
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 
-import { colors, spacing } from "../lib/theme";
+import { useThemedStyles, useTheme } from "../features/theme/theme-context";
+import { spacing, type ThemeColors } from "../lib/theme";
 import { AppButton } from "./app-button";
 
 interface ScreenStateProps {
@@ -16,6 +17,9 @@ export function ScreenState({
   loading = false,
   retry,
 }: ScreenStateProps) {
+  const { colors } = useTheme();
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={styles.container}>
       {loading ? (
@@ -28,25 +32,26 @@ export function ScreenState({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    minHeight: 280,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.md,
-    padding: spacing.lg,
-  },
-  title: {
-    color: colors.text,
-    fontSize: 20,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  message: {
-    color: colors.muted,
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: "center",
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      minHeight: 280,
+      alignItems: "center",
+      justifyContent: "center",
+      gap: spacing.md,
+      padding: spacing.lg,
+    },
+    title: {
+      color: colors.text,
+      fontSize: 20,
+      fontWeight: "700",
+      textAlign: "center",
+    },
+    message: {
+      color: colors.muted,
+      fontSize: 15,
+      lineHeight: 22,
+      textAlign: "center",
+    },
+  });

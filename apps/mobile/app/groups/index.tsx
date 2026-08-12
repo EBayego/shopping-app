@@ -8,10 +8,12 @@ import { Screen } from "../../components/screen";
 import { ScreenState } from "../../components/screen-state";
 import { useGroupsQuery } from "../../features/groups/queries";
 import { getErrorMessage } from "../../lib/errors";
-import { colors, spacing } from "../../lib/theme";
+import { useThemedStyles } from "../../features/theme/theme-context";
+import { spacing, type ThemeColors } from "../../lib/theme";
 import { useUiStore } from "../../stores/ui-store";
 
 export default function GroupsScreen() {
+  const styles = useThemedStyles(createStyles);
   const groups = useGroupsQuery();
   const [inviteCode, setInviteCode] = useState("");
   const isHelpVisible = useUiStore((state) => state.isGroupHelpVisible);
@@ -134,36 +136,41 @@ export default function GroupsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  headerActions: { flexDirection: "row", gap: spacing.sm },
-  empty: { paddingVertical: spacing.xl, alignItems: "center", gap: spacing.sm },
-  title: { color: colors.text, fontSize: 22, fontWeight: "800" },
-  muted: { color: colors.muted, lineHeight: 21 },
-  list: { gap: spacing.sm },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.xs,
-  },
-  pressed: { opacity: 0.7 },
-  cardTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
-  joinBox: {
-    marginTop: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: spacing.lg,
-    gap: spacing.md,
-  },
-  sectionTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
-  helpLink: { color: colors.primary, fontWeight: "700", textAlign: "center" },
-  helpText: { color: colors.muted, textAlign: "center", lineHeight: 21 },
-  pendingInvite: {
-    backgroundColor: colors.successBackground,
-    borderRadius: 14,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    headerActions: { flexDirection: "row", gap: spacing.sm },
+    empty: {
+      paddingVertical: spacing.xl,
+      alignItems: "center",
+      gap: spacing.sm,
+    },
+    title: { color: colors.text, fontSize: 22, fontWeight: "800" },
+    muted: { color: colors.muted, lineHeight: 21 },
+    list: { gap: spacing.sm },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      gap: spacing.xs,
+    },
+    pressed: { opacity: 0.7 },
+    cardTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
+    joinBox: {
+      marginTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingTop: spacing.lg,
+      gap: spacing.md,
+    },
+    sectionTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
+    helpLink: { color: colors.primary, fontWeight: "700", textAlign: "center" },
+    helpText: { color: colors.muted, textAlign: "center", lineHeight: 21 },
+    pendingInvite: {
+      backgroundColor: colors.successBackground,
+      borderRadius: 14,
+      padding: spacing.md,
+      gap: spacing.sm,
+    },
+  });

@@ -16,13 +16,15 @@ import {
 import { isValidSpanishPostalCode } from "../../../features/groups/validation";
 import { getErrorMessage } from "../../../lib/errors";
 import { createOperationId } from "../../../lib/operation-id";
-import { colors, spacing } from "../../../lib/theme";
+import { useThemedStyles } from "../../../features/theme/theme-context";
+import { spacing, type ThemeColors } from "../../../lib/theme";
 
 function firstParameter(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
 }
 
 export default function GroupSettingsScreen() {
+  const styles = useThemedStyles(createStyles);
   const params = useLocalSearchParams<{ groupId: string | string[] }>();
   const groupId = firstParameter(params.groupId);
   const session = useSession();
@@ -234,40 +236,41 @@ export default function GroupSettingsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  title: { color: colors.text, fontSize: 28, fontWeight: "800" },
-  sectionTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
-  label: { color: colors.text, fontSize: 14, fontWeight: "600" },
-  muted: { color: colors.muted, lineHeight: 21 },
-  section: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  tabs: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  tab: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  activeTab: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabText: { color: colors.text },
-  activeTabText: { color: "#FFFFFF", fontWeight: "700" },
-  inviteResult: { gap: spacing.sm },
-  code: {
-    backgroundColor: colors.successBackground,
-    color: colors.text,
-    padding: spacing.md,
-    borderRadius: 10,
-    fontFamily: "monospace",
-    fontSize: 17,
-  },
-  link: { color: colors.primary, lineHeight: 21 },
-  member: { color: colors.text },
-  error: { color: colors.danger, lineHeight: 20 },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    title: { color: colors.text, fontSize: 28, fontWeight: "800" },
+    sectionTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
+    label: { color: colors.text, fontSize: 14, fontWeight: "600" },
+    muted: { color: colors.muted, lineHeight: 21 },
+    section: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 14,
+      padding: spacing.md,
+      gap: spacing.sm,
+    },
+    tabs: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+    tab: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    activeTab: { backgroundColor: colors.primary, borderColor: colors.primary },
+    tabText: { color: colors.text },
+    activeTabText: { color: "#FFFFFF", fontWeight: "700" },
+    inviteResult: { gap: spacing.sm },
+    code: {
+      backgroundColor: colors.successBackground,
+      color: colors.text,
+      padding: spacing.md,
+      borderRadius: 10,
+      fontFamily: "monospace",
+      fontSize: 17,
+    },
+    link: { color: colors.primary, lineHeight: 21 },
+    member: { color: colors.text },
+    error: { color: colors.danger, lineHeight: 20 },
+  });

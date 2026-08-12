@@ -10,7 +10,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { colors, spacing } from "../lib/theme";
+import { useThemedStyles } from "../features/theme/theme-context";
+import { spacing, type ThemeColors } from "../lib/theme";
 
 interface ScreenProps extends PropsWithChildren {
   contentStyle?: StyleProp<ViewStyle>;
@@ -18,6 +19,7 @@ interface ScreenProps extends PropsWithChildren {
 }
 
 export function Screen({ children, contentStyle, scroll = true }: ScreenProps) {
+  const styles = useThemedStyles(createStyles);
   const content = (
     <View style={[styles.content, contentStyle]}>{children}</View>
   );
@@ -43,9 +45,10 @@ export function Screen({ children, contentStyle, scroll = true }: ScreenProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
-  flex: { flex: 1 },
-  scrollContent: { flexGrow: 1 },
-  content: { flex: 1, padding: spacing.md, gap: spacing.md },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    safeArea: { flex: 1, backgroundColor: colors.background },
+    flex: { flex: 1 },
+    scrollContent: { flexGrow: 1 },
+    content: { flex: 1, padding: spacing.md, gap: spacing.md },
+  });

@@ -3,11 +3,13 @@ import { useCallback, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { secureStoreAdapter } from "../../services/secure-store-adapter";
-import { colors, spacing } from "../../lib/theme";
+import { spacing, type ThemeColors } from "../../lib/theme";
+import { useThemedStyles } from "../theme/theme-context";
 
 const DISMISSED_KEY = "voice-discovery-dismissed-v1";
 
 export function VoiceDiscoveryModal() {
+  const styles = useThemedStyles(createStyles);
   const [visible, setVisible] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
 
@@ -86,40 +88,45 @@ export function VoiceDiscoveryModal() {
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    justifyContent: "center",
-    padding: spacing.lg,
-    backgroundColor: "rgba(0, 0, 0, 0.45)",
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 18,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  heading: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  icon: { fontSize: 30 },
-  closeButton: { padding: spacing.xs },
-  close: { color: colors.muted, fontSize: 30, lineHeight: 30 },
-  title: { color: colors.text, fontSize: 22, fontWeight: "800" },
-  body: { color: colors.muted, lineHeight: 22 },
-  checkboxRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    borderRadius: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxChecked: { backgroundColor: colors.primary },
-  checkmark: { color: "#FFFFFF", fontWeight: "800" },
-  checkboxText: { color: colors.text, fontWeight: "600" },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      justifyContent: "center",
+      padding: spacing.lg,
+      backgroundColor: "rgba(0, 0, 0, 0.45)",
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 18,
+      padding: spacing.lg,
+      gap: spacing.md,
+    },
+    heading: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    icon: { fontSize: 30 },
+    closeButton: { padding: spacing.xs },
+    close: { color: colors.muted, fontSize: 30, lineHeight: 30 },
+    title: { color: colors.text, fontSize: 22, fontWeight: "800" },
+    body: { color: colors.muted, lineHeight: 22 },
+    checkboxRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+    },
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      borderRadius: 6,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    checkboxChecked: { backgroundColor: colors.primary },
+    checkmark: { color: "#FFFFFF", fontWeight: "800" },
+    checkboxText: { color: colors.text, fontWeight: "600" },
+  });

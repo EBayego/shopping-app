@@ -28,7 +28,8 @@ import { VoiceDiscoveryModal } from "../../features/voice/voice-discovery-modal"
 import { normalizeShoppingItemInput } from "../../features/groups/validation";
 import { getErrorMessage } from "../../lib/errors";
 import { createOperationId } from "../../lib/operation-id";
-import { colors, spacing } from "../../lib/theme";
+import { useThemedStyles } from "../../features/theme/theme-context";
+import { spacing, type ThemeColors } from "../../lib/theme";
 import { useOfflineSync } from "../../offline/offline-sync-provider";
 import { speechRecognitionService } from "../../services/expo-speech-recognition-service";
 
@@ -37,6 +38,7 @@ function firstParameter(value: string | string[] | undefined): string {
 }
 
 export default function GroupDetailScreen() {
+  const styles = useThemedStyles(createStyles);
   const params = useLocalSearchParams<{
     groupId: string | string[];
     joinOutcome?: string | string[];
@@ -445,105 +447,114 @@ export default function GroupDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  heading: { gap: spacing.sm },
-  headingCopy: { gap: spacing.xs },
-  successBanner: {
-    color: colors.text,
-    backgroundColor: colors.successBackground,
-    padding: spacing.md,
-    borderRadius: 12,
-  },
-  syncBanner: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: spacing.md,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-  },
-  syncErrorBanner: { borderColor: colors.danger },
-  syncText: { color: colors.muted, flex: 1 },
-  title: { color: colors.text, fontSize: 28, fontWeight: "800" },
-  sectionTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
-  muted: { color: colors.muted, lineHeight: 21 },
-  tabs: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  tab: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  activeTab: { backgroundColor: colors.primary, borderColor: colors.primary },
-  tabText: { color: colors.text },
-  activeTabText: { color: "#FFFFFF", fontWeight: "700" },
-  addBox: { gap: spacing.sm, marginVertical: spacing.sm },
-  empty: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: spacing.lg,
-    gap: spacing.sm,
-    alignItems: "center",
-  },
-  items: { gap: spacing.sm },
-  item: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  itemBody: { flex: 1, gap: spacing.sm },
-  itemActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    flexWrap: "wrap",
-    gap: spacing.sm,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    borderRadius: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxChecked: { backgroundColor: colors.primary },
-  checkmark: { color: "#FFFFFF", fontWeight: "800" },
-  itemText: { color: colors.text, fontSize: 16, flex: 1 },
-  itemChecked: { color: colors.muted, textDecorationLine: "line-through" },
-  quantityButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surface,
-  },
-  quantityButtonText: {
-    color: colors.primary,
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  quantity: {
-    color: colors.text,
-    minWidth: 24,
-    textAlign: "center",
-    fontWeight: "700",
-  },
-  quantityUnit: { color: colors.muted, fontWeight: "600" },
-  actionText: { color: colors.primary, fontWeight: "700", padding: spacing.xs },
-  deleteText: { color: colors.danger, fontWeight: "700", padding: spacing.xs },
-  smallButton: { minHeight: 40, flexGrow: 1 },
-  error: { color: colors.danger, lineHeight: 20 },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    heading: { gap: spacing.sm },
+    headingCopy: { gap: spacing.xs },
+    successBanner: {
+      color: colors.text,
+      backgroundColor: colors.successBackground,
+      padding: spacing.md,
+      borderRadius: 12,
+    },
+    syncBanner: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: spacing.md,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: spacing.sm,
+    },
+    syncErrorBanner: { borderColor: colors.danger },
+    syncText: { color: colors.muted, flex: 1 },
+    title: { color: colors.text, fontSize: 28, fontWeight: "800" },
+    sectionTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
+    muted: { color: colors.muted, lineHeight: 21 },
+    tabs: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+    tab: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    activeTab: { backgroundColor: colors.primary, borderColor: colors.primary },
+    tabText: { color: colors.text },
+    activeTabText: { color: "#FFFFFF", fontWeight: "700" },
+    addBox: { gap: spacing.sm, marginVertical: spacing.sm },
+    empty: {
+      backgroundColor: colors.surface,
+      borderRadius: 14,
+      padding: spacing.lg,
+      gap: spacing.sm,
+      alignItems: "center",
+    },
+    items: { gap: spacing.sm },
+    item: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      padding: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    itemBody: { flex: 1, gap: spacing.sm },
+    itemActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: spacing.sm,
+    },
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      borderRadius: 6,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    checkboxChecked: { backgroundColor: colors.primary },
+    checkmark: { color: "#FFFFFF", fontWeight: "800" },
+    itemText: { color: colors.text, fontSize: 16, flex: 1 },
+    itemChecked: { color: colors.muted, textDecorationLine: "line-through" },
+    quantityButton: {
+      width: 34,
+      height: 34,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.surface,
+    },
+    quantityButtonText: {
+      color: colors.primary,
+      fontSize: 20,
+      fontWeight: "700",
+    },
+    quantity: {
+      color: colors.text,
+      minWidth: 24,
+      textAlign: "center",
+      fontWeight: "700",
+    },
+    quantityUnit: { color: colors.muted, fontWeight: "600" },
+    actionText: {
+      color: colors.primary,
+      fontWeight: "700",
+      padding: spacing.xs,
+    },
+    deleteText: {
+      color: colors.danger,
+      fontWeight: "700",
+      padding: spacing.xs,
+    },
+    smallButton: { minHeight: 40, flexGrow: 1 },
+    error: { color: colors.danger, lineHeight: 20 },
+  });

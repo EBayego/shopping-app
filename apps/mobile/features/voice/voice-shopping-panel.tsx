@@ -8,7 +8,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "../../components/app-button";
 import { AppInput } from "../../components/app-input";
-import { colors, spacing } from "../../lib/theme";
+import { useThemedStyles } from "../theme/theme-context";
+import { spacing, type ThemeColors } from "../../lib/theme";
 import {
   SpeechRecognitionError,
   type SpeechRecognitionService,
@@ -53,6 +54,7 @@ export function VoiceShoppingPanel({
   onConfirm,
   service,
 }: VoiceShoppingPanelProps) {
+  const styles = useThemedStyles(createStyles);
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [drafts, setDrafts] = useState<EditableDraft[]>([]);
@@ -210,6 +212,7 @@ function VoiceDraftEditor({
   index: number;
   onChange: (patch: Partial<Omit<EditableDraft, "id" | "source">>) => void;
 }) {
+  const styles = useThemedStyles(createStyles);
   const confidenceMessage =
     draft.source.confidence === "HIGH"
       ? "Resultado de alta confianza, preseleccionado."
@@ -448,57 +451,62 @@ function messageForError(error: SpeechRecognitionError): string {
   }
 }
 
-const styles = StyleSheet.create({
-  panel: { gap: spacing.md, marginVertical: spacing.sm },
-  heading: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  title: { color: colors.text, fontSize: 17, fontWeight: "700" },
-  action: { color: colors.primary, fontWeight: "700" },
-  hint: { color: colors.muted, lineHeight: 20 },
-  label: { color: colors.text, fontWeight: "700" },
-  listeningBox: {
-    backgroundColor: colors.successBackground,
-    borderRadius: 12,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  transcriptBox: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: spacing.md,
-    gap: spacing.xs,
-  },
-  transcript: { color: colors.text, lineHeight: 22 },
-  card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  lowCard: { borderColor: colors.danger },
-  selectionRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  selectionCopy: { flex: 1 },
-  checkbox: {
-    width: 26,
-    height: 26,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkboxSelected: { backgroundColor: colors.primary },
-  checkmark: { color: "#FFFFFF", fontWeight: "800" },
-  fieldRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  rowInput: { minWidth: 112 },
-  packageBox: { gap: spacing.sm },
-  error: { color: colors.danger, lineHeight: 20, fontWeight: "600" },
-  privacy: { color: colors.muted, fontSize: 12, lineHeight: 18 },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    panel: { gap: spacing.md, marginVertical: spacing.sm },
+    heading: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    title: { color: colors.text, fontSize: 17, fontWeight: "700" },
+    action: { color: colors.primary, fontWeight: "700" },
+    hint: { color: colors.muted, lineHeight: 20 },
+    label: { color: colors.text, fontWeight: "700" },
+    listeningBox: {
+      backgroundColor: colors.successBackground,
+      borderRadius: 12,
+      padding: spacing.md,
+      gap: spacing.sm,
+    },
+    transcriptBox: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: spacing.md,
+      gap: spacing.xs,
+    },
+    transcript: { color: colors.text, lineHeight: 22 },
+    card: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 12,
+      padding: spacing.md,
+      gap: spacing.sm,
+    },
+    lowCard: { borderColor: colors.danger },
+    selectionRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing.sm,
+    },
+    selectionCopy: { flex: 1 },
+    checkbox: {
+      width: 26,
+      height: 26,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    checkboxSelected: { backgroundColor: colors.primary },
+    checkmark: { color: "#FFFFFF", fontWeight: "800" },
+    fieldRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+    rowInput: { minWidth: 112 },
+    packageBox: { gap: spacing.sm },
+    error: { color: colors.danger, lineHeight: 20, fontWeight: "600" },
+    privacy: { color: colors.muted, fontSize: 12, lineHeight: 18 },
+  });

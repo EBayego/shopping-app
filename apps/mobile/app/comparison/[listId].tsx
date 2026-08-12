@@ -5,8 +5,9 @@ import { StyleSheet, Text, View } from "react-native";
 import { Screen } from "../../components/screen";
 import { ScreenState } from "../../components/screen-state";
 import { useBasketComparisonQuery } from "../../features/comparison/queries";
+import { useThemedStyles } from "../../features/theme/theme-context";
 import { getErrorMessage } from "../../lib/errors";
-import { colors, spacing } from "../../lib/theme";
+import { spacing, type ThemeColors } from "../../lib/theme";
 
 const euro = new Intl.NumberFormat("es-ES", {
   style: "currency",
@@ -14,6 +15,7 @@ const euro = new Intl.NumberFormat("es-ES", {
 });
 
 export default function BasketComparisonScreen() {
+  const styles = useThemedStyles(createStyles);
   const params = useLocalSearchParams<{ listId: string | string[] }>();
   const listId = Array.isArray(params.listId)
     ? (params.listId[0] ?? "")
@@ -89,6 +91,7 @@ export default function BasketComparisonScreen() {
 }
 
 function ComparisonLine({ line }: { line: BasketComparisonLine }) {
+  const styles = useThemedStyles(createStyles);
   if (line.status !== "MATCHED") {
     const reason =
       line.status === "UNAVAILABLE"
@@ -134,43 +137,44 @@ function ComparisonLine({ line }: { line: BasketComparisonLine }) {
   );
 }
 
-const styles = StyleSheet.create({
-  intro: { gap: spacing.sm },
-  title: { color: colors.text, fontSize: 24, fontWeight: "800" },
-  muted: { color: colors.muted, fontSize: 14, lineHeight: 20 },
-  card: {
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: spacing.sm,
-    padding: spacing.md,
-  },
-  bestCard: { borderColor: colors.primary, borderWidth: 2 },
-  cardHeader: {
-    alignItems: "flex-start",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-  },
-  retailer: { color: colors.text, fontSize: 20, fontWeight: "800" },
-  coverage: { color: colors.primary, fontSize: 14, fontWeight: "700" },
-  totalBox: { alignItems: "flex-end" },
-  total: { color: colors.text, fontSize: 20, fontWeight: "800" },
-  subtotal: { color: colors.muted, fontSize: 11 },
-  warning: { color: "#9A6700", fontSize: 12, lineHeight: 17 },
-  line: {
-    borderTopColor: colors.border,
-    borderTopWidth: 1,
-    flexDirection: "row",
-    gap: spacing.sm,
-    justifyContent: "space-between",
-    paddingTop: spacing.sm,
-  },
-  lineMain: { flex: 1 },
-  lineName: { color: colors.text, fontSize: 15, fontWeight: "700" },
-  product: { color: colors.muted, fontSize: 12, lineHeight: 17 },
-  linePrice: { color: colors.text, fontSize: 15, fontWeight: "700" },
-  missing: { color: colors.danger, fontSize: 12 },
-  promo: { color: colors.primary, fontSize: 12, fontWeight: "700" },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    intro: { gap: spacing.sm },
+    title: { color: colors.text, fontSize: 24, fontWeight: "800" },
+    muted: { color: colors.muted, fontSize: 14, lineHeight: 20 },
+    card: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: 16,
+      borderWidth: 1,
+      gap: spacing.sm,
+      padding: spacing.md,
+    },
+    bestCard: { borderColor: colors.primary, borderWidth: 2 },
+    cardHeader: {
+      alignItems: "flex-start",
+      flexDirection: "row",
+      justifyContent: "space-between",
+      gap: spacing.sm,
+    },
+    retailer: { color: colors.text, fontSize: 20, fontWeight: "800" },
+    coverage: { color: colors.primary, fontSize: 14, fontWeight: "700" },
+    totalBox: { alignItems: "flex-end" },
+    total: { color: colors.text, fontSize: 20, fontWeight: "800" },
+    subtotal: { color: colors.muted, fontSize: 11 },
+    warning: { color: "#9A6700", fontSize: 12, lineHeight: 17 },
+    line: {
+      borderTopColor: colors.border,
+      borderTopWidth: 1,
+      flexDirection: "row",
+      gap: spacing.sm,
+      justifyContent: "space-between",
+      paddingTop: spacing.sm,
+    },
+    lineMain: { flex: 1 },
+    lineName: { color: colors.text, fontSize: 15, fontWeight: "700" },
+    product: { color: colors.muted, fontSize: 12, lineHeight: 17 },
+    linePrice: { color: colors.text, fontSize: 15, fontWeight: "700" },
+    missing: { color: colors.danger, fontSize: 12 },
+    promo: { color: colors.primary, fontSize: 12, fontWeight: "700" },
+  });

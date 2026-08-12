@@ -11,10 +11,12 @@ import {
   type CreateGroupErrors,
 } from "../features/groups/validation";
 import { getErrorMessage } from "../lib/errors";
-import { colors, spacing } from "../lib/theme";
+import { useThemedStyles } from "../features/theme/theme-context";
+import { spacing, type ThemeColors } from "../lib/theme";
 import { useUiStore } from "../stores/ui-store";
 
 export default function OnboardingScreen() {
+  const styles = useThemedStyles(createStyles);
   const [groupName, setGroupName] = useState("");
   const [listName, setListName] = useState("Compra semanal");
   const [postalCode, setPostalCode] = useState("");
@@ -93,20 +95,21 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  content: { paddingTop: spacing.xl },
-  title: { color: colors.text, fontSize: 28, fontWeight: "800" },
-  subtitle: {
-    color: colors.muted,
-    fontSize: 16,
-    lineHeight: 23,
-    marginBottom: spacing.sm,
-  },
-  error: { color: colors.danger, lineHeight: 20 },
-  pendingText: {
-    color: colors.text,
-    backgroundColor: colors.successBackground,
-    padding: spacing.md,
-    borderRadius: 12,
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    content: { paddingTop: spacing.xl },
+    title: { color: colors.text, fontSize: 28, fontWeight: "800" },
+    subtitle: {
+      color: colors.muted,
+      fontSize: 16,
+      lineHeight: 23,
+      marginBottom: spacing.sm,
+    },
+    error: { color: colors.danger, lineHeight: 20 },
+    pendingText: {
+      color: colors.text,
+      backgroundColor: colors.successBackground,
+      padding: spacing.md,
+      borderRadius: 12,
+    },
+  });
