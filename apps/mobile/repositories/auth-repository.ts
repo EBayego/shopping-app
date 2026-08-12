@@ -22,11 +22,6 @@ export async function restoreOrCreateAnonymousSession(): Promise<EnsuredSession>
   return ensureAnonymousSession(getSupabaseClient().auth);
 }
 
-export async function signOutLocalSession(): Promise<void> {
-  const { error } = await getSupabaseClient().auth.signOut({ scope: "local" });
-  if (error) throw error;
-}
-
 export async function beginSocialIdentityLink(
   provider: SocialIdentityProvider,
 ): Promise<void> {

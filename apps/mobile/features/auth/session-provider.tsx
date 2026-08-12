@@ -13,10 +13,7 @@ import { AppState } from "react-native";
 
 import { getErrorMessage } from "../../lib/errors";
 import { queryClient } from "../../lib/query-client";
-import {
-  restoreOrCreateAnonymousSession,
-  signOutLocalSession,
-} from "../../repositories/auth-repository";
+import { restoreOrCreateAnonymousSession } from "../../repositories/auth-repository";
 import { getSupabaseClient } from "../../services/supabase";
 
 type SessionState =
@@ -26,7 +23,6 @@ type SessionState =
 
 type SessionContextValue = SessionState & {
   retry: () => Promise<void>;
-  resetSession: () => Promise<void>;
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -99,23 +95,9 @@ export function SessionProvider({ children }: PropsWithChildren) {
     };
   }, [restoreOrCreateSession]);
 
-  const resetSession = useCallback(async () => {
-    try {
-      await signOutLocalSession();
-      queryClient.clear();
-      await restoreOrCreateSession();
-    } catch (error) {
-      setState({
-        status: "error",
-        session: null,
-        error: getErrorMessage(error),
-      });
-    }
-  }, [restoreOrCreateSession]);
-
   const value = useMemo<SessionContextValue>(
-    () => ({ ...state, retry: restoreOrCreateSession, resetSession }),
-    [resetSession, restoreOrCreateSession, state],
+    () => ({ ...state, retry: restoreOrCreateSession }),
+    [restoreOrCreateSession, state],
   );
 
   return (

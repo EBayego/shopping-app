@@ -220,15 +220,6 @@ export default function SettingsScreen() {
           ),
         )}
       </View>
-
-      <Text style={styles.identifier}>ID de sesión: {userId}</Text>
-      <Text style={styles.warning}>
-        Reiniciar crea una identidad anónima nueva. Perderás el acceso a los
-        grupos de la sesión actual si no conservas una invitación.
-      </Text>
-      <AppButton tone="danger" onPress={() => void session.resetSession()}>
-        Reiniciar sesión local
-      </AppButton>
     </Screen>
   );
 }
@@ -309,12 +300,4 @@ const createStyles = (colors: ThemeColors) =>
     themeOptionText: { color: colors.text, fontWeight: "700" as const },
     themeOptionTextActive: { color: colors.background },
     pressed: { opacity: 0.78 },
-    identifier: { color: colors.muted, fontSize: 12, marginTop: spacing.lg },
-    warning: {
-      color: colors.danger,
-      backgroundColor: colors.dangerBackground,
-      padding: spacing.md,
-      borderRadius: 12,
-      lineHeight: 21,
-    },
   });
