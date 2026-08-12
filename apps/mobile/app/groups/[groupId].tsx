@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ShoppingIntentDraft } from "@shopping-app/voice-parser";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -175,26 +175,32 @@ export default function GroupDetailScreen() {
 
   return (
     <Screen>
+      <Stack.Screen
+        options={{
+          title: detail.data.group.name,
+          headerRight: () => (
+            <Pressable
+              accessibilityLabel="Ajustes del grupo"
+              accessibilityRole="button"
+              hitSlop={6}
+              onPress={() =>
+                router.push({
+                  pathname: "/groups/settings/[groupId]",
+                  params: { groupId },
+                })
+              }
+              style={({ pressed }) => [
+                styles.headerIconButton,
+                pressed && styles.headerIconButtonPressed,
+              ]}
+            >
+              <Ionicons color={colors.text} name="settings-outline" size={24} />
+            </Pressable>
+          ),
+        }}
+      />
       <VoiceDiscoveryModal />
-      <View style={styles.heading}>
-        <View style={styles.headingCopy}>
-          <Text style={styles.title}>{detail.data.group.name}</Text>
-          <Text style={styles.muted}>
-            {detail.data.members.length} miembro(s)
-          </Text>
-        </View>
-        <AppButton
-          tone="secondary"
-          onPress={() =>
-            router.push({
-              pathname: "/groups/settings/[groupId]",
-              params: { groupId },
-            })
-          }
-        >
-          Ajustes del grupo
-        </AppButton>
-      </View>
+      <Text style={styles.muted}>{detail.data.members.length} miembro(s)</Text>
 
       {joinOutcome ? (
         <Text style={styles.successBanner}>
@@ -476,8 +482,14 @@ export default function GroupDetailScreen() {
 
 const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
-    heading: { gap: spacing.sm },
-    headingCopy: { gap: spacing.xs },
+    headerIconButton: {
+      alignItems: "center",
+      borderRadius: 20,
+      height: 40,
+      justifyContent: "center",
+      width: 40,
+    },
+    headerIconButtonPressed: { opacity: 0.6 },
     successBanner: {
       color: colors.text,
       backgroundColor: colors.successBackground,
@@ -497,7 +509,6 @@ const createStyles = (colors: ThemeColors) =>
     },
     syncErrorBanner: { borderColor: colors.danger },
     syncText: { color: colors.muted, flex: 1 },
-    title: { color: colors.text, fontSize: 28, fontWeight: "800" },
     sectionTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
     muted: { color: colors.muted, lineHeight: 21 },
     tabs: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
