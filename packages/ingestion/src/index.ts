@@ -32,6 +32,8 @@ export type {
   CircuitBreakerOptions,
   CatalogIngestionRequest,
   FinishSyncRunInput,
+  IngestionCollectionFailure,
+  IngestionCollectionResult,
   IngestionOptions,
   IngestionRequest,
   IngestionResult,

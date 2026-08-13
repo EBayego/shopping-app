@@ -60,7 +60,12 @@ export class IngestionPersistenceCore {
     session: IngestionSession,
     observations: PreparedObservationSet,
     health: ProviderHealth,
-    recordCatalogMisses = false,
+    options: {
+      recordCatalogMisses?: boolean;
+      status?: "succeeded" | "partial";
+      metadata?: Readonly<Record<string, unknown>>;
+      errorMessage?: string;
+    } = {},
   ): Promise<void> {
     const scope = {
       retailerId: session.retailerId,
@@ -69,7 +74,7 @@ export class IngestionPersistenceCore {
     for (const batch of batches(observations.products, this.batchSize)) {
       await this.store.upsertProducts(scope, batch);
     }
-    if (recordCatalogMisses) {
+    if (options.recordCatalogMisses === true) {
       await this.store.recordCatalogProductMisses(
         scope,
         session.runId,
@@ -80,11 +85,13 @@ export class IngestionPersistenceCore {
       session,
       observations.offers,
       health,
-      "succeeded",
+      options.status ?? "succeeded",
       {
         batchSize: this.batchSize,
         productsSeen: observations.products.length,
+        ...options.metadata,
       },
+      options.errorMessage,
     );
   }
 
@@ -94,6 +101,7 @@ export class IngestionPersistenceCore {
     health: ProviderHealth,
     status: "succeeded" | "partial" | "failed" = "succeeded",
     metadata: Readonly<Record<string, unknown>> = {},
+    errorMessage?: string,
   ): Promise<void> {
     const failedCount =
       typeof metadata.failed === "number" ? metadata.failed : "Some";
@@ -116,7 +124,8 @@ export class IngestionPersistenceCore {
       ...(status === "succeeded"
         ? {}
         : {
-            errorMessage: `${failedCount} price refreshes failed`,
+            errorMessage:
+              errorMessage ?? `${failedCount} ingestion operations failed`,
           }),
       metadata: { batchSize: this.batchSize, ...metadata },
     });

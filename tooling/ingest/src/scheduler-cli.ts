@@ -15,6 +15,7 @@ import {
 import {
   ScheduledIngestionRunner,
   SupabaseJobDispatcher,
+  type SchedulerTickResult,
 } from "./scheduled-ingestion.js";
 
 export async function main(): Promise<void> {
@@ -40,6 +41,15 @@ export async function main(): Promise<void> {
       ...result,
     }),
   );
+  assertSuccessfulTick(result);
+}
+
+export function assertSuccessfulTick(result: SchedulerTickResult): void {
+  if (result.failed > 0) {
+    throw new Error(
+      `${result.failed} of ${result.processed} scheduled ingestion jobs failed`,
+    );
+  }
 }
 
 function required(name: string): string {

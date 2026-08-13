@@ -122,11 +122,16 @@ export class PipelineRefreshExecutor implements RefreshExecutor {
       }
       return;
     }
-    await new RetailerIngestionPipeline(
+    const result = await new RetailerIngestionPipeline(
       createCatalogStrategy(retailer),
       this.store,
       { logger: this.logger },
     ).ingest({ postalCode: request.postal_code });
+    if (result.status !== "succeeded") {
+      throw new ObservedIngestionError(
+        new Error(`CATALOG_SYNC completed with status ${result.status}`),
+      );
+    }
   }
 }
 

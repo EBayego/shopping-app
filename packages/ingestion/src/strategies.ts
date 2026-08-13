@@ -1,30 +1,37 @@
 import type { Market } from "@shopping-app/domain";
 import type {
   CatalogRetailerProvider,
-  RetailerObservationSet,
   SearchRetailerProvider,
 } from "@shopping-app/retailer-contracts";
 
 import type {
   CatalogIngestionRequest,
+  IngestionCollectionResult,
   IngestionStrategy,
   ProviderOperationRunner,
   SearchIngestionRequest,
 } from "./types.js";
+import { safeError } from "./resilience.js";
 
 export class SearchIngestionStrategy implements IngestionStrategy<SearchIngestionRequest> {
   readonly kind = "SEARCH_INGESTION" as const;
 
   constructor(readonly provider: SearchRetailerProvider) {}
 
-  collect(
+  async collect(
     request: SearchIngestionRequest,
     market: Market,
     runner: ProviderOperationRunner,
-  ): Promise<RetailerObservationSet> {
-    return runner.run("search_products", () =>
+  ): Promise<IngestionCollectionResult> {
+    const observations = await runner.run("search_products", () =>
       this.provider.searchProducts(request.query, market),
     );
+    return {
+      ...observations,
+      status: "succeeded",
+      attemptedOperations: 1,
+      failures: [],
+    };
   }
 
   metadata(request: SearchIngestionRequest): Readonly<Record<string, unknown>> {
@@ -41,25 +48,50 @@ export class CatalogIngestionStrategy implements IngestionStrategy<CatalogIngest
     request: CatalogIngestionRequest,
     market: Market,
     runner: ProviderOperationRunner,
-  ): Promise<RetailerObservationSet> {
-    const categoryIds =
+  ): Promise<IngestionCollectionResult> {
+    const categoryIds = uniqueCategoryIds(
       request.categoryIds === undefined
-        ? (
+        ? leafCategories(
             await runner.run("get_categories", () =>
               this.provider.getCategories(market),
-            )
+            ),
           ).map((category) => category.externalId)
-        : [...request.categoryIds];
-    const observations = await Promise.all(
+        : request.categoryIds,
+    );
+    const observations = await Promise.allSettled(
       categoryIds.map((categoryId) =>
         runner.run("get_products_by_category", () =>
           this.provider.getProductsByCategory(categoryId, market),
         ),
       ),
     );
+    const failures = observations.flatMap((result, index) =>
+      result.status === "rejected"
+        ? [
+            {
+              subject: categoryIds[index] as string,
+              error: safeError(result.reason),
+            },
+          ]
+        : [],
+    );
+    const successes = observations.flatMap((result) =>
+      result.status === "fulfilled" ? [result.value] : [],
+    );
+    if (failures.length > 0 && successes.length === 0) {
+      throw new AggregateError(
+        observations.flatMap((result) =>
+          result.status === "rejected" ? [result.reason] : [],
+        ),
+        `All ${failures.length} catalog categories failed`,
+      );
+    }
     return {
-      products: observations.flatMap((result) => result.products),
-      offers: observations.flatMap((result) => result.offers),
+      products: successes.flatMap((result) => result.products),
+      offers: successes.flatMap((result) => result.offers),
+      status: failures.length === 0 ? "succeeded" : "partial",
+      attemptedOperations: categoryIds.length,
+      failures,
     };
   }
 
@@ -73,4 +105,25 @@ export class CatalogIngestionStrategy implements IngestionStrategy<CatalogIngest
         : { categoryIds: [...request.categoryIds] }),
     };
   }
+}
+
+function leafCategories<
+  T extends { externalId: string; parentExternalId?: string },
+>(categories: readonly T[]): T[] {
+  const parentIds = new Set(
+    categories.flatMap((category) =>
+      category.parentExternalId === undefined
+        ? []
+        : [category.parentExternalId],
+    ),
+  );
+  return categories.filter((category) => !parentIds.has(category.externalId));
+}
+
+function uniqueCategoryIds(categoryIds: readonly string[]): string[] {
+  return [
+    ...new Set(
+      categoryIds.map((categoryId) => categoryId.trim()).filter(Boolean),
+    ),
+  ];
 }

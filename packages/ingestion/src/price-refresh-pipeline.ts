@@ -171,6 +171,9 @@ export class PriceRefreshPipeline {
             (failure) => failure.retailerProductExternalId,
           ),
         },
+        failures.length === 0
+          ? undefined
+          : `${failures.length} product price refreshes failed`,
       );
       this.logger.info("price_refresh.completed", {
         retailer: market.retailer,

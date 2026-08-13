@@ -123,8 +123,19 @@ export interface IngestionStrategy<TRequest extends IngestionRequest> {
     request: TRequest,
     market: Market,
     runner: ProviderOperationRunner,
-  ): Promise<RetailerObservationSet>;
+  ): Promise<IngestionCollectionResult>;
   metadata(request: TRequest): Readonly<Record<string, unknown>>;
+}
+
+export interface IngestionCollectionFailure {
+  subject: string;
+  error: Readonly<Record<string, unknown>>;
+}
+
+export interface IngestionCollectionResult extends RetailerObservationSet {
+  status: "succeeded" | "partial";
+  attemptedOperations: number;
+  failures: readonly IngestionCollectionFailure[];
 }
 
 export interface PreparedObservationSet {
@@ -175,5 +186,6 @@ export interface IngestionResult {
   productsSeen: number;
   offersSeen: number;
   dryRun: boolean;
+  status: "succeeded" | "partial" | "failed";
   syncRunId?: string;
 }

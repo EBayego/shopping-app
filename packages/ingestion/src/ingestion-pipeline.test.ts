@@ -93,7 +93,7 @@ class FakeCatalogProvider implements CatalogRetailerProvider {
     return Promise.resolve([{ externalId: "dairy", name: "Lácteos" }]);
   }
 
-  getProductsByCategory(): Promise<RetailerSearchResult> {
+  getProductsByCategory(_categoryId: string): Promise<RetailerSearchResult> {
     return Promise.resolve({
       products: [
         {
@@ -114,11 +114,11 @@ class FakeCatalogProvider implements CatalogRetailerProvider {
   }
 
   async getProduct(): Promise<RetailerProduct> {
-    return (await this.getProductsByCategory()).products[0]!;
+    return (await this.getProductsByCategory("dairy")).products[0]!;
   }
 
   async refreshPrices(): Promise<ProductOffer[]> {
-    return (await this.getProductsByCategory()).offers;
+    return (await this.getProductsByCategory("dairy")).offers;
   }
 
   healthCheck(): Promise<ProviderHealth> {
@@ -127,6 +127,37 @@ class FakeCatalogProvider implements CatalogRetailerProvider {
       status: "healthy",
       checkedAt: observedAt,
     });
+  }
+}
+
+class PartialCatalogProvider extends FakeCatalogProvider {
+  readonly requestedCategoryIds: string[] = [];
+
+  override getCategories(): Promise<RetailerCategory[]> {
+    return Promise.resolve([
+      { externalId: "root", name: "Root", level: 0 },
+      {
+        externalId: "dairy",
+        name: "Lácteos",
+        parentExternalId: "root",
+        level: 1,
+      },
+      {
+        externalId: "broken",
+        name: "Rota",
+        parentExternalId: "root",
+        level: 1,
+      },
+    ]);
+  }
+
+  override getProductsByCategory(
+    categoryId: string,
+  ): Promise<RetailerSearchResult> {
+    this.requestedCategoryIds.push(categoryId);
+    return categoryId === "broken"
+      ? Promise.reject(new Error("category unavailable"))
+      : super.getProductsByCategory(categoryId);
   }
 }
 
@@ -249,6 +280,35 @@ describe("RetailerIngestionPipeline", () => {
     ).ingest({ postalCode: "50009", categoryIds: ["dairy"] });
 
     expect(store.catalogMissRuns).toEqual([]);
+  });
+
+  it("persists successful leaf categories and marks a full scan as partial", async () => {
+    const store = new FakeStore();
+    const provider = new PartialCatalogProvider();
+
+    const result = await new RetailerIngestionPipeline(
+      new CatalogIngestionStrategy(provider),
+      store,
+      { retry: { maxAttempts: 1 } },
+    ).ingest({ postalCode: "50009" });
+
+    expect(result).toMatchObject({
+      status: "partial",
+      productsSeen: 1,
+      offersSeen: 1,
+    });
+    expect(provider.requestedCategoryIds).toEqual(["dairy", "broken"]);
+    expect(store.products.has("catalog-milk-1")).toBe(true);
+    expect(store.catalogMissRuns).toEqual([]);
+    expect(store.finished.at(-1)).toMatchObject({
+      status: "partial",
+      productsSeen: 1,
+      offersSeen: 1,
+      metadata: {
+        attemptedOperations: 2,
+        failedOperations: 1,
+      },
+    });
   });
 
   it("does not persist a dry-run", async () => {

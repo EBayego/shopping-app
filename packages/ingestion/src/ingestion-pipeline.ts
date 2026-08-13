@@ -59,7 +59,7 @@ export class RetailerIngestionPipeline<TRequest extends IngestionRequest> {
         productsSeen: observations.products.length,
         offersSeen: observations.offers.length,
       });
-      return result(market, observations, true);
+      return result(market, observations, true, collected.status);
     }
 
     const session = await this.persistence.open(
@@ -79,22 +79,50 @@ export class RetailerIngestionPipeline<TRequest extends IngestionRequest> {
         products: observations.products.length,
         offers: observations.offers.length,
       };
-      const health = await this.readHealth(market.retailer);
-      await this.persistence.persist(
-        session,
-        observations,
-        health,
-        isCompleteCatalogRequest(this.strategy.kind, request),
-      );
-      this.logger.info("ingestion.succeeded", {
-        strategy: this.strategy.kind,
-        retailer: market.retailer,
-        runId: session.runId,
-        productsSeen: counts.products,
-        offersSeen: counts.offers,
+      const health =
+        collected.status === "partial"
+          ? {
+              retailer: market.retailer,
+              status: "degraded" as const,
+              checkedAt: this.now(),
+              message: `${collected.failures.length} of ${collected.attemptedOperations} catalog operations failed`,
+            }
+          : await this.readHealth(market.retailer);
+      await this.persistence.persist(session, observations, health, {
+        recordCatalogMisses:
+          collected.status === "succeeded" &&
+          isCompleteCatalogRequest(this.strategy.kind, request),
+        status: collected.status,
+        metadata: {
+          attemptedOperations: collected.attemptedOperations,
+          failedOperations: collected.failures.length,
+          ...(collected.failures.length === 0
+            ? {}
+            : {
+                failures: collected.failures,
+              }),
+        },
+        ...(collected.status === "partial"
+          ? {
+              errorMessage: `${collected.failures.length} catalog categories failed`,
+            }
+          : {}),
       });
+      this.logger.info(
+        collected.status === "succeeded"
+          ? "ingestion.succeeded"
+          : "ingestion.partial",
+        {
+          strategy: this.strategy.kind,
+          retailer: market.retailer,
+          runId: session.runId,
+          productsSeen: counts.products,
+          offersSeen: counts.offers,
+          failedOperations: collected.failures.length,
+        },
+      );
       return {
-        ...result(market, observations, false),
+        ...result(market, observations, false, collected.status),
         syncRunId: session.runId,
       };
     } catch (error) {
@@ -134,6 +162,7 @@ function result(
   market: { retailer: IngestionResult["retailer"]; externalId: string },
   observations: { products: readonly unknown[]; offers: readonly unknown[] },
   dryRun: boolean,
+  status: IngestionResult["status"],
 ): IngestionResult {
   return {
     retailer: market.retailer,
@@ -141,6 +170,7 @@ function result(
     productsSeen: observations.products.length,
     offersSeen: observations.offers.length,
     dryRun,
+    status,
   };
 }
 

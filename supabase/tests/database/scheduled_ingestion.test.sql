@@ -1,6 +1,6 @@
 begin;
 
-select plan(23);
+select plan(24);
 
 select has_table('public', 'ingestion_runtime_config', 'central runtime configuration exists');
 select has_table('public', 'provider_job_schedules', 'provider schedules exist');
@@ -39,6 +39,23 @@ update public.provider_sync_runs
 set status = 'succeeded', finished_at = now()
 where market_id = '90000000-0000-4000-8000-000000000001';
 
+insert into public.retailer_market_postal_codes (retailer_id, market_id, postal_code)
+values (
+  '00000000-0000-4000-8000-000000000001',
+  '90000000-0000-4000-8000-000000000001',
+  '50009'
+);
+delete from public.retailer_products;
+insert into public.retailer_products (
+  retailer_id, market_id, external_id, name, observed_at
+) values (
+  '00000000-0000-4000-8000-000000000001',
+  '90000000-0000-4000-8000-000000000001',
+  'scheduler-product',
+  'Scheduler product',
+  now()
+);
+
 insert into public.groups (id, name)
 values ('91000000-0000-4000-8000-000000000001', 'Scheduled ingestion group');
 insert into public.shopping_lists (id, group_id, name, postal_code)
@@ -58,21 +75,40 @@ select is(
   (
     select count(*)
     from public.retailers retailer
-    cross join lateral (
-      select 'PRICE_REFRESH'
-      where 'PRICE_REFRESH' = any(retailer.capabilities)
-      union all
-      select 'CATALOG_SYNC'
-      where 'CATALOG' = any(retailer.capabilities)
-    ) request_kind
     cross join (
       select distinct postal_code from public.shopping_lists
       union
       select distinct postal_code from public.retailer_market_postal_codes
     ) scope
+    cross join lateral (
+      select 'PRICE_REFRESH'
+      where 'PRICE_REFRESH' = any(retailer.capabilities)
+        and exists (
+          select 1
+          from public.retailer_market_postal_codes mapping
+          join public.retailer_products product
+            on product.retailer_id = mapping.retailer_id
+           and product.market_id = mapping.market_id
+           and product.active
+          where mapping.retailer_id = retailer.id
+            and mapping.postal_code = scope.postal_code
+        )
+      union all
+      select 'CATALOG_SYNC'
+      where 'CATALOG' = any(retailer.capabilities)
+    ) request_kind
     where retailer.operational_status <> 'DISABLED'
   ),
   'one independent job per provider capability and postal scope is queued'
+);
+select is(
+  (
+    select count(*)
+    from public.refresh_requests
+    where request_type = 'PRICE_REFRESH'
+  ),
+  1::bigint,
+  'price refresh is only queued for a provider market with active products'
 );
 select set_eq(
   $$
