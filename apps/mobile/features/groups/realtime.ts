@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { AppState } from "react-native";
 
 import { getSupabaseClient } from "../../services/supabase";
-import { groupKeys } from "./queries";
+import { groupKeys } from "./query-keys";
 import { createRefetchScheduler } from "./reconciliation";
 
 export function subscribeToGroupBroadcast(
@@ -15,7 +15,9 @@ export function subscribeToGroupBroadcast(
   let disposed = false;
   let channel: ReturnType<typeof supabase.channel> | undefined;
   const reconcile = createRefetchScheduler(() => {
-    void queryClient.invalidateQueries({ queryKey: groupKeys.detail(groupId) });
+    void queryClient.invalidateQueries({
+      queryKey: groupKeys.detailScope(groupId),
+    });
   });
 
   void supabase.realtime.setAuth().then(() => {

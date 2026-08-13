@@ -17,7 +17,7 @@ import {
 import { AppState } from "react-native";
 
 import { useSession } from "../features/auth/session-provider";
-import { groupKeys } from "../features/groups/queries";
+import { groupKeys } from "../features/groups/query-keys";
 import { getErrorMessage } from "../lib/errors";
 import { setNetworkOnline } from "./network-state";
 import { shoppingSyncEngine } from "./offline-shopping-repository";
@@ -49,6 +49,7 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
   const running = useRef<Promise<void> | null>(null);
   const rerunRequested = useRef(false);
   const onlineRef = useRef(true);
+  const profileId = session.status === "ready" ? session.session.user.id : null;
 
   const refreshStatus = useCallback(async () => {
     await sqliteShoppingStore.initialize();
@@ -56,7 +57,7 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
   }, []);
 
   const syncNow = useCallback(() => {
-    if (!onlineRef.current || session.status !== "ready") return;
+    if (!onlineRef.current || !profileId) return;
     if (running.current) {
       rerunRequested.current = true;
       return;
@@ -66,7 +67,7 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
       .sync()
       .then(async () => {
         await refreshStatus();
-        await queryClient.invalidateQueries({ queryKey: groupKeys.all });
+        await queryClient.invalidateQueries({ queryKey: groupKeys.root });
       })
       .catch(async (error: unknown) => {
         const message = getErrorMessage(error);
@@ -89,7 +90,7 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
         }
       });
     running.current = task;
-  }, [queryClient, refreshStatus, session.status]);
+  }, [profileId, queryClient, refreshStatus]);
 
   useEffect(() => {
     void refreshStatus();
@@ -105,8 +106,13 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
   }, [refreshStatus, syncNow]);
 
   useEffect(() => {
-    if (session.status === "ready") syncNow();
-  }, [session.status, syncNow]);
+    if (!profileId) return;
+    void queryClient.invalidateQueries(
+      { queryKey: groupKeys.root },
+      { cancelRefetch: false },
+    );
+    syncNow();
+  }, [profileId, queryClient, syncNow]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {

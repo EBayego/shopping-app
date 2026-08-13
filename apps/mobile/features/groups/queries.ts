@@ -13,17 +13,15 @@ import {
   listOfflineGroups,
 } from "../../offline/offline-shopping-repository";
 import { useOfflineSync } from "../../offline/offline-sync-provider";
+import { groupKeys } from "./query-keys";
 import type { AddShoppingIntentInput, EditShoppingIntentInput } from "./types";
-
-export const groupKeys = {
-  all: ["groups"] as const,
-  detail: (groupId: string) => ["groups", groupId] as const,
-};
 
 export function useGroupsQuery() {
   const session = useSession();
+  const profileId =
+    session.status === "ready" ? session.session.user.id : "signed-out";
   return useQuery({
-    queryKey: groupKeys.all,
+    queryKey: groupKeys.list(profileId),
     queryFn: listOfflineGroups,
     enabled: session.status === "ready",
   });
@@ -31,8 +29,10 @@ export function useGroupsQuery() {
 
 export function useGroupDetailQuery(groupId: string) {
   const session = useSession();
+  const profileId =
+    session.status === "ready" ? session.session.user.id : "signed-out";
   return useQuery({
-    queryKey: groupKeys.detail(groupId),
+    queryKey: groupKeys.detail(profileId, groupId),
     queryFn: () => getOfflineGroupDetail(groupId),
     enabled: session.status === "ready" && groupId.length > 0,
   });
@@ -43,7 +43,7 @@ export function useCreateGroupMutation() {
   return useMutation({
     mutationFn: createGroup,
     onSuccess: async () =>
-      queryClient.invalidateQueries({ queryKey: groupKeys.all }),
+      queryClient.invalidateQueries({ queryKey: groupKeys.root }),
   });
 }
 
@@ -52,7 +52,7 @@ export function useJoinGroupMutation() {
   return useMutation({
     mutationFn: joinGroup,
     onSuccess: async () =>
-      queryClient.invalidateQueries({ queryKey: groupKeys.all }),
+      queryClient.invalidateQueries({ queryKey: groupKeys.root }),
   });
 }
 
@@ -212,7 +212,10 @@ function completeLocalMutation(
   detail: Awaited<ReturnType<typeof enqueueShoppingOperation>>,
   sync: { refreshStatus: () => Promise<void>; syncNow: () => void },
 ): void {
-  queryClient.setQueryData(groupKeys.detail(groupId), detail);
+  queryClient.setQueriesData(
+    { queryKey: groupKeys.detailScope(groupId), type: "active" },
+    detail,
+  );
   void sync.refreshStatus();
   sync.syncNow();
 }
