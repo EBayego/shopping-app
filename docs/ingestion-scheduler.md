@@ -57,6 +57,55 @@ ofertas stale/very-stale y productos indicados en solicitudes manuales usando
 la política de frescura existente. Un catálogo completo solo se descarga cuando
 vence su cadencia de catálogo; no se descarga en cada tick.
 
+## Entornos
+
+Actualmente hay un único proyecto Supabase remoto. El workflow ejecuta un solo
+tick contra ese proyecto usando estos Repository Secrets:
+
+- `SUPABASE_URL`: URL del proyecto Supabase remoto.
+- `SUPABASE_SECRET_KEY`: secret key server-side del mismo proyecto.
+
+Development continúa usando Supabase local y una ejecución manual. Las builds
+móviles que apunten al mismo proyecto remoto comparten su catálogo y sus
+precios; no necesitan un scheduler independiente.
+
+Los workflows programados usan la rama por defecto del repositorio, actualmente
+`develop`. Cuando exista un segundo proyecto Supabase para producción, se deben
+separar sus credenciales y su ciclo de despliegue antes de añadir un segundo
+tick. No definas la secret key como variable `EXPO_PUBLIC_*`.
+
+## Bootstrap de retailers y catálogo
+
+Los registros operativos de DIA, Mercadona, Alcampo y Eroski se crean mediante
+migraciones, por lo que existen después de `supabase db push` sin ejecutar el
+seed. `seed.sql` solo contiene mercados, productos, matches, precios y ofertas
+demo para desarrollo local.
+
+El primer tick descubre los códigos postales presentes en `shopping_lists` y
+`retailer_market_postal_codes`, crea los correspondientes
+`provider_job_schedules`, encola los trabajos vencidos y los procesa. Para
+comprobar el bootstrap de un entorno:
+
+```sql
+select code, operational_status, capabilities
+from public.retailers
+order by code;
+
+select retailer_id, request_type, postal_code, enabled, next_run_at
+from public.provider_job_schedules
+order by postal_code, request_type, retailer_id;
+
+select status, request_type, postal_code, count(*)
+from public.refresh_requests
+group by status, request_type, postal_code
+order by postal_code, request_type, status;
+```
+
+Mercadona y Alcampo disponen de estrategia de catálogo. DIA descubre productos
+mediante búsquedas concretas y Eroski solo refresca productos previamente
+conocidos; no se anuncian como catálogos completos hasta que exista una
+estrategia de discovery confirmada para esos proveedores.
+
 ## Variables y secretos
 
 La CLI necesita:
@@ -65,9 +114,9 @@ La CLI necesita:
 - `SUPABASE_SECRET_KEY` (`sb_secret_...`)
 - `REFRESH_WORKER_ID` (opcional)
 
-Configura las dos primeras como GitHub Actions secrets con esos nombres. Para
-local usa un `.env` no versionado o variables de sesión; el repositorio solo
-incluye `tooling/ingest/.env.example` con valores ficticios.
+Configura las dos primeras como Repository Secrets con esos nombres. Para local
+usa un `.env` no versionado o variables de sesión; el repositorio solo incluye
+`tooling/ingest/.env.example` con valores ficticios.
 
 `SUPABASE_SECRET_KEY` es exclusivamente server-side: nunca debe aparecer en
 `apps/mobile`, código enviado al navegador, variables `EXPO_PUBLIC_*`, URLs ni

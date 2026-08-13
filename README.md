@@ -161,9 +161,10 @@ pnpm ingest:scheduler
 Usa `--dry-run` para inspección cuando la estrategia lo admita. La ingesta de
 catálogo Mercadona se crea desde la planificación del scheduler, no desde un
 flag de búsqueda manual. El scheduler de
-`.github/workflows/ingestion-scheduler.yml` ejecuta cada 30 minutos y requiere
-los secrets `SUPABASE_URL` y `SUPABASE_SECRET_KEY`. Evita runs concurrentes por
-scope, usa leases/`SKIP LOCKED`, reintentos y conserva auditoría. Operación y
+`.github/workflows/ingestion-scheduler.yml` ejecuta cada 30 minutos un único job
+contra el proyecto Supabase remoto configurado en los Repository Secrets
+`SUPABASE_URL` y `SUPABASE_SECRET_KEY`. Evita runs concurrentes por scope, usa
+leases/`SKIP LOCKED`, reintentos y conserva auditoría. Bootstrap, operación y
 pausas: `docs/ingestion-scheduler.md`.
 
 ## Mobile, deep links y voz
