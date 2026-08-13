@@ -5,146 +5,159 @@ import { describe, expect, it, vi } from "vitest";
 import {
   MarketResolutionError,
   ProductNotFoundError,
-  ProviderCapabilityUnavailableError,
   ProviderContractChangedError,
   RateLimitedError,
+  supportsCatalog,
   supportsSearch,
 } from "@shopping-app/retailer-contracts";
 
 import { EroskiProvider } from "./eroski-provider.js";
 
-const PRODUCT_URL =
-  "https://supermercado.eroski.es/es/productdetail/18631259-solomillo-de-pavo-al-vacio-eroski-bipack-sobre-al-peso-aprox-750-g/";
 const OBSERVED_AT = new Date("2026-08-09T12:00:00.000Z");
-const MARKET = {
-  retailer: "EROSKI",
-  externalId: "shop-ref:sanitized-shop-001",
-  postalCode: "unknown",
-  metadata: { shopRef: "sanitized-shop-001" },
-} as const;
+const BOOTSTRAP_COOKIES =
+  "supermarket.ali.shop=157; Path=/, supermarket.ali.shopName=Bilbondo; Path=/, JSESSIONID=session; Path=/";
 
 function fixture(name: string): string {
   return readFileSync(new URL(`./fixtures/${name}`, import.meta.url), "utf8");
 }
 
-function htmlResponse(html: string, status = 200): Response {
+function publicProductFixture(): string {
+  return fixture("product-18631259.html").replaceAll(
+    "sanitized-shop-001",
+    "157",
+  );
+}
+
+function htmlResponse(
+  html: string,
+  status = 200,
+  setCookie?: string,
+): Response {
   return new Response(html, {
     status,
-    headers: { "content-type": "text/html; charset=utf-8" },
+    headers: {
+      "content-type": "text/html; charset=utf-8",
+      ...(setCookie === undefined ? {} : { "set-cookie": setCookie }),
+    },
   });
 }
 
 describe("EroskiProvider", () => {
-  it("obtiene producto y refresca su oferta desde la URL pública confirmada", async () => {
+  it("resuelve la tienda pública y refresca un producto por su id", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
-      .mockImplementation(() =>
-        Promise.resolve(htmlResponse(fixture("product-18631259.html"))),
-      );
+      .mockResolvedValueOnce(
+        htmlResponse("<!doctype html><nav></nav>", 200, BOOTSTRAP_COOKIES),
+      )
+      .mockResolvedValueOnce(htmlResponse(publicProductFixture()))
+      .mockResolvedValueOnce(htmlResponse(publicProductFixture()));
     const provider = new EroskiProvider({
       fetch: fetchMock,
       now: () => OBSERVED_AT,
     });
+    const market = await provider.resolveMarket("50009");
+    const product = await provider.getProduct(" 18631259 ", market);
+    const offers = await provider.refreshPrices(["18631259"], market);
 
-    const product = await provider.getProduct(" 18631259 ", MARKET);
-    const offers = await provider.refreshPrices(["18631259"], MARKET);
-
+    expect(market).toMatchObject({
+      externalId: "shop-ref:157",
+      name: "Eroski Bilbondo",
+      postalCode: "50009",
+      metadata: {
+        shopRef: "157",
+        marketResolution: "public-default",
+        pricesMayVaryByLocation: true,
+      },
+    });
     expect(product).toMatchObject({
       retailer: "EROSKI",
       externalId: "18631259",
-      marketId: MARKET.externalId,
+      marketId: market.externalId,
     });
     expect(offers).toEqual([
       expect.objectContaining({
         retailerProductId: "18631259",
         normalPrice: 6,
         pricePerUnit: 8,
-        marketId: MARKET.externalId,
+        marketId: market.externalId,
       }),
     ]);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect((fetchMock.mock.calls[0]?.[0] as URL).href).toBe(PRODUCT_URL);
+    expect((fetchMock.mock.calls[1]?.[0] as URL).pathname).toBe(
+      "/es/productdetail/18631259-x/",
+    );
   });
 
-  it("no finge SEARCH y declara mercado no disponible", async () => {
+  it("expone catálogo y búsqueda confirmados", () => {
     const provider = new EroskiProvider({ fetch: vi.fn<typeof fetch>() });
-    await expect(provider.resolveMarket("50009")).rejects.toBeInstanceOf(
-      ProviderCapabilityUnavailableError,
-    );
-    expect(supportsSearch(provider)).toBe(false);
+    expect(supportsSearch(provider)).toBe(true);
+    expect(supportsCatalog(provider)).toBe(true);
   });
 
-  it("no inventa una URL para ids cuyo slug canónico no está confirmado", async () => {
-    const fetchMock = vi.fn<typeof fetch>();
+  it("detecta cambios de estructura y mercados incompatibles", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        htmlResponse("<!doctype html><nav></nav>", 200, BOOTSTRAP_COOKIES),
+      )
+      .mockResolvedValueOnce(
+        htmlResponse(fixture("product-structure-changed.html")),
+      );
     const provider = new EroskiProvider({ fetch: fetchMock });
-    await expect(provider.getProduct("999", MARKET)).rejects.toMatchObject({
-      name: "ProviderCapabilityUnavailableError",
-      capability: "productUrlResolution",
-    });
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("detecta cambios de estructura y un shopRef incompatible", async () => {
-    const changed = new EroskiProvider({
-      fetch: vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(
-          htmlResponse(fixture("product-structure-changed.html")),
-        ),
-    });
-    await expect(changed.getProduct("18631259", MARKET)).rejects.toBeInstanceOf(
-      ProviderContractChangedError,
-    );
-
-    const valid = new EroskiProvider({
-      fetch: vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(htmlResponse(fixture("product-18631259.html"))),
-    });
+    const market = await provider.resolveMarket("50009");
     await expect(
-      valid.getProduct("18631259", {
-        ...MARKET,
-        externalId: "shop-ref:other",
-        metadata: {},
-      }),
+      provider.getProduct("18631259", market),
+    ).rejects.toBeInstanceOf(ProviderContractChangedError);
+    await expect(
+      provider.getProduct("18631259", { ...market, retailer: "DIA" }),
     ).rejects.toBeInstanceOf(MarketResolutionError);
   });
 
   it("mapea 404 y 429 a los errores tipados existentes", async () => {
-    const notFound = new EroskiProvider({
-      fetch: vi
-        .fn<typeof fetch>()
-        .mockResolvedValue(htmlResponse("missing", 404)),
-    });
+    const notFoundFetch = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        htmlResponse("<!doctype html>", 200, BOOTSTRAP_COOKIES),
+      )
+      .mockResolvedValueOnce(htmlResponse("missing", 404));
+    const notFound = new EroskiProvider({ fetch: notFoundFetch });
+    const market = await notFound.resolveMarket("50009");
     await expect(
-      notFound.getProduct("18631259", MARKET),
+      notFound.getProduct("18631259", market),
     ).rejects.toBeInstanceOf(ProductNotFoundError);
 
-    const limited = new EroskiProvider({
-      fetch: vi.fn<typeof fetch>().mockResolvedValue(
+    const limitedFetch = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        htmlResponse("<!doctype html>", 200, BOOTSTRAP_COOKIES),
+      )
+      .mockResolvedValueOnce(
         new Response("limited", {
           status: 429,
           headers: { "retry-after": "2", "content-type": "text/html" },
         }),
-      ),
-    });
+      );
+    const limited = new EroskiProvider({ fetch: limitedFetch });
+    const limitedMarket = await limited.resolveMarket("50009");
     const error = await limited
-      .getProduct("18631259", MARKET)
+      .getProduct("18631259", limitedMarket)
       .catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(RateLimitedError);
     expect((error as RateLimitedError).retryAfterMs).toBe(2_000);
   });
 
-  it("rechaza mercados de otro retailer antes de consultar", async () => {
-    const fetchMock = vi.fn<typeof fetch>();
+  it("rechaza identificadores y mercados no pertenecientes a esta instancia", async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        htmlResponse("<!doctype html>", 200, BOOTSTRAP_COOKIES),
+      );
     const provider = new EroskiProvider({ fetch: fetchMock });
+    const market = await provider.resolveMarket("50009");
+    await expect(provider.getProduct("invalid", market)).rejects.toBeInstanceOf(
+      ProductNotFoundError,
+    );
     await expect(
-      provider.getProduct("18631259", {
-        retailer: "DIA",
-        externalId: "shop-ref:sanitized-shop-001",
-        postalCode: "unknown",
-      }),
+      new EroskiProvider({ fetch: fetchMock }).getProduct("1", market),
     ).rejects.toBeInstanceOf(MarketResolutionError);
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

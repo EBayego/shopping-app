@@ -25,15 +25,15 @@ describe("EroskiHtmlParser", () => {
       externalId: "18631259",
       name: "Solomillo de pavo al vacío EROSKI, bipack, sobre al peso aprox. 750 g",
       brand: "EROSKI",
-      price: 6,
+      normalPrice: 6,
       unitPrice: { amount: 8, unit: "kg" },
-      format: "bipack, sobre al peso aprox. 750 g",
       weight: { amount: 750, unit: "g" },
       shopRef: "sanitized-shop-001",
       image: "https://supermercado.eroski.es/images/products/18631259.jpg",
       availability: true,
       variableWeight: true,
       productUrl: PRODUCT_URL,
+      requiresMembership: false,
     });
   });
 
@@ -54,7 +54,7 @@ describe("EroskiHtmlParser", () => {
       externalId: "42",
       name: "Leche EROSKI 1 l",
       brand: "EROSKI",
-      price: 1.25,
+      normalPrice: 1.25,
       unitPrice: { amount: 1.25, unit: "l" },
       weight: { amount: 1, unit: "l" },
       shopRef: "shop-42",
@@ -79,7 +79,7 @@ describe("EroskiHtmlParser", () => {
       expect(error).toBeInstanceOf(EroskiHtmlStructureError);
       expect((error as EroskiHtmlStructureError).missingFields).toEqual([
         "name",
-        "price",
+        "normalPrice",
         "shopRef",
         "availability",
       ]);

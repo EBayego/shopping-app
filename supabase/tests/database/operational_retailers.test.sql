@@ -30,8 +30,8 @@ select extensions.is(
 
 select extensions.is(
   (select capabilities from public.retailers where code = 'EROSKI'),
-  array['PRICE_REFRESH']::text[],
-  'Eroski is not advertised as a full catalog provider'
+  array['SEARCH', 'CATALOG', 'PRICE_REFRESH']::text[],
+  'Eroski exposes its confirmed public catalog and price refresh capabilities'
 );
 
 select extensions.is(

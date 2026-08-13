@@ -1,80 +1,72 @@
-# EroskiProvider: viabilidad técnica
+# EroskiProvider: contrato operativo
 
-## Estado recomendado
+## Estado
 
-**DEGRADED (parcial).** Se ha confirmado que una página pública de detalle de
-producto puede obtenerse por `GET` y devuelve HTML renderizado en servidor. El
-provider parsea ese HTML de forma defensiva, pero no declara disponibles la
-resolución de mercado ni la búsqueda.
+**DEGRADED con `SEARCH`, `CATALOG` y `PRICE_REFRESH` (confirmado el 13 de
+agosto de 2026).** Eroski no permite seleccionar una tienda sin código postal,
+pero una sesión anónima de la web asigna de forma reproducible la tienda pública
+de alimentación `157` (`Bilbondo`). El provider usa esa tienda para cualquier
+código postal y declara `pricesMayVaryByLocation: true`; por ello la interfaz
+debe avisar de que los precios pueden no ser precisos para la ubicación del grupo.
 
-## Capacidad operativa confirmada
+## Sesión y mercado
 
-La implementación solo usa páginas públicas de esta familia:
+El flujo parte siempre de una sesión limpia:
 
 ```text
-GET https://supermercado.eroski.es/es/productdetail/{id}-{slug}/
+GET https://supermercado.eroski.es/
 ```
 
-La URL completa y canónica debe conocerse de antemano. No se presupone que una
-URL construida solo con el identificador funcione, por lo que el provider usa un
-registro explícito `productUrls`. El producto `18631259` se incluye porque su URL
-canónica fue confirmada mediante un HAR real.
+La respuesta pública establece `JSESSIONID`, `supermarket.ali.shop=157` y
+`supermarket.ali.shopName=Bilbondo`. No se reutilizan cookies de navegador,
+credenciales, tokens ni datos de los HAR. El provider conserva las cookies solo
+en memoria durante su propia instancia y crea el mercado `shop-ref:157`.
 
-`EroskiHttpClient` acepta únicamente el origen configurado y rutas de
-`productdetail`, solicita HTML y no ejecuta JavaScript. `EroskiHtmlParser` usa un
-parser DOM (`cheerio`), selectores semánticos y JSON-LD como fallback. Las
-expresiones regulares se limitan a valores de campo ya extraídos (cantidades,
-unidades y marcadores textuales); no se usan para parsear el documento completo.
+## Catálogo y búsqueda
 
-## Campos y separación de dominio
+La navegación HTML contiene el árbol completo. Se publican las categorías de
+segundo nivel de los departamentos de supermercado; las secciones destacadas de
+electrónica, electrohogar y descanso quedan fuera. Cada categoría conserva su
+ruta confirmada y su paginación incluye las subcategorías mostradas como filtros.
 
-Cuando existen, el DTO interno conserva `externalId`, `name`, `brand`, `price`,
-`unitPrice`, `format`, `weight`, `shopRef`, `image` y `availability`.
+La primera página de productos está en el documento HTML. Las siguientes usan
+el mismo contrato Tapestry observado en los HAR:
 
-- `EroskiMapper.toProduct` genera un `RetailerProduct` sin precios.
-- `EroskiMapper.toOffer` genera el `ProductOffer` con precio, precio por unidad y
-  disponibilidad.
-- El `shopRef` observado se compara con el mercado suministrado. Se acepta como
-  `Market.externalId` el propio valor o `shop-ref:{valor}`, y también puede
-  declararse como `Market.metadata.shopRef`. Una discrepancia se rechaza para no
-  asociar precios a una tienda incorrecta.
+```text
+POST /es/supermarket:loadpage?t:ac={ruta-de-categoria}
+t:zoneid=productListZone&pageNumber={n}
+```
 
-Un `shopRef` visible en una página pública identifica el contexto observado, pero
-no demuestra qué código postal o tienda física representa.
+Se recorre hasta recibir una página vacía y se aplica un máximo defensivo de 100
+páginas. Las tarjetas aportan ID, nombre, marca, URL, imagen, precio actual,
+precio anterior, precio por unidad, promoción, categoría y formatos de peso
+variable. El precio visible debe coincidir con `data-metrics`; una divergencia
+se trata como cambio de contrato.
 
-## Detección de cambios
+La búsqueda pública usa el documento
+`GET /es/search/results/?q={consulta}` y devuelve su primera página, igual que el
+contrato `SearchRetailerProvider` del resto del proyecto. No se usa el endpoint
+de sugerencias con `t:formdata` opaco.
 
-Se consideran obligatorios para una observación de precio segura:
-`externalId`, `name`, `price`, `shopRef` y `availability`. Si desaparecen, si hay
-varios `shopRef` incompatibles o si el identificador no coincide con el solicitado,
-el provider emite `ProviderContractChangedError`. Respuestas vacías o con un
-`Content-Type` distinto de HTML también se tratan como cambio de contrato.
+## Detalle y refresh
 
-Los fixtures están sanitizados: no contienen cookies, tokens, credenciales ni
-datos de sesión.
+Eroski resuelve cualquier ID numérico con una ruta estable, sin conocer el slug:
 
-## Capacidades pendientes
+```text
+GET /es/productdetail/{id}-x/
+```
 
-- `resolveMarket`: lanza siempre `ProviderCapabilityUnavailableError`; no existe
-  un flujo confirmado y reproducible para elegir tienda mediante código postal.
-- `searchProducts`: no hay contrato público confirmado.
-- Resolución general de un identificador a su slug/URL canónica.
-- Un endpoint JSON equivalente a la página SSR.
-- Confirmar la estabilidad de selectores y datos semánticos en más categorías,
-  productos agotados, promociones y formatos por unidad.
-- Relacionar de forma verificable `shopRef`, tienda, código postal y precios.
+El servidor devuelve el producto correspondiente y permite refrescar por ID de
+forma directa. Se extraen precio normal/promocional, precio por unidad,
+disponibilidad, peso variable e identidad. Las respuestas 404, 429, de contrato
+incompatible y de red se traducen a los errores tipados comunes.
 
-## Límites operativos
+## Límites
 
-No se automatiza login, no se guardan credenciales, no se usa Playwright,
-Selenium ni un navegador controlado, y no se intenta sortear CAPTCHA, WAF u otros
-controles anti-bot. El test live es opcional y solo se activa con
-`RUN_LIVE_PROVIDER_TESTS=true`.
-
-## Condiciones para ampliar el provider
-
-1. Confirmar un mecanismo autorizado y reproducible de selección de mercado.
-2. Confirmar cómo obtener de forma general la URL canónica de un producto.
-3. Añadir fixtures reales sanitizados de varias estructuras y estados de stock.
-4. Ejecutar observaciones live periódicas que permitan medir estabilidad antes de
-   declarar nuevas capacidades como operativas.
+- El mercado no representa el código postal solicitado: siempre es la tienda
+  pública `157`. Esta es la razón de mantener el estado `DEGRADED` y del aviso UI.
+- No se ha observado un producto agotado en los HAR; el parser reconoce textos
+  de no disponibilidad y, para detalle, exige el control público de añadir.
+- No se automatiza login, no se guardan credenciales y no se intenta eludir WAF,
+  CAPTCHA ni controles anti-bot.
+- El test live es opcional y se activa con `RUN_LIVE_PROVIDER_TESTS=true`.

@@ -54,11 +54,9 @@ select lives_ok(
   'supported price refresh can be queued'
 );
 select is((select count(*) from public.refresh_requests where status = 'PENDING'), 1::bigint, 'refresh request remains pending for a worker');
-select throws_ok(
+select lives_ok(
   $$select * from public.admin_request_refresh('00000000-0000-4000-8000-000000000004', 'CATALOG_SYNC', '50009', '{}', 'operator@example.com')$$,
-  '0A000',
-  'Provider EROSKI does not support CATALOG_SYNC',
-  'unsupported catalog sync is rejected server-side'
+  'Eroski public catalog sync can be queued'
 );
 select lives_ok(
   $$select * from public.admin_request_refresh('00000000-0000-4000-8000-000000000002', 'CATALOG_SYNC', '50009', '{}', 'operator@example.com')$$,

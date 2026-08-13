@@ -15,12 +15,6 @@ export interface AlcampoAreaDto {
   longitude: number;
   formattedAddress: string;
 }
-export interface AlcampoAddressLookupDto {
-  latitude: number;
-  longitude: number;
-  postalCode: string;
-  formattedAddress: string;
-}
 export interface AlcampoTemporaryDestinationDto {
   deliveryDestinationId: string;
 }
@@ -311,23 +305,6 @@ export function parseArea(
         longitude,
         formattedAddress,
       };
-}
-export function parseAddressLookup(
-  payload: unknown,
-): AlcampoAddressLookupDto | undefined {
-  if (!isRecord(payload) || !isRecord(payload.location)) return undefined;
-  const latitude = decimal(payload.location.latitude);
-  const longitude = decimal(payload.location.longitude);
-  const postalCode = isRecord(payload.addressDetails)
-    ? text(payload.addressDetails.postalCode)
-    : undefined;
-  const formattedAddress = text(payload.formattedAddress);
-  return latitude === undefined ||
-    longitude === undefined ||
-    postalCode === undefined ||
-    formattedAddress === undefined
-    ? undefined
-    : { latitude, longitude, postalCode, formattedAddress };
 }
 export function parseTemporaryDestination(
   payload: unknown,

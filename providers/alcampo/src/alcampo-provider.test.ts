@@ -71,7 +71,6 @@ describe("AlcampoProvider", () => {
       ),
       json(fixture("area-search-50009.json")),
       json(fixture("area-detail-50009.json")),
-      json(fixture("address-lookup-50009.json")),
       json(fixture("temporary-destination.json")),
       json(fixture("delivery-address-50009.json")),
       json(fixture("active-session.json")),
@@ -98,53 +97,23 @@ describe("AlcampoProvider", () => {
     expect(Object.isFrozen(market)).toBe(true);
     await provider.getProduct("54180", market);
     expect(market.externalId).toBe(REGION);
-    const temporaryBody = JSON.parse(requestBody(fetchMock, 4)) as Record<
+    const temporaryBody = JSON.parse(requestBody(fetchMock, 3)) as Record<
       string,
       unknown
     >;
     expect(temporaryBody).toMatchObject({
       visitorId: "00000000-0000-4000-8000-000000000011",
-      latitude: 41.63989,
-      longitude: -0.9040223,
-      postalCode: "50009",
-      formattedAddress: "Calle de prueba, 12, 50009 Zaragoza, España",
-    });
-    expect(requestBody(fetchMock, 6)).toContain(REGION);
-  });
-
-  it("reutiliza la dirección confirmada del área cuando el geocodificador rechaza Node", async () => {
-    const responses = [
-      html(
-        readFileSync(
-          new URL("./fixtures/bootstrap-home.html", import.meta.url),
-          "utf8",
-        ),
-      ),
-      json(fixture("area-search-50009.json")),
-      json(fixture("area-detail-50009.json")),
-      json({ code: "webaddressws-3000" }, 400),
-      json(fixture("temporary-destination.json")),
-      json(fixture("delivery-address-50009.json")),
-      json(fixture("active-session.json")),
-    ];
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockImplementation(() => Promise.resolve(responses.shift()!));
-    const provider = new AlcampoProvider({
-      fetch: fetchMock,
-      environment: {},
-      maxRetries: 0,
-    });
-
-    const market = await provider.resolveMarket("50009");
-
-    expect(market.externalId).toBe(REGION);
-    expect(JSON.parse(requestBody(fetchMock, 4))).toMatchObject({
       latitude: 41.640049,
       longitude: -0.9032769,
       postalCode: "50009",
       formattedAddress: "50009 Zaragoza, España",
     });
+    expect(requestBody(fetchMock, 5)).toContain(REGION);
+    expect(
+      fetchMock.mock.calls.some(([input]) =>
+        requestUrl(input).includes("address-lookup/by-coordinates"),
+      ),
+    ).toBe(false);
   });
 
   it("recorre catálogo SSR, deduplica y produce observaciones separadas", async () => {
@@ -261,7 +230,7 @@ describe("AlcampoProvider", () => {
     expect(batchRequests).toBe(3);
   });
 
-  it("getProduct admite ID numérico y refreshPrices conserva éxitos parciales y observación nueva", async () => {
+  it("getProduct admite IDs numéricos y alfanuméricos y refreshPrices conserva éxitos parciales", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockImplementation((input) => {
       const url = requestUrl(input);
       if (url.includes("99999"))

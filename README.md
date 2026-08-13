@@ -141,13 +141,13 @@ Supabase Edge secrets porque estos procesos son Node externos.
 
 Estado funcional de beta:
 
-| Provider  | Estado              | Capacidades confirmadas                                         |
-| --------- | ------------------- | --------------------------------------------------------------- |
-| DIA       | ACTIVE              | búsqueda y refresh por mercado                                  |
-| Mercadona | ACTIVE              | catálogo por categorías y refresh; sin búsqueda live confirmada |
-| Alcampo   | DEGRADED            | refresh dirigido de producto; sesión/WAF limita cobertura       |
-| Eroski    | DEGRADED            | refresh dirigido desde detalle SSR; sin discovery completo      |
-| DISABLED  | ninguno por defecto | se puede pausar desde admin                                     |
+| Provider  | Estado              | Capacidades confirmadas                                             |
+| --------- | ------------------- | ------------------------------------------------------------------- |
+| DIA       | ACTIVE              | búsqueda, catálogo paginado y refresh por mercado                   |
+| Mercadona | ACTIVE              | catálogo por categorías y refresh; sin búsqueda live confirmada     |
+| Alcampo   | DEGRADED            | catálogo y refresh; WAF intermitente limita barridos completos      |
+| Eroski    | DEGRADED            | catálogo, búsqueda y refresh con tienda pública; precio orientativo |
+| DISABLED  | ninguno por defecto | se puede pausar desde admin                                         |
 
 La app nunca consulta al retailer: busca en PostgreSQL. Ejemplos de ingesta:
 
@@ -279,7 +279,7 @@ atómicas, checked, Realtime, outbox offline, búsqueda/ofertas, alta de product
 preview/confirmación de voz y comparación con total/cobertura/no encontrados/
 stale/promos.
 
-Parciales: discovery de Alcampo/Eroski, búsqueda live de Mercadona, recuperación
+Parciales: discovery de Alcampo, búsqueda live de Mercadona, recuperación
 de identidad anónima tras desinstalar, telemetría UX de reintentos Realtime y
 assets/metadata de store definitivos. Deuda adicional: retención de
 `price_history`, breaker distribuido, checkpoint de catálogos grandes y Basic

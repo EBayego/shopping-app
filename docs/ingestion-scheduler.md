@@ -101,10 +101,13 @@ group by status, request_type, postal_code
 order by postal_code, request_type, status;
 ```
 
-Mercadona, Alcampo y DIA disponen de estrategia de catálogo. DIA obtiene el
+Mercadona, Alcampo, DIA y Eroski disponen de estrategia de catálogo. DIA obtiene el
 árbol desde `menu-data` y recorre las páginas PLP de cada subcategoría, además
-de conservar su búsqueda bajo demanda. Eroski solo refresca productos
-previamente conocidos y no se anuncia como catálogo completo.
+de conservar su búsqueda bajo demanda. Eroski inicia una sesión anónima limpia,
+usa la tienda pública de alimentación `157` y recorre el HTML y la paginación
+Tapestry de las categorías. También ofrece búsqueda y refresh directo mediante
+`/productdetail/{id}-x/`. Como esa tienda no se resuelve desde el código postal,
+sus precios son orientativos y el retailer permanece `DEGRADED`.
 
 ## Variables y secretos
 
@@ -171,7 +174,7 @@ vencidos se cierran como fallidos y las solicitudes huérfanas se recuperan.
 Un fallo de provider se completa y se reprograma con delay hasta alcanzar el
 límite de intentos. Después queda `FAILED`; los éxitos quedan `SUCCEEDED`
 (equivalente operativo a `SUCCESS`). El runner continúa con la siguiente
-solicitud, así que un fallo de Eroski no bloquea DIA.
+solicitud, así que el fallo de un provider no bloquea los demás.
 
 Cada pipeline persiste su run en `provider_sync_runs`, actualiza
 `provider_health` y emite logs JSON. La cola conserva `PENDING`, `RUNNING`,

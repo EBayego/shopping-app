@@ -145,6 +145,21 @@ describe("DIA catalog", () => {
         plp_items: [{}],
       }),
     ).toBeUndefined();
+    expect(
+      parseDiaCatalogPage({
+        selected_category_id: "L2051",
+        pagination: { page_number: 1, page_size: 20, total_pages: 1 },
+        total_items: 1,
+        plp_items: [
+          {
+            sku_id: "USD-1",
+            display_name: "Producto con moneda incompatible",
+            units_in_stock: 1,
+            prices: { price: 1, currency: "USD" },
+          },
+        ],
+      }),
+    ).toBeUndefined();
 
     const fetchMock = vi
       .fn<typeof fetch>()

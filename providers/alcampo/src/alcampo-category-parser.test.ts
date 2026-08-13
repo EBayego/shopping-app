@@ -7,7 +7,7 @@ import {
 
 describe("AlcampoCategoryParser", () => {
   const parser = new AlcampoCategoryParser();
-  it("extrae IDs numéricos, URLs y deduplica", () => {
+  it("extrae IDs numéricos o alfanuméricos, URLs y deduplica", () => {
     const html = readFileSync(
       new URL("./fixtures/category-oc1603.html", import.meta.url),
       "utf8",

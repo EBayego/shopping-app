@@ -1,9 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type {
-  AlcampoAddressLookupDto,
-  AlcampoAreaDto,
-} from "./alcampo-dtos.js";
+import type { AlcampoAreaDto } from "./alcampo-dtos.js";
 import { AlcampoInitialStateParser } from "./alcampo-initial-state-parser.js";
 import type { AlcampoSessionContext } from "./alcampo-session-context.js";
 
@@ -123,28 +120,8 @@ export class AlcampoHttpClient {
       { method: "GET", headers: this.dynamicHeaders(bootstrap) },
     );
   }
-  lookupAddress(
-    area: AlcampoAreaDto,
-    bootstrap: AlcampoBootstrapResult,
-  ): Promise<unknown> {
-    return this.jsonRequest(
-      "api/address/v3/address-lookup/by-coordinates",
-      "address lookup",
-      {
-        method: "POST",
-        headers: {
-          ...this.dynamicHeaders(bootstrap),
-          "content-type": "application/json; charset=utf-8",
-        },
-        body: JSON.stringify({
-          latitude: area.latitude,
-          longitude: area.longitude,
-        }),
-      },
-    );
-  }
   createTemporaryDestination(
-    address: AlcampoAddressLookupDto,
+    address: AlcampoAreaDto,
     bootstrap: AlcampoBootstrapResult,
   ): Promise<unknown> {
     return this.jsonRequest(
@@ -316,8 +293,7 @@ export class AlcampoHttpClient {
       });
       this.captureCookies(response.headers);
       if (
-        response.headers.get("x-amzn-waf-action")?.toLowerCase() ===
-        "challenge"
+        response.headers.get("x-amzn-waf-action")?.toLowerCase() === "challenge"
       )
         throw new AlcampoHttpError(
           "http",

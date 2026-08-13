@@ -169,15 +169,20 @@ describe("PipelineRefreshExecutor observability", () => {
         ...request,
         retailer_code: "EROSKI",
         request_type: "CATALOG_SYNC",
+        postal_code: "",
       }),
-    ).rejects.toThrow("EROSKI does not have a registered CATALOG strategy");
+    ).rejects.toThrow(
+      "Provider EROSKI could not resolve market for postal code",
+    );
     expect(recordPreflightFailure).toHaveBeenCalledOnce();
     const recorded = recordPreflightFailure.mock.calls[0]?.[0];
     expect(recorded).toMatchObject({
       retailer: "EROSKI",
       syncType: "CATALOG_SYNC",
-      errorMessage: "EROSKI does not have a registered CATALOG strategy",
     });
+    expect(recorded?.errorMessage).toContain(
+      "Provider EROSKI could not resolve market for postal code",
+    );
     expect(recorded?.startedAt).toBeInstanceOf(Date);
     expect(recorded?.finishedAt).toBeInstanceOf(Date);
   });

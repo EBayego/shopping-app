@@ -22,7 +22,6 @@ import {
 } from "./alcampo-category-parser.js";
 import {
   parseActiveSession,
-  parseAddressLookup,
   parseAlcampoProduct,
   parseAlcampoProductsBatch,
   parseArea,
@@ -31,7 +30,6 @@ import {
   parseDeliveryAddress,
   parseTemporaryDestination,
   type AlcampoCategoryDto,
-  type AlcampoAddressLookupDto,
   type AlcampoProductDto,
 } from "./alcampo-dtos.js";
 import {
@@ -60,7 +58,6 @@ export class AlcampoProvider
   private readonly concurrency: number;
   private readonly contexts = new WeakMap<Market, AlcampoSessionContext>();
   private readonly categoryPaths = new Map<string, string>();
-  private readonly internalProductIds = new Map<string, string>();
 
   constructor(options: AlcampoProviderOptions = {}) {
     this.client = new AlcampoHttpClient(options);
@@ -95,31 +92,8 @@ export class AlcampoProvider
         throw new MarketResolutionError("ALCAMPO", normalized, {
           message: "Alcampo resolved a different postal code",
         });
-      let address: AlcampoAddressLookupDto | undefined;
-      try {
-        address = parseAddressLookup(
-          await this.client.lookupAddress(area, bootstrap),
-        );
-      } catch (error) {
-        // The public geocoder can reject a server-side request even though the
-        // confirmed area response already contains every destination field.
-        // Reusing those values is deterministic and does not invent an address.
-        if (!(error instanceof AlcampoHttpError) || error.status !== 400)
-          throw error;
-        address = {
-          latitude: area.latitude,
-          longitude: area.longitude,
-          postalCode: area.postalCode,
-          formattedAddress: area.formattedAddress,
-        };
-      }
-      if (address === undefined) throw this.contract("address lookup");
-      if (address.postalCode !== normalized)
-        throw new MarketResolutionError("ALCAMPO", normalized, {
-          message: "Alcampo address lookup resolved a different postal code",
-        });
       const temporary = parseTemporaryDestination(
-        await this.client.createTemporaryDestination(address, bootstrap),
+        await this.client.createTemporaryDestination(area, bootstrap),
       );
       if (temporary === undefined)
         throw this.contract("temporary delivery destination");
@@ -225,9 +199,6 @@ export class AlcampoProvider
     try {
       const page = await this.client.getCategoryHtml(path, context);
       const listing = this.categoryParser.parse(page.html, page.url);
-      for (const [retailerProductId, productId] of listing.internalProductIds) {
-        this.internalProductIds.set(retailerProductId, productId);
-      }
       const dtos = await this.loadCatalogProducts(listing, market);
       const observedAt = this.now();
       return {

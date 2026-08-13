@@ -12,7 +12,7 @@ export interface DiaProductAnalyticsDto {
 }
 
 export interface DiaSearchPricesDto {
-  currency?: string;
+  currency: "EUR";
   discountPercentage?: number;
   isClubPrice?: boolean;
   isPromoPrice?: boolean;
@@ -28,7 +28,6 @@ export interface DiaSearchItemDto {
   image?: string;
   category?: string;
   subcategory?: string;
-  objectId?: string;
   skuId: string;
   unitsInStock?: number;
   url?: string;
@@ -113,11 +112,11 @@ function parseDiaSearchPrices(value: unknown): DiaSearchPricesDto | undefined {
     return undefined;
   }
   const price = asFiniteNumber(value.price);
-  if (price === undefined || price < 0) {
+  const currency = asNonEmptyString(value.currency)?.toUpperCase();
+  if (price === undefined || price < 0 || currency !== "EUR") {
     return undefined;
   }
 
-  const currency = optionalString(value.currency);
   const discountPercentage = optionalNumber(value.discount_percentage);
   const isClubPrice = optionalBoolean(value.is_club_price);
   const isPromoPrice = optionalBoolean(value.is_promo_price);
@@ -127,7 +126,7 @@ function parseDiaSearchPrices(value: unknown): DiaSearchPricesDto | undefined {
 
   return {
     price,
-    ...(currency === undefined ? {} : { currency }),
+    currency,
     ...(discountPercentage === undefined ? {} : { discountPercentage }),
     ...(isClubPrice === undefined ? {} : { isClubPrice }),
     ...(isPromoPrice === undefined ? {} : { isPromoPrice }),
@@ -151,10 +150,10 @@ function parseDiaSearchItem(value: unknown): DiaSearchItemDto | undefined {
   const image = optionalString(value.image);
   const category = optionalString(value.l1_category_description);
   const subcategory = optionalString(value.l2_category_description);
-  const objectId = optionalString(value.object_id);
   const unitsInStock = optionalNumber(value.units_in_stock);
   const url = optionalString(value.url);
   const prices = parseDiaSearchPrices(value.prices);
+  if (value.prices != null && prices === undefined) return undefined;
 
   return {
     skuId,
@@ -163,7 +162,6 @@ function parseDiaSearchItem(value: unknown): DiaSearchItemDto | undefined {
     ...(image === undefined ? {} : { image }),
     ...(category === undefined ? {} : { category }),
     ...(subcategory === undefined ? {} : { subcategory }),
-    ...(objectId === undefined ? {} : { objectId }),
     ...(unitsInStock === undefined ? {} : { unitsInStock }),
     ...(url === undefined ? {} : { url }),
     ...(prices === undefined ? {} : { prices }),
@@ -306,52 +304,10 @@ function findProductRecord(
   payload: unknown,
   expectedExternalId: string,
 ): Record<string, unknown> | undefined {
-  if (!isRecord(payload)) {
+  if (!isRecord(payload) || !isRecord(payload.page_product_analytics))
     return undefined;
-  }
-
-  if (
-    ("externalId" in payload || "item_id" in payload) &&
-    ("name" in payload || "item_name" in payload)
-  ) {
-    return payload;
-  }
-
-  const pageProducts = payload.page_product_analytics;
-  if (isRecord(pageProducts)) {
-    const candidate = pageProducts[expectedExternalId];
-    if (isRecord(candidate)) {
-      return candidate;
-    }
-  }
-
-  for (const key of ["product", "data", "item"] as const) {
-    const candidate = payload[key];
-    if (
-      isRecord(candidate) &&
-      "externalId" in candidate &&
-      "name" in candidate
-    ) {
-      return candidate;
-    }
-  }
-
-  for (const key of ["items", "products"] as const) {
-    const candidates = payload[key];
-    if (Array.isArray(candidates)) {
-      for (const candidate of candidates as readonly unknown[]) {
-        if (
-          isRecord(candidate) &&
-          "externalId" in candidate &&
-          "name" in candidate
-        ) {
-          return candidate;
-        }
-      }
-    }
-  }
-
-  return undefined;
+  const candidate = payload.page_product_analytics[expectedExternalId];
+  return isRecord(candidate) ? candidate : undefined;
 }
 
 export function parseDiaProductAnalytics(

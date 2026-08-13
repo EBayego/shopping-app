@@ -22,7 +22,17 @@ export class EroskiMapper {
       ...(dto.weight === undefined
         ? {}
         : { packageSize: dto.weight.amount, packageUnit: dto.weight.unit }),
+      ...(dto.packageCount === undefined
+        ? {}
+        : { packageCount: dto.packageCount }),
+      ...(dto.totalAmount === undefined
+        ? {}
+        : { totalAmount: dto.totalAmount }),
       variableWeight: dto.variableWeight,
+      ...(dto.category === undefined ? {} : { category: dto.category }),
+      ...(dto.subcategory === undefined
+        ? {}
+        : { subcategory: dto.subcategory }),
       ...(dto.image === undefined ? {} : { imageUrl: dto.image }),
       productUrl: dto.productUrl,
       marketId: market.externalId,
@@ -39,14 +49,21 @@ export class EroskiMapper {
     return {
       retailerProductId: dto.externalId,
       marketId: market.externalId,
-      normalPrice: dto.price,
+      normalPrice: dto.normalPrice,
+      ...(dto.promoPrice === undefined ? {} : { promoPrice: dto.promoPrice }),
       ...(dto.unitPrice === undefined
         ? {}
         : {
             pricePerUnit: dto.unitPrice.amount,
             referenceUnit: dto.unitPrice.unit,
           }),
-      requiresMembership: false,
+      ...(dto.promotionType === undefined
+        ? {}
+        : { promotionType: dto.promotionType }),
+      ...(dto.promotionText === undefined
+        ? {}
+        : { promotionText: dto.promotionText }),
+      requiresMembership: dto.requiresMembership,
       available: dto.availability,
       observedAt,
     };

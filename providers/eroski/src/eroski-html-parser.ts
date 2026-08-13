@@ -18,7 +18,11 @@ export class EroskiHtmlStructureError extends Error {
 }
 
 export class EroskiHtmlParser {
-  parse(html: string, pageUrl: string): EroskiProductDto {
+  parse(
+    html: string,
+    pageUrl: string,
+    expectedShopRef?: string,
+  ): EroskiProductDto {
     const $ = load(html);
     const structuredProduct = this.structuredProduct($);
     const externalId =
@@ -28,27 +32,32 @@ export class EroskiHtmlParser {
       this.stringValue(structuredProduct?.sku) ??
       this.externalIdFromUrl(pageUrl);
     const name =
-      this.text($, 'main h1, .product-detail h1, h1[itemprop="name"]') ??
+      this.text(
+        $,
+        'h1.description-title, main h1, .product-detail h1, h1[itemprop="name"]',
+      ) ??
       this.attribute($, '[itemprop="name"]', "content") ??
       this.stringValue(structuredProduct?.name) ??
       this.attribute($, 'meta[property="og:title"]', "content");
     const offers = this.firstRecord(structuredProduct?.offers);
-    const price =
+    const currentPrice =
       this.decimal(this.attribute($, "[data-price]", "data-price")) ??
       this.decimal(this.attribute($, '[itemprop="price"]', "content")) ??
       this.decimal(offers?.price) ??
       this.decimal(
         this.text(
           $,
-          '.price-now, .product-price, .price__current, [itemprop="price"]',
+          '.offer-now, .price-now, .product-price, .price__current, [itemprop="price"]',
         ),
       );
-    const shopRef = this.shopRef($, pageUrl);
+    const previousPrice = this.decimal(this.text($, ".offer-before"));
+    const normalPrice = previousPrice ?? currentPrice;
+    const shopRef = this.shopRef($, pageUrl) ?? expectedShopRef;
     const availability = this.availability($, offers);
     const requiredFields: ReadonlyArray<readonly [string, unknown]> = [
       ["externalId", externalId],
       ["name", name],
-      ["price", price],
+      ["normalPrice", normalPrice],
       ["shopRef", shopRef],
       ["availability", availability],
     ];
@@ -76,6 +85,7 @@ export class EroskiHtmlParser {
     const imageValue =
       this.attribute($, '[itemprop="image"]', "content") ??
       this.attribute($, '[itemprop="image"]', "src") ??
+      this.attribute($, "img.product-img", "src") ??
       this.attribute($, 'meta[property="og:image"]', "content") ??
       this.structuredImage(structuredProduct?.image);
     const variableWeightValue = this.attribute(
@@ -87,15 +97,20 @@ export class EroskiHtmlParser {
       $,
       ".variable-weight, .weight-product, [data-variable-weight]",
     );
+    const promotionText = this.text($, ".partner-price, .product-offer");
+    const hasPromoPrice =
+      previousPrice !== undefined &&
+      currentPrice !== undefined &&
+      previousPrice > currentPrice;
 
     return {
       externalId: externalId as string,
       name: name as string,
       ...(brand === undefined ? {} : { brand }),
-      price: price as number,
+      normalPrice: normalPrice as number,
+      ...(hasPromoPrice ? { promoPrice: currentPrice } : {}),
       ...this.unitPrice($),
-      ...(format === undefined ? {} : { format }),
-      ...this.weight(weightSource),
+      ...this.packaging(weightSource),
       shopRef: shopRef as string,
       ...(imageValue === undefined
         ? {}
@@ -107,6 +122,8 @@ export class EroskiHtmlParser {
           `${markerText ?? ""} ${format ?? ""} ${name as string}`,
         ),
       productUrl: pageUrl,
+      ...this.promotion(promotionText, hasPromoPrice),
+      requiresMembership: /club|socio/i.test(promotionText ?? ""),
     };
   }
 
@@ -199,6 +216,7 @@ export class EroskiHtmlParser {
         return true;
       if (normalized === "false") return false;
     }
+    if ($(".toAddProduct").length > 0) return true;
     let addButton: ReturnType<CheerioAPI> | undefined;
     $("button").each((_index, element) => {
       if (/^\s*a(?:ñ|n)adir\s*$/i.test($(element).text())) {
@@ -214,7 +232,7 @@ export class EroskiHtmlParser {
 
   private unitPrice($: CheerioAPI): { unitPrice?: EroskiUnitPriceDto } {
     const selector =
-      "[data-unit-price], .unit-price, .price-unit, .price__unit";
+      "[data-unit-price], .unit-price, .price-unit, .price__unit, .quantity-text";
     const raw =
       this.attribute($, "[data-unit-price]", "data-unit-price") ??
       this.text($, selector);
@@ -227,8 +245,37 @@ export class EroskiHtmlParser {
       : { unitPrice: { amount, unit } };
   }
 
-  private weight(value: string | undefined): { weight?: EroskiWeightDto } {
+  private packaging(value: string | undefined): {
+    weight?: EroskiWeightDto;
+    packageCount?: number;
+    totalAmount?: number;
+  } {
     if (value === undefined) return {};
+    const multi = value.match(
+      /\b(\d+)\s*x\s*(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l)\b/i,
+    );
+    if (
+      multi?.[1] !== undefined &&
+      multi[2] !== undefined &&
+      multi[3] !== undefined
+    ) {
+      const count = Number(multi[1]);
+      const amount = this.decimal(multi[2]);
+      const unit = this.unit(multi[3]);
+      if (
+        Number.isInteger(count) &&
+        count > 0 &&
+        amount !== undefined &&
+        amount > 0 &&
+        unit !== undefined &&
+        unit !== "unit"
+      )
+        return {
+          weight: { amount, unit },
+          packageCount: count,
+          totalAmount: count * amount,
+        };
+    }
     const match = value.match(/(\d+(?:[.,]\d+)?)\s*(kg|g|ml|l)\b/i);
     if (match?.[1] === undefined || match[2] === undefined) return {};
     const amount = this.decimal(match[1]);
@@ -236,6 +283,21 @@ export class EroskiHtmlParser {
     return amount === undefined || unit === undefined || unit === "unit"
       ? {}
       : { weight: { amount, unit } };
+  }
+
+  private promotion(
+    text: string | undefined,
+    hasPromoPrice: boolean,
+  ): Pick<EroskiProductDto, "promotionType" | "promotionText"> {
+    if (text === undefined) return {};
+    const promotionType = /club|socio/i.test(text)
+      ? ("membership" as const)
+      : /unidad|\b\d+\s*[x×]\s*\d+/i.test(text)
+        ? ("multi-buy" as const)
+        : hasPromoPrice && /%/.test(text)
+          ? ("percentage" as const)
+          : ("other" as const);
+    return { promotionType, promotionText: text };
   }
 
   private unit(

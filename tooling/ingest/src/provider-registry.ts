@@ -50,7 +50,9 @@ const REGISTRY: Partial<Record<Retailer, ProviderRegistration>> = {
       new PriceRefreshIngestionStrategy(new AlcampoProvider()),
   },
   EROSKI: {
-    capabilities: ["PRICE_REFRESH"],
+    capabilities: ["SEARCH", "CATALOG", "PRICE_REFRESH"],
+    createSearch: () => new SearchIngestionStrategy(new EroskiProvider()),
+    createCatalog: () => new CatalogIngestionStrategy(new EroskiProvider()),
     createPriceRefresh: () =>
       new PriceRefreshIngestionStrategy(new EroskiProvider()),
   },
