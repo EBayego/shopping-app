@@ -10,7 +10,13 @@ import {
 describe("search provider registry", () => {
   it("registers DIA search", () => {
     expect(createSearchStrategy("DIA").kind).toBe("SEARCH_INGESTION");
+    expect(createCatalogStrategy("DIA").kind).toBe("CATALOG_SYNC");
     expect(createPriceRefreshStrategy("DIA").kind).toBe("PRICE_REFRESH");
+    expect(getIngestionCapabilities("DIA")).toEqual([
+      "SEARCH",
+      "CATALOG",
+      "PRICE_REFRESH",
+    ]);
   });
 
   it("keeps Mercadona disabled without a confirmed search capability", () => {

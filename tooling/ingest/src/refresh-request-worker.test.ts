@@ -167,15 +167,16 @@ describe("PipelineRefreshExecutor observability", () => {
     await expect(
       new PipelineRefreshExecutor(store).execute({
         ...request,
+        retailer_code: "EROSKI",
         request_type: "CATALOG_SYNC",
       }),
-    ).rejects.toThrow("DIA does not have a registered CATALOG strategy");
+    ).rejects.toThrow("EROSKI does not have a registered CATALOG strategy");
     expect(recordPreflightFailure).toHaveBeenCalledOnce();
     const recorded = recordPreflightFailure.mock.calls[0]?.[0];
     expect(recorded).toMatchObject({
-      retailer: "DIA",
+      retailer: "EROSKI",
       syncType: "CATALOG_SYNC",
-      errorMessage: "DIA does not have a registered CATALOG strategy",
+      errorMessage: "EROSKI does not have a registered CATALOG strategy",
     });
     expect(recorded?.startedAt).toBeInstanceOf(Date);
     expect(recorded?.finishedAt).toBeInstanceOf(Date);

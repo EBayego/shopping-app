@@ -44,6 +44,22 @@ export interface DiaSearchPageDto {
   items: DiaSearchItemDto[];
 }
 
+export interface DiaMenuCategoryDto {
+  id: string;
+  name: string;
+  link: string;
+  children: DiaMenuCategoryDto[];
+}
+
+export interface DiaCatalogPageDto {
+  categoryId: string;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
+  totalItems: number;
+  items: DiaSearchItemDto[];
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -203,6 +219,87 @@ export function parseDiaSearchPage(
     items,
     ...(postalCode === undefined ? {} : { postalCode }),
   };
+}
+
+function parseDiaMenuCategory(value: unknown): DiaMenuCategoryDto | undefined {
+  if (!isRecord(value)) return undefined;
+  const id = asNonEmptyString(value.id);
+  const name = asNonEmptyString(value.name);
+  const link = asNonEmptyString(value.link);
+  if (
+    id === undefined ||
+    !/^L\d+$/.test(id) ||
+    name === undefined ||
+    link === undefined ||
+    !link.startsWith("/") ||
+    link.startsWith("//") ||
+    link.includes("?") ||
+    link.includes("#") ||
+    !link.endsWith(`/c/${id}`)
+  ) {
+    return undefined;
+  }
+  const rawChildren = value.children;
+  if (rawChildren != null && !Array.isArray(rawChildren)) return undefined;
+  const children = (Array.isArray(rawChildren) ? rawChildren : []).map(
+    parseDiaMenuCategory,
+  );
+  return children.some((child) => child === undefined)
+    ? undefined
+    : {
+        id,
+        name,
+        link,
+        children: children as DiaMenuCategoryDto[],
+      };
+}
+
+export function parseDiaMenu(
+  payload: unknown,
+): DiaMenuCategoryDto[] | undefined {
+  if (!isRecord(payload) || !Array.isArray(payload.categories))
+    return undefined;
+  const categories = payload.categories.map(parseDiaMenuCategory);
+  return categories.length === 0 ||
+    categories.some((category) => category === undefined)
+    ? undefined
+    : (categories as DiaMenuCategoryDto[]);
+}
+
+export function parseDiaCatalogPage(
+  payload: unknown,
+): DiaCatalogPageDto | undefined {
+  if (!isRecord(payload) || !isRecord(payload.pagination)) return undefined;
+  const categoryId = asNonEmptyString(payload.selected_category_id);
+  const pageNumber = asNonNegativeInteger(payload.pagination.page_number);
+  const pageSize = asNonNegativeInteger(payload.pagination.page_size);
+  const totalPages = asNonNegativeInteger(payload.pagination.total_pages);
+  const totalItems = asNonNegativeInteger(payload.total_items);
+  if (
+    categoryId === undefined ||
+    !/^L\d+$/.test(categoryId) ||
+    pageNumber === undefined ||
+    pageSize === undefined ||
+    totalPages === undefined ||
+    totalItems === undefined
+  ) {
+    return undefined;
+  }
+  const rawItems = payload.plp_items;
+  if (!Array.isArray(rawItems) && totalItems !== 0) return undefined;
+  const items = (Array.isArray(rawItems) ? rawItems : []).map(
+    parseDiaSearchItem,
+  );
+  return items.some((item) => item === undefined)
+    ? undefined
+    : {
+        categoryId,
+        pageNumber,
+        pageSize,
+        totalPages,
+        totalItems,
+        items: items as DiaSearchItemDto[],
+      };
 }
 
 function findProductRecord(

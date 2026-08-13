@@ -31,8 +31,9 @@ export function supportsIngestionCapability(
 
 const REGISTRY: Partial<Record<Retailer, ProviderRegistration>> = {
   DIA: {
-    capabilities: ["SEARCH", "PRICE_REFRESH"],
+    capabilities: ["SEARCH", "CATALOG", "PRICE_REFRESH"],
     createSearch: () => new SearchIngestionStrategy(new DiaProvider()),
+    createCatalog: () => new CatalogIngestionStrategy(new DiaProvider()),
     createPriceRefresh: () =>
       new PriceRefreshIngestionStrategy(new DiaProvider()),
   },

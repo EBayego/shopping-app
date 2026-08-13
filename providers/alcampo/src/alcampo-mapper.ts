@@ -65,7 +65,10 @@ export class AlcampoMapper {
     if (promotion?.price !== undefined)
       this.assertEuro(promotion.price.currency, "promotion price");
     const promotionText = promotion?.description;
-    const promotionType = this.promotionType(promotion?.type);
+    const promotionType = this.promotionType(
+      promotion?.type,
+      promotion?.description,
+    );
     return {
       retailerProductId: dto.retailerProductId,
       marketId: market.externalId,
@@ -135,23 +138,29 @@ export class AlcampoMapper {
       ? undefined
       : { amount, unit: match[2].toLowerCase() as AlcampoQuantityDto["unit"] };
   }
-  private promotionType(type: string | undefined): PromotionType | undefined {
-    if (type === undefined) return undefined;
-    const normalized = type.toLowerCase();
+  private promotionType(
+    type: string | undefined,
+    description: string | undefined,
+  ): PromotionType | undefined {
+    if (type === undefined && description === undefined) return undefined;
+    const normalized = `${type ?? ""} ${description ?? ""}`.toLowerCase();
     if (
       normalized.includes("member") ||
       normalized.includes("club") ||
-      normalized.includes("fidelity")
+      normalized.includes("fidelity") ||
+      normalized.includes("loyalty")
     )
       return "membership";
-    if (normalized.includes("percent")) return "percentage";
     if (
       normalized.includes("multi") ||
       normalized.includes("bundle") ||
       normalized.includes("2x") ||
-      normalized.includes("3x")
+      normalized.includes("3x") ||
+      /[23](?:ª|a)?\s+unidad/.test(normalized)
     )
       return "multi-buy";
+    if (normalized.includes("percent") || normalized.includes("%"))
+      return "percentage";
     if (normalized.includes("fixed") || normalized.includes("price"))
       return "fixed-price";
     return "other";

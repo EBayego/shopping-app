@@ -148,11 +148,45 @@ function quantity(value: unknown): AlcampoQuantityDto | undefined {
     : { amount, unit: parsedUnit };
 }
 function unitPrice(value: unknown): AlcampoUnitPriceDto | undefined {
-  const parsed = isRecord(value) ? money(value.price ?? value) : undefined;
-  const parsedUnit = isRecord(value) ? unit(value.unit) : undefined;
-  return parsed === undefined || parsedUnit === undefined
+  if (!isRecord(value)) return undefined;
+  const parsed = money(value.price ?? value);
+  const reference = unitPriceReference(value.unit, value.unitName);
+  return parsed === undefined || reference === undefined
     ? undefined
-    : { ...parsed, unit: parsedUnit };
+    : {
+        ...parsed,
+        amount: parsed.amount * reference.amountMultiplier,
+        unit: reference.unit,
+      };
+}
+
+function unitPriceReference(
+  value: unknown,
+  unitName: unknown,
+): { unit: ProductUnit; amountMultiplier: number } | undefined {
+  const parsedUnit = unit(value);
+  if (parsedUnit !== undefined)
+    return { unit: parsedUnit, amountMultiplier: 1 };
+  const candidates = [value, unitName]
+    .map((candidate) => text(candidate)?.toLocaleLowerCase("es-ES"))
+    .filter((candidate): candidate is string => candidate !== undefined);
+  for (const candidate of candidates) {
+    switch (candidate) {
+      case "fop.price.per.each":
+      case "each":
+        return { unit: "unit", amountMultiplier: 1 };
+      case "fop.price.per.kg":
+      case "per_1kg":
+        return { unit: "kg", amountMultiplier: 1 };
+      case "fop.price.per.litre":
+      case "per_litre":
+        return { unit: "l", amountMultiplier: 1 };
+      case "fop.price.per.100ml":
+      case "per_100ml":
+        return { unit: "l", amountMultiplier: 10 };
+    }
+  }
+  return undefined;
 }
 function grams(value: AlcampoQuantityDto): number | undefined {
   return value.unit === "g"
@@ -163,7 +197,9 @@ function grams(value: AlcampoQuantityDto): number | undefined {
 }
 function parseCatchweight(value: unknown): AlcampoCatchweightDto | undefined {
   if (!isRecord(value)) return undefined;
-  const observedQuantity = (candidate: unknown): AlcampoQuantityDto | undefined => {
+  const observedQuantity = (
+    candidate: unknown,
+  ): AlcampoQuantityDto | undefined => {
     if (!isRecord(candidate)) return undefined;
     return quantity({
       amount: candidate.amount ?? candidate.value,
@@ -203,6 +239,7 @@ function images(value: unknown): AlcampoImageDto[] | undefined {
   return result;
 }
 function promotions(value: unknown): AlcampoPromotionDto[] | undefined {
+  if (value == null) return [];
   if (!Array.isArray(value)) return undefined;
   return value.flatMap((item) => {
     if (!isRecord(item)) return [];
@@ -219,7 +256,9 @@ function promotions(value: unknown): AlcampoPromotionDto[] | undefined {
       ...(parsedPrice === undefined ? {} : { price: parsedPrice }),
       ...(typeof item.requiresMembership === "boolean"
         ? { requiresMembership: item.requiresMembership }
-        : {}),
+        : type?.toUpperCase() === "LOYALTY"
+          ? { requiresMembership: true }
+          : {}),
     };
     return [promotion];
   });
@@ -368,38 +407,39 @@ export function parseAlcampoProduct(
   payload: unknown,
 ): AlcampoProductDto | undefined {
   if (!isRecord(payload)) return undefined;
-  const productId = text(payload.productId);
-  const retailerProductId = text(payload.retailerProductId);
-  const type = text(payload.type);
-  const name = text(payload.name);
-  const parsedPrice = money(payload.price);
+  const product = isRecord(payload.product) ? payload.product : payload;
+  const productId = text(product.productId);
+  const retailerProductId = text(product.retailerProductId);
+  const type = text(product.type);
+  const name = text(product.name);
+  const parsedPrice = money(product.price);
   const parsedUnitPrice =
-    payload.unitPrice == null ? undefined : unitPrice(payload.unitPrice);
-  const categoryPath = strings(payload.categoryPath);
-  const parsedImages = images(payload.images);
-  const parsedPromotions = promotions(payload.promotions);
+    product.unitPrice == null ? undefined : unitPrice(product.unitPrice);
+  const categoryPath = strings(product.categoryPath);
+  const parsedImages = images(product.images);
+  const parsedPromotions = promotions(product.promotions);
   const parsedCatchweight =
-    payload.catchweight == null
+    product.catchweight == null
       ? undefined
-      : parseCatchweight(payload.catchweight);
+      : parseCatchweight(product.catchweight);
   if (
     productId === undefined ||
     retailerProductId === undefined ||
     type === undefined ||
     name === undefined ||
     parsedPrice === undefined ||
-    typeof payload.available !== "boolean" ||
+    typeof product.available !== "boolean" ||
     categoryPath === undefined ||
     parsedImages === undefined ||
     parsedPromotions === undefined ||
-    (payload.unitPrice != null && parsedUnitPrice === undefined) ||
-    (payload.catchweight != null && parsedCatchweight === undefined) ||
+    (product.unitPrice != null && parsedUnitPrice === undefined) ||
+    (product.catchweight != null && parsedCatchweight === undefined) ||
     (type.toUpperCase() === "CATCHWEIGHT" && parsedCatchweight === undefined)
   )
     return undefined;
-  const brand = text(payload.brand);
-  const packSizeDescription = text(payload.packSizeDescription);
-  const productUrl = text(payload.productUrl);
+  const brand = text(product.brand);
+  const packSizeDescription = text(product.packSizeDescription);
+  const productUrl = text(product.productUrl);
   return {
     productId,
     retailerProductId,
@@ -409,7 +449,7 @@ export function parseAlcampoProduct(
     ...(packSizeDescription === undefined ? {} : { packSizeDescription }),
     price: parsedPrice,
     ...(parsedUnitPrice === undefined ? {} : { unitPrice: parsedUnitPrice }),
-    available: payload.available,
+    available: product.available,
     ...(parsedCatchweight === undefined
       ? {}
       : { catchweight: parsedCatchweight }),

@@ -25,6 +25,28 @@ describe("AlcampoCategoryParser", () => {
     );
   });
 
+  it("conserva variantes alfanuméricas observadas en el catálogo real", () => {
+    const html = `<script data-test="product-listing-structured-data" type="application/ld+json">${JSON.stringify(
+      {
+        "@type": "ItemList",
+        itemListElement: [
+          {
+            item: {
+              url: "/products/jamon-al-corte/81299-LONCHA-NORMAL-2-A-3-MM",
+            },
+          },
+          { item: { url: "/products/pieza-al-corte/90024-TROZO" } },
+        ],
+      },
+    )}</script>`;
+    expect(
+      parser.parse(
+        html,
+        "https://www.compraonline.alcampo.es/categories/a/b/OC1603",
+      ).retailerProductIds,
+    ).toEqual(["81299-LONCHA-NORMAL-2-A-3-MM", "90024-TROZO"]);
+  });
+
   it("no confunde el primer lote con una categoría completa de 50 productos", () => {
     const itemListElement = Array.from({ length: 50 }, (_, index) => ({
       "@type": "ListItem",

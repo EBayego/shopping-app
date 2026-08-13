@@ -114,6 +114,29 @@ export class DiaHttpClient {
     return this.readJson(response, "search");
   }
 
+  async getMenuData(context: DiaSessionContext): Promise<unknown> {
+    const url = new URL("/api/v1/common-aggregator/menu-data", this.baseUrl);
+    const response = await this.request(url, {
+      method: "GET",
+      headers: this.contextHeaders(context.cartId, context.sessionId, true),
+    });
+    return this.readJson(response, "category menu");
+  }
+
+  async getCategoryProducts(
+    categoryLink: string,
+    page: number,
+    context: DiaSessionContext,
+  ): Promise<unknown> {
+    const pageLink = this.categoryPageLink(categoryLink, page);
+    const url = new URL(`/api/v1/plp-back/reduced${pageLink}`, this.baseUrl);
+    const response = await this.request(url, {
+      method: "GET",
+      headers: this.contextHeaders(context.cartId, context.sessionId, true),
+    });
+    return this.readJson(response, "category products");
+  }
+
   private async readJson(
     response: Response,
     resource: string,
@@ -178,6 +201,23 @@ export class DiaHttpClient {
       }
     }
     return undefined;
+  }
+
+  private categoryPageLink(categoryLink: string, page: number): string {
+    if (!Number.isInteger(page) || page < 1)
+      throw new RangeError("DIA category page must be a positive integer");
+    if (
+      !categoryLink.startsWith("/") ||
+      categoryLink.startsWith("//") ||
+      categoryLink.includes("?") ||
+      categoryLink.includes("#") ||
+      !/\/c\/L\d+$/.test(categoryLink)
+    ) {
+      throw new RangeError("DIA category link is invalid");
+    }
+    return page === 1
+      ? categoryLink
+      : categoryLink.replace(/\/c\/(L\d+)$/, `/pag-${page}/c/$1`);
   }
 
   private async request(url: URL, init: RequestInit): Promise<Response> {

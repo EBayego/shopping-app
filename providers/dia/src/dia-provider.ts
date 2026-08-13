@@ -4,6 +4,7 @@ import type {
   Market,
   ProductOffer,
   ProviderHealth,
+  RetailerCategory,
   RetailerProduct,
 } from "@shopping-app/domain";
 import {
@@ -12,12 +13,19 @@ import {
   ProviderContractChangedError,
   ProviderUnavailableError,
   RateLimitedError,
+  type CatalogRetailerProvider,
   type SearchRetailerProvider,
   type PriceRefreshRetailerProvider,
   type RetailerSearchResult,
 } from "@shopping-app/retailer-contracts";
 
-import { parseDiaProductAnalytics, parseDiaSearchPage } from "./dia-dtos.js";
+import {
+  parseDiaCatalogPage,
+  parseDiaMenu,
+  parseDiaProductAnalytics,
+  parseDiaSearchPage,
+  type DiaSearchItemDto,
+} from "./dia-dtos.js";
 import {
   DiaHttpClient,
   DiaHttpError,
@@ -42,14 +50,26 @@ export interface DiaSearchPage extends RetailerSearchResult {
   pagination: DiaSearchPagination;
 }
 
+interface DiaCatalogCategory {
+  id: string;
+  name: string;
+  link: string;
+  rootName: string;
+  parentId?: string;
+}
+
 export class DiaProvider
-  implements SearchRetailerProvider, PriceRefreshRetailerProvider
+  implements
+    SearchRetailerProvider,
+    CatalogRetailerProvider,
+    PriceRefreshRetailerProvider
 {
   private readonly client: DiaHttpClient;
   private readonly mapper = new DiaMapper();
   private readonly createId: () => string;
   private readonly now: () => Date;
   private readonly contexts = new WeakMap<Market, DiaSessionContext>();
+  private readonly catalogCategories = new Map<string, DiaCatalogCategory>();
 
   constructor(options: DiaProviderOptions = {}) {
     this.client = new DiaHttpClient(options);
@@ -152,6 +172,115 @@ export class DiaProvider
     }
   }
 
+  async getCategories(market: Market): Promise<RetailerCategory[]> {
+    const context = this.contextFor(market);
+    try {
+      const roots = parseDiaMenu(await this.client.getMenuData(context));
+      if (roots === undefined) {
+        throw new ProviderContractChangedError("DIA", {
+          message:
+            "DIA category menu is incompatible with the expected contract",
+        });
+      }
+      this.catalogCategories.clear();
+      const categories: RetailerCategory[] = [];
+      const walk = (
+        nodes: typeof roots,
+        level: number,
+        parent: DiaCatalogCategory | undefined,
+        rootName: string | undefined,
+      ): void => {
+        nodes.forEach((node, order) => {
+          if (parent?.id === node.id || this.catalogCategories.has(node.id))
+            return;
+          const category: DiaCatalogCategory = {
+            id: node.id,
+            name: node.name,
+            link: node.link,
+            rootName: rootName ?? node.name,
+            ...(parent === undefined ? {} : { parentId: parent.id }),
+          };
+          this.catalogCategories.set(category.id, category);
+          categories.push({
+            externalId: category.id,
+            name: category.name,
+            level,
+            order,
+            ...(category.parentId === undefined
+              ? {}
+              : { parentExternalId: category.parentId }),
+          });
+          walk(node.children, level + 1, category, category.rootName);
+        });
+      };
+      walk(roots, 0, undefined, undefined);
+      return categories;
+    } catch (error) {
+      throw this.catalogError(error);
+    }
+  }
+
+  async getProductsByCategory(
+    categoryId: string,
+    market: Market,
+  ): Promise<RetailerSearchResult> {
+    const normalized = categoryId.trim();
+    if (!/^L\d+$/.test(normalized))
+      throw new RangeError("DIA category id is invalid");
+    const context = this.contextFor(market);
+    try {
+      if (!this.catalogCategories.has(normalized))
+        await this.getCategories(market);
+      const category = this.catalogCategories.get(normalized);
+      if (category === undefined) {
+        throw new ProviderContractChangedError("DIA", {
+          message: `DIA category ${normalized} is absent from the current menu`,
+        });
+      }
+      const firstPage = await this.loadCatalogPage(category, 1, context);
+      const pages = [firstPage];
+      for (let page = 2; page <= firstPage.totalPages; page += 1) {
+        const nextPage = await this.loadCatalogPage(category, page, context);
+        if (
+          nextPage.totalPages !== firstPage.totalPages ||
+          nextPage.totalItems !== firstPage.totalItems
+        ) {
+          throw new ProviderContractChangedError("DIA", {
+            message: "DIA category pagination changed during traversal",
+          });
+        }
+        pages.push(nextPage);
+      }
+      const itemsBySku = new Map<string, DiaSearchItemDto>();
+      for (const item of pages.flatMap((page) => page.items))
+        itemsBySku.set(item.skuId, item);
+      if (itemsBySku.size !== firstPage.totalItems) {
+        throw new ProviderContractChangedError("DIA", {
+          message: "DIA category product count differs from total_items",
+        });
+      }
+      const items = [...itemsBySku.values()].map((item) => ({
+        ...item,
+        category: item.category ?? category.rootName,
+        ...(category.parentId === undefined
+          ? {}
+          : { subcategory: item.subcategory ?? category.name }),
+      }));
+      const observedAt = this.now();
+      return {
+        products: items.map((item) =>
+          this.mapper.searchItemToProduct(item, market, observedAt),
+        ),
+        offers: items.flatMap((item) => {
+          const offer = this.mapper.searchItemToOffer(item, market, observedAt);
+          return offer === undefined ? [] : [offer];
+        }),
+      };
+    } catch (error) {
+      throw this.catalogError(error);
+    }
+  }
+
   async getProduct(
     externalId: string,
     market: Market,
@@ -207,6 +336,27 @@ export class DiaProvider
     }
   }
 
+  private async loadCatalogPage(
+    category: DiaCatalogCategory,
+    page: number,
+    context: DiaSessionContext,
+  ) {
+    const dto = parseDiaCatalogPage(
+      await this.client.getCategoryProducts(category.link, page, context),
+    );
+    if (
+      dto === undefined ||
+      dto.categoryId !== category.id ||
+      dto.pageNumber !== page
+    ) {
+      throw new ProviderContractChangedError("DIA", {
+        message:
+          "DIA category response is incompatible with the expected contract",
+      });
+    }
+    return dto;
+  }
+
   private contextFor(market: Market): DiaSessionContext {
     if (market.retailer !== "DIA") {
       throw new MarketResolutionError("DIA", market.postalCode, {
@@ -259,6 +409,25 @@ export class DiaProvider
     if (
       error instanceof ProviderContractChangedError ||
       error instanceof MarketResolutionError
+    ) {
+      return error;
+    }
+    if (error instanceof DiaHttpError && error.kind === "invalid-response") {
+      return new ProviderContractChangedError("DIA", { cause: error });
+    }
+    return (
+      this.commonHttpError(error) ??
+      new ProviderUnavailableError("DIA", { cause: error })
+    );
+  }
+
+  private catalogError(error: unknown): Error {
+    if (
+      error instanceof ProviderContractChangedError ||
+      error instanceof MarketResolutionError ||
+      error instanceof ProviderUnavailableError ||
+      error instanceof RateLimitedError ||
+      error instanceof RangeError
     ) {
       return error;
     }

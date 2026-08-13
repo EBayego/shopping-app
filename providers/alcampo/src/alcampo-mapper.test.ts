@@ -83,4 +83,38 @@ describe("AlcampoMapper", () => {
     expect(promotion.promoPrice).toBeUndefined();
     expect(unavailable.available).toBe(false);
   });
+
+  it("clasifica LOYALTY y ofertas multi-buy sin inventar precio", () => {
+    const mapper = new AlcampoMapper();
+    const base = dto("product-54180.json");
+    const loyalty = mapper.toOffer(
+      {
+        ...base,
+        promotions: [
+          {
+            type: "LOYALTY",
+            description: "Club Alcampo 40% acumulado en tu tarjeta",
+            requiresMembership: true,
+          },
+        ],
+      },
+      MARKET,
+      OBSERVED_AT,
+    );
+    const multiBuy = mapper.toOffer(
+      {
+        ...base,
+        promotions: [{ type: "OFFER", description: "2ª unidad -50%" }],
+      },
+      MARKET,
+      OBSERVED_AT,
+    );
+    expect(loyalty).toMatchObject({
+      promotionType: "membership",
+      requiresMembership: true,
+    });
+    expect(multiBuy.promotionType).toBe("multi-buy");
+    expect(loyalty.promoPrice).toBeUndefined();
+    expect(multiBuy.promoPrice).toBeUndefined();
+  });
 });

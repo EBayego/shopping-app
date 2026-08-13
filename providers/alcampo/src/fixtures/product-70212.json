@@ -11,22 +11,22 @@
   },
   "unitPrice": {
     "price": { "amount": "11.95", "currency": "EUR" },
-    "unit": "kg",
-    "unitName": "kilogramo"
+    "unit": "fop.price.per.kg",
+    "unitName": "PER_1KG"
   },
   "available": true,
   "catchweight": {
     "minQuantity": {
       "value": "300",
-      "uom": "g"
+      "uom": "G"
     },
     "typicalQuantity": {
       "value": "400",
-      "uom": "g"
+      "uom": "G"
     },
     "maxQuantity": {
       "value": "500",
-      "uom": "g"
+      "uom": "G"
     }
   },
   "categoryPath": ["Frescos", "Carne", "Cerdo"],

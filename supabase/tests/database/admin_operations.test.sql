@@ -55,9 +55,9 @@ select lives_ok(
 );
 select is((select count(*) from public.refresh_requests where status = 'PENDING'), 1::bigint, 'refresh request remains pending for a worker');
 select throws_ok(
-  $$select * from public.admin_request_refresh('00000000-0000-4000-8000-000000000001', 'CATALOG_SYNC', '50009', '{}', 'operator@example.com')$$,
+  $$select * from public.admin_request_refresh('00000000-0000-4000-8000-000000000004', 'CATALOG_SYNC', '50009', '{}', 'operator@example.com')$$,
   '0A000',
-  'Provider DIA does not support CATALOG_SYNC',
+  'Provider EROSKI does not support CATALOG_SYNC',
   'unsupported catalog sync is rejected server-side'
 );
 select lives_ok(

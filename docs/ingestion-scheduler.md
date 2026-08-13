@@ -101,10 +101,10 @@ group by status, request_type, postal_code
 order by postal_code, request_type, status;
 ```
 
-Mercadona y Alcampo disponen de estrategia de catálogo. DIA descubre productos
-mediante búsquedas concretas y Eroski solo refresca productos previamente
-conocidos; no se anuncian como catálogos completos hasta que exista una
-estrategia de discovery confirmada para esos proveedores.
+Mercadona, Alcampo y DIA disponen de estrategia de catálogo. DIA obtiene el
+árbol desde `menu-data` y recorre las páginas PLP de cada subcategoría, además
+de conservar su búsqueda bajo demanda. Eroski solo refresca productos
+previamente conocidos y no se anuncia como catálogo completo.
 
 ## Variables y secretos
 

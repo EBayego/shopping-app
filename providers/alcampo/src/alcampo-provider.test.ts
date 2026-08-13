@@ -220,32 +220,34 @@ describe("AlcampoProvider", () => {
     const initialState = `<script data-test="initial-state-script">window.__INITIAL_STATE__=${JSON.stringify({ session: { csrf: { token: "csrf" }, metadata: { visitorId: "visitor" } }, data: { products: { productEntities } } })}</script>`;
     const categoryHtml = `${initialState}<script data-test="product-listing-structured-data" type="application/ld+json">${JSON.stringify({ "@type": "ItemList", itemListElement })}</script>`;
     let batchRequests = 0;
-    const fetchMock = vi.fn<typeof fetch>().mockImplementation((input, init) => {
-      const url = requestUrl(input);
-      if (url.includes("categories?"))
-        return Promise.resolve(json(fixture("categories.json")));
-      if (url.includes("/categories/"))
-        return Promise.resolve(html(categoryHtml));
-      if (!url.includes("/v6/products") || typeof init?.body !== "string")
-        throw new Error(`Unexpected ${url}`);
-      batchRequests += 1;
-      const requested = JSON.parse(init.body) as string[];
-      const products = requested.map((productId) => {
-        const retailerProductId = [...internalByRetailer].find(
-          ([, internalId]) => internalId === productId,
-        )?.[0];
-        if (retailerProductId === undefined)
-          throw new Error("Unknown internal product id");
-        return {
-          ...(fixture("product-54180.json") as Record<string, unknown>),
-          productId,
-          retailerProductId,
-        };
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockImplementation((input, init) => {
+        const url = requestUrl(input);
+        if (url.includes("categories?"))
+          return Promise.resolve(json(fixture("categories.json")));
+        if (url.includes("/categories/"))
+          return Promise.resolve(html(categoryHtml));
+        if (!url.includes("/v6/products") || typeof init?.body !== "string")
+          throw new Error(`Unexpected ${url}`);
+        batchRequests += 1;
+        const requested = JSON.parse(init.body) as string[];
+        const products = requested.map((productId) => {
+          const retailerProductId = [...internalByRetailer].find(
+            ([, internalId]) => internalId === productId,
+          )?.[0];
+          if (retailerProductId === undefined)
+            throw new Error("Unknown internal product id");
+          return {
+            ...(fixture("product-54180.json") as Record<string, unknown>),
+            productId,
+            retailerProductId,
+          };
+        });
+        return Promise.resolve(
+          json({ products, missedPromotions: [], restrictedGroups: [] }),
+        );
       });
-      return Promise.resolve(
-        json({ products, missedPromotions: [], restrictedGroups: [] }),
-      );
-    });
     const provider = new AlcampoProvider({
       fetch: fetchMock,
       sessionContext: context(),
@@ -260,13 +262,22 @@ describe("AlcampoProvider", () => {
   });
 
   it("getProduct admite ID numérico y refreshPrices conserva éxitos parciales y observación nueva", async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockImplementation((input) =>
-        requestUrl(input).includes("99999")
-          ? Promise.resolve(new Response("missing", { status: 404 }))
-          : Promise.resolve(json(fixture("product-54180.json"))),
+    const fetchMock = vi.fn<typeof fetch>().mockImplementation((input) => {
+      const url = requestUrl(input);
+      if (url.includes("99999"))
+        return Promise.resolve(new Response("missing", { status: 404 }));
+      const externalId = url.includes("81299-LONCHA-NORMAL-2-A-3-MM")
+        ? "81299-LONCHA-NORMAL-2-A-3-MM"
+        : "54180";
+      return Promise.resolve(
+        json({
+          product: {
+            ...(fixture("product-54180.json") as Record<string, unknown>),
+            retailerProductId: externalId,
+          },
+        }),
       );
+    });
     const provider = new AlcampoProvider({
       fetch: fetchMock,
       sessionContext: context(),
@@ -277,6 +288,11 @@ describe("AlcampoProvider", () => {
     await expect(provider.getProduct("54180", market)).resolves.toMatchObject({
       externalId: "54180",
       observedAt: OBSERVED_AT,
+    });
+    await expect(
+      provider.getProduct("81299-LONCHA-NORMAL-2-A-3-MM", market),
+    ).resolves.toMatchObject({
+      externalId: "81299-LONCHA-NORMAL-2-A-3-MM",
     });
     await expect(
       provider.refreshPrices(["54180", "99999"], market),

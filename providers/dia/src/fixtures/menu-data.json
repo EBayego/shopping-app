@@ -1,0 +1,39 @@
+{
+  "categories": [
+    {
+      "id": "L108",
+      "name": "Huevos, leche y mantequilla",
+      "link": "/huevos-leche-y-mantequilla/c/L108",
+      "children": [
+        {
+          "id": "L108",
+          "name": "Todo huevos, leche y mantequilla",
+          "link": "/huevos-leche-y-mantequilla/c/L108"
+        },
+        {
+          "id": "L2051",
+          "name": "Leche",
+          "link": "/huevos-leche-y-mantequilla/leche/c/L2051"
+        }
+      ]
+    },
+    {
+      "id": "L106",
+      "name": "Arroz, pastas y legumbres",
+      "link": "/arroz-pastas-y-legumbres/c/L106",
+      "children": [
+        {
+          "id": "L106",
+          "name": "Todo arroz, pastas y legumbres",
+          "link": "/arroz-pastas-y-legumbres/c/L106"
+        },
+        {
+          "id": "L2270",
+          "name": "Fideos",
+          "link": "/arroz-pastas-y-legumbres/fideos/c/L2270"
+        }
+      ]
+    }
+  ],
+  "offer_category": {}
+}

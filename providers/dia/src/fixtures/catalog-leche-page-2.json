@@ -1,0 +1,29 @@
+{
+  "selected_category_id": "L2051",
+  "pagination": {
+    "page_number": 2,
+    "page_size": 2,
+    "total_pages": 2
+  },
+  "total_items": 3,
+  "plp_items": [
+    {
+      "brand": "Marca promocional",
+      "display_name": "Leche de crecimiento pack 3 x 1 L",
+      "object_id": "object-PROMO3L",
+      "sku_id": "PROMO3L",
+      "units_in_stock": 12,
+      "url": "/huevos-leche-y-mantequilla/leche/p/PROMO3L",
+      "prices": {
+        "currency": "EUR",
+        "discount_percentage": 25,
+        "is_club_price": false,
+        "is_promo_price": true,
+        "measure_unit": "LITRO",
+        "price": 1.8,
+        "price_per_unit": 0.6,
+        "strikethrough_price": 2.4
+      }
+    }
+  ]
+}

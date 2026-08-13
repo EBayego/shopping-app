@@ -48,5 +48,28 @@ describe.skipIf(process.env.RUN_LIVE_PROVIDER_TESTS !== "true")(
         expect(product.retailer).toBe("DIA");
       }
     }, 30_000);
+
+    it("recorre la categoría de leche confirmada", async () => {
+      const provider = new DiaProvider({ timeoutMs: 15_000 });
+      const market = await provider.resolveMarket("50009");
+      const categories = await provider.getCategories(market);
+      expect(
+        categories.find((category) => category.externalId === "L2051"),
+      ).toMatchObject({ name: "Leche" });
+
+      const { products, offers } = await provider.getProductsByCategory(
+        "L2051",
+        market,
+      );
+      expect(products.length).toBeGreaterThan(0);
+      expect(offers.length).toBeGreaterThan(0);
+      expect(
+        products.every(
+          (product) =>
+            product.retailer === "DIA" &&
+            product.marketId === "postal-code:50009",
+        ),
+      ).toBe(true);
+    }, 60_000);
   },
 );

@@ -12,8 +12,8 @@ select extensions.is(
 
 select extensions.is(
   (select capabilities from public.retailers where code = 'DIA'),
-  array['SEARCH', 'PRICE_REFRESH']::text[],
-  'DIA exposes only its implemented ingestion capabilities'
+  array['SEARCH', 'CATALOG', 'PRICE_REFRESH']::text[],
+  'DIA exposes its confirmed search, catalog and price refresh capabilities'
 );
 
 select extensions.is(

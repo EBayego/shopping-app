@@ -386,7 +386,7 @@ export class AlcampoProvider
     market: Market,
   ): Promise<AlcampoProductDto> {
     const normalized = externalId.trim();
-    if (!/^\d+$/.test(normalized))
+    if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(normalized))
       throw new ProductNotFoundError("ALCAMPO", externalId);
     try {
       const dto = parseAlcampoProduct(

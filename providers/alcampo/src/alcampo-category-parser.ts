@@ -63,14 +63,21 @@ export class AlcampoCategoryParser {
           { cause },
         );
       }
-      const match = url.pathname.match(/\/products\/[^/]+\/(\d+)\/?$/);
-      if (match?.[1] === undefined) {
+      const match = url.pathname.match(/\/products\/[^/]+\/([^/]+)\/?$/);
+      const retailerProductId =
+        match?.[1] === undefined
+          ? undefined
+          : decodeURIComponent(match[1]).trim();
+      if (
+        retailerProductId === undefined ||
+        !/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(retailerProductId)
+      ) {
         throw new AlcampoCategoryHtmlError(
-          "Alcampo product URL does not end in a numeric retailerProductId",
+          "Alcampo product URL does not end in a valid retailerProductId",
         );
       }
-      if (!productUrls.has(match[1])) ids.push(match[1]);
-      productUrls.set(match[1], url.href);
+      if (!productUrls.has(retailerProductId)) ids.push(retailerProductId);
+      productUrls.set(retailerProductId, url.href);
     }
     let internalProductIds: ReadonlyMap<string, string> = new Map();
     try {
