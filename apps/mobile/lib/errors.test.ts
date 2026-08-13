@@ -12,4 +12,10 @@ describe("getErrorMessage", () => {
   it("no asume que el valor recibido sea Error", () => {
     expect(getErrorMessage(null)).toBe("Ha ocurrido un error inesperado.");
   });
+
+  it("traduce el error de vinculación manual desactivada", () => {
+    expect(getErrorMessage(new Error("Manual linking is disabled"))).toBe(
+      "La vinculación de cuentas está desactivada en Supabase.",
+    );
+  });
 });

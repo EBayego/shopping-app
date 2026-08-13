@@ -19,6 +19,9 @@ export function getErrorMessage(error: unknown): string {
   if (message.includes("Only a group owner")) {
     return "Solo la persona propietaria del grupo puede crear invitaciones.";
   }
+  if (message.toLowerCase().includes("manual linking is disabled")) {
+    return "La vinculación de cuentas está desactivada en Supabase.";
+  }
   if (message.includes("Network request failed") || message.includes("fetch")) {
     return "No se ha podido conectar. Comprueba la red e inténtalo de nuevo.";
   }
