@@ -4,7 +4,7 @@ import {
   ensureAnonymousSession,
   type EnsuredSession,
 } from "../features/auth/anonymous-session";
-import { parseOAuthCallbackUrl } from "../features/auth/oauth-callback";
+import type { OAuthCallbackResult } from "../features/auth/oauth-callback";
 import { secureStoreAdapter } from "../services/secure-store-adapter";
 import { getSupabaseClient } from "../services/supabase";
 
@@ -72,26 +72,34 @@ async function beginSocialOAuth(
 }
 
 export async function completeSocialIdentityLink(
-  callbackUrl: string,
+  callback: OAuthCallbackResult,
 ): Promise<Pick<PendingIdentityLink, "intent" | "provider">> {
-  const { code, errorDescription } = parseOAuthCallbackUrl(callbackUrl);
+  const { code, errorDescription } = callback;
   if (errorDescription) throw new Error(errorDescription);
   if (!code)
     throw new Error("La respuesta de acceso no incluye un código válido.");
 
+  console.info("[auth-callback] Reading pending OAuth flow");
   const pendingLink = await readPendingIdentityLink();
   if (!pendingLink) {
     throw new Error("No se encontró un inicio de sesión pendiente.");
   }
 
   try {
+    console.info("[auth-callback] Exchanging PKCE code with Supabase", {
+      hasFlowId: pendingLink.flowId !== null,
+      intent: pendingLink.intent,
+      provider: pendingLink.provider,
+    });
     const { error } = await getSupabaseClient().auth.exchangeCodeForSession(
       code,
       pendingLink.flowId ? { flowId: pendingLink.flowId } : undefined,
     );
     if (error) throw error;
+    console.info("[auth-callback] Supabase session stored");
     return { provider: pendingLink.provider, intent: pendingLink.intent };
   } finally {
+    console.info("[auth-callback] Clearing pending OAuth flow");
     await secureStoreAdapter.removeItem(PENDING_IDENTITY_LINK_KEY);
   }
 }
