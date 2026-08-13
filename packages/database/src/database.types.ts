@@ -1311,6 +1311,23 @@ export type Database = {
           max_jobs_per_tick: number
         }[]
       }
+      edit_shopping_product_operation: {
+        Args: {
+          brand_preference?: string
+          intent_id: string
+          normalized_name: string
+          operation_id: string
+          package_count?: number
+          package_size?: number
+          package_unit?: string
+          raw_text: string
+          requested_quantity?: number
+          requested_unit?: string
+          total_amount?: number
+          variant?: string
+        }
+        Returns: Json
+      }
       generate_group_invite: {
         Args: {
           allowed_uses?: number

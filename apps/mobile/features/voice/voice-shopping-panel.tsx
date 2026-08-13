@@ -1,19 +1,23 @@
 import {
   parseShoppingIntentSegments,
   type ShoppingIntentDraft,
-  type ShoppingIntentUnit,
 } from "@shopping-app/voice-parser";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "../../components/app-button";
-import { AppInput } from "../../components/app-input";
 import { useThemedStyles } from "../theme/theme-context";
 import { spacing, type ThemeColors } from "../../lib/theme";
 import {
   SpeechRecognitionError,
   type SpeechRecognitionService,
 } from "./speech-recognition-service";
+import {
+  draftToFieldValues,
+  fieldValuesToDraft,
+  ShoppingIntentFields,
+  type ShoppingIntentFieldValues,
+} from "./shopping-intent-fields";
 
 interface VoiceShoppingPanelProps {
   adding: boolean;
@@ -22,31 +26,14 @@ interface VoiceShoppingPanelProps {
   service: SpeechRecognitionService;
 }
 
-interface EditableDraft {
+interface EditableDraft extends ShoppingIntentFieldValues {
   id: string;
   source: ShoppingIntentDraft;
   selected: boolean;
-  product: string;
-  variant: string;
-  brandPreference: string;
-  requestedQuantity: string;
-  requestedUnit: string;
-  packageCount: string;
-  packageSize: string;
-  packageUnit: string;
 }
 
-const VALID_UNITS = new Set<ShoppingIntentUnit>([
-  "g",
-  "kg",
-  "ml",
-  "cl",
-  "l",
-  "unit",
-  "bottle",
-  "can",
-  "pack",
-]);
+const WAVEFORM_BAR_COUNT = 28;
+const EMPTY_WAVEFORM = Array.from({ length: WAVEFORM_BAR_COUNT }, () => 0);
 
 export function VoiceShoppingPanel({
   adding,
@@ -60,6 +47,13 @@ export function VoiceShoppingPanel({
   const [drafts, setDrafts] = useState<EditableDraft[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [blockedPermission, setBlockedPermission] = useState(false);
+  const [durationSeconds, setDurationSeconds] = useState(0);
+  const [waveform, setWaveform] = useState<readonly number[]>(EMPTY_WAVEFORM);
+  const startedAt = useRef<number | null>(null);
+
+  const handleVolumeChange = useCallback((level: number): void => {
+    setWaveform((current) => [...current.slice(1), clamp(level, 0, 1)]);
+  }, []);
 
   const startListening = useCallback(async (): Promise<void> => {
     setListening(true);
@@ -67,9 +61,13 @@ export function VoiceShoppingPanel({
     setBlockedPermission(false);
     setTranscript("");
     setDrafts([]);
+    setDurationSeconds(0);
+    setWaveform(EMPTY_WAVEFORM);
+    startedAt.current = Date.now();
     try {
       const recognized = await service.recognize({
         locale: "es-ES",
+        onVolumeChange: handleVolumeChange,
       });
       if (recognized.transcript.trim().length === 0) {
         throw new SpeechRecognitionError(
@@ -96,9 +94,22 @@ export function VoiceShoppingPanel({
       setBlockedPermission(speechError.code === "PERMISSION_BLOCKED");
       setMessage(messageForError(speechError));
     } finally {
+      startedAt.current = null;
       setListening(false);
     }
-  }, [service]);
+  }, [handleVolumeChange, service]);
+
+  useEffect(() => {
+    if (!listening) return undefined;
+    const timer = setInterval(() => {
+      if (startedAt.current !== null) {
+        setDurationSeconds(
+          Math.max(0, Math.floor((Date.now() - startedAt.current) / 1000)),
+        );
+      }
+    }, 250);
+    return () => clearInterval(timer);
+  }, [listening]);
 
   useEffect(() => {
     void startListening();
@@ -148,6 +159,7 @@ export function VoiceShoppingPanel({
         <View style={styles.listeningBox}>
           <Text style={styles.title}>Escuchando…</Text>
           <Text style={styles.hint}>Di uno o varios productos.</Text>
+          <AudioWaveform durationSeconds={durationSeconds} levels={waveform} />
           <AppButton
             tone="secondary"
             onPress={() => {
@@ -240,73 +252,7 @@ function VoiceDraftEditor({
           <Text style={styles.hint}>{confidenceMessage}</Text>
         </View>
       </Pressable>
-      <AppInput
-        label="Producto"
-        onChangeText={(product) => onChange({ product })}
-        value={draft.product}
-      />
-      {draft.variant.trim() ? (
-        <AppInput
-          label="Variante"
-          onChangeText={(variant) => onChange({ variant })}
-          value={draft.variant}
-        />
-      ) : null}
-      {draft.brandPreference.trim() ? (
-        <AppInput
-          label="Marca"
-          onChangeText={(brandPreference) => onChange({ brandPreference })}
-          value={draft.brandPreference}
-        />
-      ) : null}
-      <View style={styles.fieldRow}>
-        <AppInput
-          keyboardType="decimal-pad"
-          label="Cantidad"
-          onChangeText={(requestedQuantity) => onChange({ requestedQuantity })}
-          style={styles.rowInput}
-          value={draft.requestedQuantity}
-        />
-        {shouldShowUnit(draft.requestedUnit) ? (
-          <AppInput
-            autoCapitalize="none"
-            label="Unidad"
-            onChangeText={(requestedUnit) => onChange({ requestedUnit })}
-            style={styles.rowInput}
-            value={draft.requestedUnit}
-          />
-        ) : null}
-      </View>
-      {draft.packageCount || draft.packageSize || draft.packageUnit ? (
-        <View style={styles.packageBox}>
-          <Text style={styles.label}>Formato del envase</Text>
-          <View style={styles.fieldRow}>
-            <AppInput
-              keyboardType="decimal-pad"
-              label="Envases"
-              onChangeText={(packageCount) => onChange({ packageCount })}
-              style={styles.rowInput}
-              value={draft.packageCount}
-            />
-            <AppInput
-              keyboardType="decimal-pad"
-              label="Tamaño"
-              onChangeText={(packageSize) => onChange({ packageSize })}
-              style={styles.rowInput}
-              value={draft.packageSize}
-            />
-            {shouldShowUnit(draft.packageUnit) ? (
-              <AppInput
-                autoCapitalize="none"
-                label="Unidad envase"
-                onChangeText={(packageUnit) => onChange({ packageUnit })}
-                style={styles.rowInput}
-                value={draft.packageUnit}
-              />
-            ) : null}
-          </View>
-        </View>
-      ) : null}
+      <ShoppingIntentFields onChange={onChange} values={draft} />
     </View>
   );
 }
@@ -319,117 +265,49 @@ function toEditableDraft(
     id: `${index}:${draft.rawText}`,
     source: draft,
     selected: draft.confidence === "HIGH",
-    product: capitalizeFirst(draft.product ?? ""),
-    variant: draft.variant ?? "",
-    brandPreference: draft.brandPreference ?? "",
-    requestedQuantity: numberText(draft.requestedQuantity),
-    requestedUnit: capitalizeFirst(draft.requestedUnit ?? ""),
-    packageCount: numberText(draft.packageCount),
-    packageSize: numberText(draft.packageSize),
-    packageUnit: capitalizeFirst(draft.packageUnit ?? ""),
+    ...draftToFieldValues(draft),
   };
 }
 
 function fromEditableDraft(editable: EditableDraft): ShoppingIntentDraft {
-  const product = editable.product.trim();
-  if (!product)
-    throw new TypeError("Cada resultado seleccionado necesita un producto.");
-  const requestedQuantity = optionalPositiveNumber(
-    editable.requestedQuantity,
-    "cantidad",
+  return fieldValuesToDraft(editable, editable.source);
+}
+
+function AudioWaveform({
+  durationSeconds,
+  levels,
+}: {
+  durationSeconds: number;
+  levels: readonly number[];
+}) {
+  const styles = useThemedStyles(createStyles);
+  const duration = formatDuration(durationSeconds);
+  return (
+    <View
+      accessibilityLabel={`Duración de grabación ${duration}`}
+      style={styles.waveformRow}
+    >
+      <View accessibilityElementsHidden style={styles.waveform}>
+        {levels.map((level, index) => (
+          <View
+            key={index}
+            style={[styles.waveformBar, { height: 4 + Math.round(level * 28) }]}
+          />
+        ))}
+      </View>
+      <Text style={styles.duration}>{duration}</Text>
+    </View>
   );
-  const requestedUnit = optionalUnit(editable.requestedUnit, "unidad");
-  if ((requestedQuantity === undefined) !== (requestedUnit === undefined)) {
-    throw new TypeError("La cantidad y su unidad deben indicarse juntas.");
-  }
-  const packageCount = optionalPositiveInteger(
-    editable.packageCount,
-    "número de envases",
-  );
-  const packageSize = optionalPositiveNumber(
-    editable.packageSize,
-    "tamaño del envase",
-  );
-  const packageUnit = optionalUnit(editable.packageUnit, "unidad del envase");
-  if ((packageSize === undefined) !== (packageUnit === undefined)) {
-    throw new TypeError(
-      "El tamaño y la unidad del envase deben indicarse juntos.",
-    );
-  }
-  const totalAmount =
-    packageSize !== undefined
-      ? (packageCount ?? requestedQuantity ?? 1) * packageSize
-      : requestedQuantity !== undefined &&
-          requestedUnit !== undefined &&
-          requestedUnit !== "unit" &&
-          requestedUnit !== "bottle" &&
-          requestedUnit !== "can" &&
-          requestedUnit !== "pack"
-        ? requestedQuantity
-        : undefined;
-  return {
-    rawText: editable.source.rawText,
-    confidence: editable.source.confidence,
-    product,
-    ...(editable.variant.trim() ? { variant: editable.variant.trim() } : {}),
-    ...(editable.brandPreference.trim()
-      ? { brandPreference: editable.brandPreference.trim() }
-      : {}),
-    ...(requestedQuantity === undefined ? {} : { requestedQuantity }),
-    ...(requestedUnit === undefined ? {} : { requestedUnit }),
-    ...(packageCount === undefined ? {} : { packageCount }),
-    ...(packageSize === undefined ? {} : { packageSize }),
-    ...(packageUnit === undefined ? {} : { packageUnit }),
-    ...(totalAmount === undefined ? {} : { totalAmount }),
-  };
 }
 
-function optionalPositiveNumber(
-  value: string,
-  label: string,
-): number | undefined {
-  if (!value.trim()) return undefined;
-  const parsed = Number(value.replace(",", "."));
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new TypeError(`La ${label} debe ser un número mayor que cero.`);
-  }
-  return parsed;
+function formatDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`;
 }
 
-function optionalPositiveInteger(
-  value: string,
-  label: string,
-): number | undefined {
-  const parsed = optionalPositiveNumber(value, label);
-  if (parsed !== undefined && !Number.isInteger(parsed)) {
-    throw new TypeError(`El ${label} debe ser un número entero.`);
-  }
-  return parsed;
-}
-
-function optionalUnit(
-  value: string,
-  label: string,
-): ShoppingIntentUnit | undefined {
-  const normalized = value.trim().toLowerCase();
-  if (!normalized) return undefined;
-  if (!VALID_UNITS.has(normalized as ShoppingIntentUnit)) {
-    throw new TypeError(`La ${label} no es válida.`);
-  }
-  return normalized as ShoppingIntentUnit;
-}
-
-function numberText(value: number | undefined): string {
-  return value === undefined ? "" : String(value);
-}
-
-function capitalizeFirst(value: string): string {
-  return value.length === 0 ? value : value[0]!.toUpperCase() + value.slice(1);
-}
-
-function shouldShowUnit(value: string): boolean {
-  const normalized = value.trim().toLowerCase();
-  return normalized.length > 0 && normalized !== "unit";
+function clamp(value: number, minimum: number, maximum: number): number {
+  return Math.min(maximum, Math.max(minimum, value));
 }
 
 function messageForError(error: SpeechRecognitionError): string {
@@ -469,6 +347,31 @@ const createStyles = (colors: ThemeColors) =>
       padding: spacing.md,
       gap: spacing.sm,
     },
+    waveformRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: spacing.sm,
+      minHeight: 40,
+    },
+    waveform: {
+      alignItems: "center",
+      flex: 1,
+      flexDirection: "row",
+      gap: 2,
+      height: 36,
+    },
+    waveformBar: {
+      backgroundColor: colors.primary,
+      borderRadius: 2,
+      flex: 1,
+      minWidth: 2,
+    },
+    duration: {
+      color: colors.text,
+      fontVariant: ["tabular-nums"],
+      fontWeight: "700",
+      minWidth: 46,
+    },
     transcriptBox: {
       backgroundColor: colors.surface,
       borderColor: colors.border,
@@ -504,9 +407,6 @@ const createStyles = (colors: ThemeColors) =>
     },
     checkboxSelected: { backgroundColor: colors.primary },
     checkmark: { color: "#FFFFFF", fontWeight: "800" },
-    fieldRow: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-    rowInput: { minWidth: 112 },
-    packageBox: { gap: spacing.sm },
     error: { color: colors.danger, lineHeight: 20, fontWeight: "600" },
     privacy: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   });

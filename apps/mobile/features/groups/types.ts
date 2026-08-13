@@ -53,3 +53,16 @@ export interface AddShoppingIntentInput {
   brandPreference?: string;
   variant?: string;
 }
+
+export interface EditShoppingIntentInput {
+  rawText: string;
+  normalizedName: string;
+  requestedQuantity: number;
+  requestedUnit: string | null;
+  packageCount: number | null;
+  packageSize: number | null;
+  packageUnit: string | null;
+  totalAmount: number | null;
+  brandPreference: string | null;
+  variant: string | null;
+}

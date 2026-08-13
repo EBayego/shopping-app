@@ -12,8 +12,16 @@ export function applyOperationLocally(
         : { ...detail, intents: [...detail.intents, operation.localIntent] };
     case "edit_intent":
       return patchIntent(detail, operation.intentId, {
-        raw_text: operation.rawText,
-        normalized_name: operation.normalizedName,
+        raw_text: operation.input.rawText,
+        normalized_name: operation.input.normalizedName,
+        requested_quantity: operation.input.requestedQuantity,
+        requested_unit: operation.input.requestedUnit,
+        package_count: operation.input.packageCount,
+        package_size: operation.input.packageSize,
+        package_unit: operation.input.packageUnit,
+        total_amount: operation.input.totalAmount,
+        brand_preference: operation.input.brandPreference,
+        variant: operation.input.variant,
         updated_at: operation.createdAt,
       });
     case "set_checked":

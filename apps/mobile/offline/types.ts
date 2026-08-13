@@ -1,4 +1,8 @@
-import type { GroupDetail, ShoppingIntent } from "../features/groups/types";
+import type {
+  EditShoppingIntentInput,
+  GroupDetail,
+  ShoppingIntent,
+} from "../features/groups/types";
 
 export type PendingOperationStatus = "pending" | "conflict";
 
@@ -17,8 +21,7 @@ export type ShoppingOperation =
   | (OperationBase & {
       kind: "edit_intent";
       intentId: string;
-      rawText: string;
-      normalizedName: string;
+      input: EditShoppingIntentInput;
     })
   | (OperationBase & {
       kind: "set_checked";

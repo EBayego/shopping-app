@@ -119,7 +119,7 @@ describe("ShoppingSyncEngine", () => {
     expect(status.conflictCount).toBe(1);
     expect(store.operations[0]?.operation).toMatchObject({
       operationId: "edit-deleted",
-      rawText: "Pan integral",
+      input: { rawText: "Pan integral" },
     });
     expect(store.detail.intents).toHaveLength(0);
   });
@@ -419,8 +419,18 @@ function edit(operationId: string, rawText: string): ShoppingOperation {
     operationId,
     groupId: "group-1",
     intentId: "intent-1",
-    rawText,
-    normalizedName: rawText.toLowerCase(),
+    input: {
+      rawText,
+      normalizedName: rawText.toLowerCase(),
+      requestedQuantity: 1,
+      requestedUnit: null,
+      packageCount: null,
+      packageSize: null,
+      packageUnit: null,
+      totalAmount: null,
+      brandPreference: null,
+      variant: null,
+    },
     createdAt: NOW,
   };
 }

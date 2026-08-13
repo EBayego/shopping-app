@@ -2,6 +2,7 @@ import { getSupabaseClient } from "../services/supabase";
 import type {
   CreateGroupInput,
   CreateGroupResult,
+  EditShoppingIntentInput,
   GroupDetail,
   GroupSummary,
   JoinGroupResult,
@@ -187,13 +188,6 @@ type IntentOperation =
       normalizedName: string;
     }
   | {
-      action: "edit";
-      operationId: string;
-      intentId: string;
-      rawText: string;
-      normalizedName: string;
-    }
-  | {
       action: "set_checked";
       operationId: string;
       intentId: string;
@@ -216,7 +210,7 @@ async function applyIntentOperation(
       ...(operation.action === "add"
         ? { shopping_list_id: operation.shoppingListId }
         : { intent_id: operation.intentId }),
-      ...(operation.action === "add" || operation.action === "edit"
+      ...(operation.action === "add"
         ? {
             raw_text: operation.rawText,
             normalized_name: operation.normalizedName,
@@ -246,16 +240,40 @@ export async function setShoppingIntentChecked(
 
 export async function editShoppingIntent(
   intentId: string,
-  input: { rawText: string; normalizedName: string },
+  input: EditShoppingIntentInput,
   operationId: string,
 ): Promise<ShoppingIntent> {
-  return applyIntentOperation({
-    action: "edit",
-    operationId,
-    intentId,
-    rawText: input.rawText,
-    normalizedName: input.normalizedName,
-  });
+  const { data, error } = await getSupabaseClient().rpc(
+    "edit_shopping_product_operation",
+    {
+      operation_id: operationId,
+      intent_id: intentId,
+      raw_text: input.rawText,
+      normalized_name: input.normalizedName,
+      requested_quantity: input.requestedQuantity,
+      ...(input.requestedUnit === null
+        ? {}
+        : { requested_unit: input.requestedUnit }),
+      ...(input.packageCount === null
+        ? {}
+        : { package_count: input.packageCount }),
+      ...(input.packageSize === null
+        ? {}
+        : { package_size: input.packageSize }),
+      ...(input.packageUnit === null
+        ? {}
+        : { package_unit: input.packageUnit }),
+      ...(input.totalAmount === null
+        ? {}
+        : { total_amount: input.totalAmount }),
+      ...(input.brandPreference === null
+        ? {}
+        : { brand_preference: input.brandPreference }),
+      ...(input.variant === null ? {} : { variant: input.variant }),
+    },
+  );
+  if (error) throw error;
+  return data as unknown as ShoppingIntent;
 }
 
 export async function changeShoppingIntentQuantity(
@@ -333,10 +351,7 @@ export const shoppingSyncBackend: ShoppingSyncBackend = {
       case "edit_intent":
         return editShoppingIntent(
           operation.intentId,
-          {
-            rawText: operation.rawText,
-            normalizedName: operation.normalizedName,
-          },
+          operation.input,
           operation.operationId,
         );
       case "set_checked":

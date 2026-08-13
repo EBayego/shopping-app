@@ -6,7 +6,6 @@ import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "../../components/app-button";
-import { AppInput } from "../../components/app-input";
 import { Screen } from "../../components/screen";
 import { ScreenState } from "../../components/screen-state";
 import { useSession } from "../../features/auth/session-provider";
@@ -26,7 +25,13 @@ import type { ProductSearchResult } from "../../features/search/types";
 import { voiceDraftToIntentInput } from "../../features/voice/voice-intent-input";
 import { VoiceShoppingPanel } from "../../features/voice/voice-shopping-panel";
 import { VoiceDiscoveryModal } from "../../features/voice/voice-discovery-modal";
+import {
+  fieldValuesToDraft,
+  ShoppingIntentFields,
+  type ShoppingIntentFieldValues,
+} from "../../features/voice/shopping-intent-fields";
 import { normalizeShoppingItemInput } from "../../features/groups/validation";
+import type { ShoppingIntent } from "../../features/groups/types";
 import { getErrorMessage } from "../../lib/errors";
 import { createOperationId } from "../../lib/operation-id";
 import { useThemedStyles, useTheme } from "../../features/theme/theme-context";
@@ -36,6 +41,42 @@ import { speechRecognitionService } from "../../services/expo-speech-recognition
 
 function firstParameter(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
+}
+
+function intentToFieldValues(
+  intent: ShoppingIntent,
+): ShoppingIntentFieldValues {
+  const hasStandaloneQuantity =
+    intent.package_count === null &&
+    (intent.requested_unit !== null || intent.requested_quantity !== 1);
+  return {
+    product: capitalizeFirst(intent.normalized_name),
+    variant: intent.variant ?? "",
+    brandPreference: intent.brand_preference ?? "",
+    requestedQuantity: hasStandaloneQuantity
+      ? numberText(intent.requested_quantity)
+      : "",
+    requestedUnit: hasStandaloneQuantity
+      ? unitText(intent.requested_unit ?? "unit")
+      : "",
+    packageCount: numberText(intent.package_count),
+    packageSize: numberText(intent.package_size),
+    packageUnit: unitText(intent.package_unit),
+  };
+}
+
+function numberText(value: number | null): string {
+  return value === null ? "" : String(value).replace(".", ",");
+}
+
+function unitText(value: string | null): string {
+  if (value === null) return "";
+  if (value === "unit") return "Ud.";
+  return capitalizeFirst(value);
+}
+
+function capitalizeFirst(value: string): string {
+  return value.length === 0 ? value : value[0]!.toUpperCase() + value.slice(1);
 }
 
 export default function GroupDetailScreen() {
@@ -61,7 +102,8 @@ export default function GroupDetailScreen() {
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
   const [editingIntentId, setEditingIntentId] = useState<string | null>(null);
-  const [editingText, setEditingText] = useState("");
+  const [editingValues, setEditingValues] =
+    useState<ShoppingIntentFieldValues | null>(null);
   const [editingError, setEditingError] = useState<string | null>(null);
 
   useGroupRealtime(
@@ -155,12 +197,37 @@ export default function GroupDetailScreen() {
   };
 
   const submitIntentEdit = (intentId: string) => {
+    if (editingValues === null) return;
     try {
-      const normalized = normalizeShoppingItemInput(editingText);
+      const draft = fieldValuesToDraft(editingValues, {
+        confidence: "HIGH",
+        rawText: editingValues.product.trim(),
+      });
+      const parsed = voiceDraftToIntentInput(draft);
       setEditingError(null);
       editIntent.mutate(
-        { intentId, operationId: createOperationId(), ...normalized },
-        { onSuccess: () => setEditingIntentId(null) },
+        {
+          intentId,
+          operationId: createOperationId(),
+          input: {
+            rawText: parsed.rawText,
+            normalizedName: parsed.normalizedName,
+            requestedQuantity: parsed.requestedQuantity ?? 1,
+            requestedUnit: parsed.requestedUnit ?? null,
+            packageCount: parsed.packageCount ?? null,
+            packageSize: parsed.packageSize ?? null,
+            packageUnit: parsed.packageUnit ?? null,
+            totalAmount: parsed.totalAmount ?? null,
+            brandPreference: parsed.brandPreference ?? null,
+            variant: parsed.variant ?? null,
+          },
+        },
+        {
+          onSuccess: () => {
+            setEditingIntentId(null);
+            setEditingValues(null);
+          },
+        },
       );
     } catch (error) {
       setEditingError(getErrorMessage(error));
@@ -344,16 +411,23 @@ export default function GroupDetailScreen() {
                       ) : null}
                     </Pressable>
                     <View style={styles.itemBody}>
-                      {editingIntentId === intent.id ? (
+                      {editingIntentId === intent.id && editingValues ? (
                         <>
-                          <AppInput
+                          <ShoppingIntentFields
                             autoFocus
-                            error={editingError ?? undefined}
-                            label="Nombre del producto"
-                            onChangeText={setEditingText}
-                            onSubmitEditing={() => submitIntentEdit(intent.id)}
-                            value={editingText}
+                            onChange={(patch) =>
+                              setEditingValues((current) =>
+                                current === null
+                                  ? null
+                                  : { ...current, ...patch },
+                              )
+                            }
+                            showEmptyOptionalFields
+                            values={editingValues}
                           />
+                          {editingError ? (
+                            <Text style={styles.error}>{editingError}</Text>
+                          ) : null}
                           <View style={styles.itemActions}>
                             <AppButton
                               loading={editIntent.isPending}
@@ -365,7 +439,10 @@ export default function GroupDetailScreen() {
                             <AppButton
                               style={styles.smallButton}
                               tone="secondary"
-                              onPress={() => setEditingIntentId(null)}
+                              onPress={() => {
+                                setEditingIntentId(null);
+                                setEditingValues(null);
+                              }}
                             >
                               Cancelar
                             </AppButton>
@@ -428,7 +505,7 @@ export default function GroupDetailScreen() {
                           hitSlop={6}
                           onPress={() => {
                             setEditingIntentId(intent.id);
-                            setEditingText(intent.raw_text);
+                            setEditingValues(intentToFieldValues(intent));
                             setEditingError(null);
                           }}
                           style={({ pressed }) => [

@@ -19,6 +19,7 @@ export class SpeechRecognitionError extends Error {
 
 export interface SpeechRecognitionOptions {
   locale: string;
+  onVolumeChange?: (level: number) => void;
 }
 
 export interface SpeechRecognitionResult {

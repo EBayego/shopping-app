@@ -53,7 +53,11 @@ describe("ExpoSpeechRecognitionService", () => {
 
   it("keeps listening across final segments until the user stops", async () => {
     const service = new ExpoSpeechRecognitionService();
-    const recognition = service.recognize({ locale: "es-ES" });
+    const onVolumeChange = vi.fn<(level: number) => void>();
+    const recognition = service.recognize({
+      locale: "es-ES",
+      onVolumeChange,
+    });
     const resolved = vi.fn();
     void recognition.then(resolved);
     await flushPromises();
@@ -63,8 +67,17 @@ describe("ExpoSpeechRecognitionService", () => {
         lang: "es-ES",
         continuous: true,
         interimResults: true,
+        recordingOptions: { persist: false },
+        volumeChangeEventOptions: { enabled: true, intervalMillis: 100 },
       }),
     );
+
+    emit("volumechange", { value: -2 });
+    emit("volumechange", { value: 4 });
+    emit("volumechange", { value: 10 });
+    expect(onVolumeChange).toHaveBeenNthCalledWith(1, 0);
+    expect(onVolumeChange).toHaveBeenNthCalledWith(2, 0.5);
+    expect(onVolumeChange).toHaveBeenNthCalledWith(3, 1);
 
     emit("result", {
       isFinal: true,

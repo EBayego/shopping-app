@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   SpeechRecognitionError,
+  type SpeechRecognitionOptions,
   type SpeechRecognitionResult,
   type SpeechRecognitionService,
 } from "./speech-recognition-service";
@@ -60,10 +61,12 @@ describe("VoiceShoppingPanel", () => {
       }),
     );
     const recognize = vi.fn(
-      () =>
-        new Promise<SpeechRecognitionResult>((resolve) => {
+      (options: SpeechRecognitionOptions) => {
+        expect(options.locale).toBe("es-ES");
+        return new Promise<SpeechRecognitionResult>((resolve) => {
           resolveRecognition = resolve;
-        }),
+        });
+      },
     );
     const service: SpeechRecognitionService = {
       recognize,
@@ -75,6 +78,14 @@ describe("VoiceShoppingPanel", () => {
 
     expect(recognize).toHaveBeenCalledOnce();
     expect(screenText(renderer)).toContain("Escuchando…");
+    expect(
+      renderer.root.findByProps({
+        accessibilityLabel: "Duración de grabación 00:00",
+      }),
+    ).toBeDefined();
+    const recognitionOptions = recognize.mock.calls[0]?.[0];
+    expect(recognitionOptions?.locale).toBe("es-ES");
+    expect(typeof recognitionOptions?.onVolumeChange).toBe("function");
     await pressAndFlush(buttonByText(renderer, "Parar escucha"));
 
     expect(stop).toHaveBeenCalledOnce();

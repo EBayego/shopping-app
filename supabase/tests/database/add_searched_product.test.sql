@@ -1,7 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
-select extensions.plan(5);
+select extensions.plan(6);
 
 insert into auth.users (
   instance_id, id, aud, role, raw_app_meta_data, raw_user_meta_data,
@@ -87,6 +87,36 @@ select extensions.is(
   '3|3|6',
   'changing a packaged item keeps its visible quantity, package count and total aligned'
 );
+
+with edited_intent as (
+  select public.edit_shopping_product_operation(
+    '80000000-0000-4000-8000-000000000016',
+    (
+      select id
+      from public.shopping_intents
+      where raw_text = 'dos botellas de leche de dos litros'
+    ),
+    'Tres packs de yogur natural', 'yogur',
+    3, 'unit', 3, 4, 'unit', 12, 'Danone', 'natural'
+  ) as result
+)
+select extensions.is(
+  concat_ws(
+    '|',
+    result ->> 'normalized_name',
+    result ->> 'requested_quantity',
+    result ->> 'requested_unit',
+    result ->> 'package_count',
+    result ->> 'package_size',
+    result ->> 'package_unit',
+    result ->> 'total_amount',
+    result ->> 'brand_preference',
+    result ->> 'variant'
+  ),
+  'yogur|3|unit|3|4|unit|12|Danone|natural',
+  'editing an item persists quantity, units, packaging, brand and variant'
+)
+from edited_intent;
 
 select set_config('request.jwt.claims', '{"sub":"82222222-2222-4222-8222-222222222222","role":"authenticated","is_anonymous":true}', true);
 select extensions.throws_ok(

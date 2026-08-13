@@ -13,7 +13,7 @@ import {
   listOfflineGroups,
 } from "../../offline/offline-shopping-repository";
 import { useOfflineSync } from "../../offline/offline-sync-provider";
-import type { AddShoppingIntentInput } from "./types";
+import type { AddShoppingIntentInput, EditShoppingIntentInput } from "./types";
 
 export const groupKeys = {
   all: ["groups"] as const,
@@ -130,8 +130,7 @@ export function useEditIntentMutation(groupId: string) {
   return useMutation({
     mutationFn: (variables: {
       intentId: string;
-      rawText: string;
-      normalizedName: string;
+      input: EditShoppingIntentInput;
       operationId: string;
     }) =>
       enqueueShoppingOperation({

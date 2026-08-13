@@ -4,6 +4,7 @@ import { getSupabaseClient } from "../services/supabase";
 import {
   addShoppingIntent,
   createGroup,
+  editShoppingIntent,
   generateGroupInvite,
   joinGroup,
 } from "./groups-repository";
@@ -137,6 +138,45 @@ describe("groups repository RPCs", () => {
       shopping_list_id: "list-1",
       raw_text: "Regalo para Marta",
       normalized_name: "regalo para marta",
+    });
+  });
+
+  it("edita todos los campos estructurados del item", async () => {
+    const intent = { id: "intent-1", normalized_name: "yogur" };
+    const rpc = vi.fn().mockResolvedValue({ data: intent, error: null });
+    useClient({ rpc });
+
+    await expect(
+      editShoppingIntent(
+        "intent-1",
+        {
+          rawText: "Yogur natural",
+          normalizedName: "yogur",
+          requestedQuantity: 3,
+          requestedUnit: "unit",
+          packageCount: 3,
+          packageSize: 4,
+          packageUnit: "unit",
+          totalAmount: 12,
+          brandPreference: "Danone",
+          variant: "natural",
+        },
+        "operation-3",
+      ),
+    ).resolves.toBe(intent);
+    expect(rpc).toHaveBeenCalledWith("edit_shopping_product_operation", {
+      operation_id: "operation-3",
+      intent_id: "intent-1",
+      raw_text: "Yogur natural",
+      normalized_name: "yogur",
+      requested_quantity: 3,
+      requested_unit: "unit",
+      package_count: 3,
+      package_size: 4,
+      package_unit: "unit",
+      total_amount: 12,
+      brand_preference: "Danone",
+      variant: "natural",
     });
   });
 });

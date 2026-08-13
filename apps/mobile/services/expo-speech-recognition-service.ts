@@ -98,6 +98,9 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
           }
         }),
         ExpoSpeechRecognitionModule.addListener("nomatch", () => undefined),
+        ExpoSpeechRecognitionModule.addListener("volumechange", (event) => {
+          options.onVolumeChange?.(normalizeVolume(event.value));
+        }),
         ExpoSpeechRecognitionModule.addListener("end", () => {
           if (!stopRequested) {
             committedSegments = appendSegment(
@@ -200,10 +203,15 @@ function startNativeRecognition(
       continuous: true,
       maxAlternatives: 1,
       recordingOptions: { persist: false },
+      volumeChangeEventOptions: { enabled: true, intervalMillis: 100 },
     });
   } catch (error) {
     finish({ error: nativeError(error) });
   }
+}
+
+function normalizeVolume(value: number): number {
+  return Math.min(1, Math.max(0, (value + 2) / 12));
 }
 
 function joinTranscript(current: string, next: string): string {
