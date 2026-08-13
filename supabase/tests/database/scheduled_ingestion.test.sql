@@ -39,6 +39,9 @@ update public.provider_sync_runs
 set status = 'succeeded', finished_at = now()
 where market_id = '90000000-0000-4000-8000-000000000001';
 
+delete from public.retailer_market_postal_codes
+where retailer_id = '00000000-0000-4000-8000-000000000001'
+  and postal_code = '50009';
 insert into public.retailer_market_postal_codes (retailer_id, market_id, postal_code)
 values (
   '00000000-0000-4000-8000-000000000001',
@@ -47,12 +50,13 @@ values (
 );
 delete from public.retailer_products;
 insert into public.retailer_products (
-  retailer_id, market_id, external_id, name, observed_at
+  retailer_id, market_id, external_id, name, observed_at, last_seen_at
 ) values (
   '00000000-0000-4000-8000-000000000001',
   '90000000-0000-4000-8000-000000000001',
   'scheduler-product',
   'Scheduler product',
+  now(),
   now()
 );
 

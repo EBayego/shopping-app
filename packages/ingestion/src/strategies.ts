@@ -1,6 +1,7 @@
 import type { Market } from "@shopping-app/domain";
 import type {
   CatalogRetailerProvider,
+  RetailerObservationSet,
   SearchRetailerProvider,
 } from "@shopping-app/retailer-contracts";
 
@@ -65,24 +66,23 @@ export class CatalogIngestionStrategy implements IngestionStrategy<CatalogIngest
         ),
       ),
     );
-    const failures = observations.flatMap((result, index) =>
-      result.status === "rejected"
-        ? [
-            {
-              subject: categoryIds[index] as string,
-              error: safeError(result.reason),
-            },
-          ]
-        : [],
-    );
-    const successes = observations.flatMap((result) =>
-      result.status === "fulfilled" ? [result.value] : [],
-    );
+    const failures: IngestionCollectionResult["failures"][number][] = [];
+    const successes: RetailerObservationSet[] = [];
+    const failureReasons: unknown[] = [];
+    observations.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        successes.push(result.value);
+        return;
+      }
+      failureReasons.push(result.reason);
+      failures.push({
+        subject: categoryIds[index] as string,
+        error: safeError(result.reason),
+      });
+    });
     if (failures.length > 0 && successes.length === 0) {
       throw new AggregateError(
-        observations.flatMap((result) =>
-          result.status === "rejected" ? [result.reason] : [],
-        ),
+        failureReasons,
         `All ${failures.length} catalog categories failed`,
       );
     }

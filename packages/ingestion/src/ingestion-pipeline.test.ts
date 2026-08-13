@@ -93,7 +93,8 @@ class FakeCatalogProvider implements CatalogRetailerProvider {
     return Promise.resolve([{ externalId: "dairy", name: "Lácteos" }]);
   }
 
-  getProductsByCategory(_categoryId: string): Promise<RetailerSearchResult> {
+  getProductsByCategory(categoryId: string): Promise<RetailerSearchResult> {
+    void categoryId;
     return Promise.resolve({
       products: [
         {

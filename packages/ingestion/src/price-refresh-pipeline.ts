@@ -182,6 +182,7 @@ export class PriceRefreshPipeline {
         attempted: selected.length,
         succeeded: offers.length,
         failed: failures.length,
+        ...(failures.length === 0 ? {} : { failures }),
       });
       return {
         retailer: market.retailer,

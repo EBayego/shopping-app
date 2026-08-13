@@ -30,13 +30,20 @@ interface RefreshRequestRow {
   retailers?: { code?: unknown };
 }
 
+interface RefreshCompletionRow {
+  status: "PENDING" | "SUCCEEDED" | "FAILED";
+}
+
+export type RefreshCompletionOutcome =
+  "succeeded" | "retry_scheduled" | "failed";
+
 export interface RefreshQueue {
   claim(workerId: string): Promise<RefreshRequest | undefined>;
   complete(
     requestId: string,
     succeeded: boolean,
     error?: string,
-  ): Promise<void>;
+  ): Promise<RefreshCompletionOutcome>;
 }
 
 export interface RefreshExecutor {
@@ -50,17 +57,21 @@ export class RefreshRequestWorker {
     private readonly workerId: string,
   ) {}
 
-  async runOnce(): Promise<"idle" | "succeeded" | "failed"> {
+  async runOnce(): Promise<
+    "idle" | "succeeded" | "retry_scheduled" | "failed"
+  > {
     const request = await this.queue.claim(this.workerId);
     if (request === undefined) return "idle";
     try {
       await this.executor.execute(request);
-      await this.queue.complete(request.id, true);
-      return "succeeded";
     } catch (error) {
-      await this.queue.complete(request.id, false, sanitizeError(error));
-      return "failed";
+      return this.queue.complete(request.id, false, sanitizeError(error));
     }
+    const outcome = await this.queue.complete(request.id, true);
+    if (outcome !== "succeeded") {
+      throw new Error(`Successful refresh completed as ${outcome}`);
+    }
+    return outcome;
   }
 }
 
@@ -177,15 +188,28 @@ export class SupabaseRefreshQueue implements RefreshQueue {
     requestId: string,
     succeeded: boolean,
     error?: string,
-  ): Promise<void> {
-    await this.request("/rest/v1/rpc/complete_refresh_request", {
-      method: "POST",
-      body: JSON.stringify({
-        target_request_id: requestId,
-        succeeded,
-        completion_error: error ?? null,
-      }),
-    });
+  ): Promise<RefreshCompletionOutcome> {
+    const rows = await this.request<RefreshCompletionRow[]>(
+      "/rest/v1/rpc/complete_refresh_request?select=status",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          target_request_id: requestId,
+          succeeded,
+          completion_error: error ?? null,
+        }),
+      },
+    );
+    switch (rows[0]?.status) {
+      case "SUCCEEDED":
+        return "succeeded";
+      case "PENDING":
+        return "retry_scheduled";
+      case "FAILED":
+        return "failed";
+      default:
+        throw new Error("Refresh completion returned no final status");
+    }
   }
 
   private async request<T = unknown>(

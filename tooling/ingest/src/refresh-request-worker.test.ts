@@ -21,7 +21,7 @@ const request = {
 describe("RefreshRequestWorker", () => {
   it("claims, executes and completes a request", async () => {
     const claim = vi.fn().mockResolvedValue(request);
-    const complete = vi.fn().mockResolvedValue(undefined);
+    const complete = vi.fn().mockResolvedValue("succeeded" as const);
     const queue: RefreshQueue = {
       claim,
       complete,
@@ -39,7 +39,7 @@ describe("RefreshRequestWorker", () => {
   });
 
   it("records a redacted failure without leaking credentials", async () => {
-    const complete = vi.fn().mockResolvedValue(undefined);
+    const complete = vi.fn().mockResolvedValue("failed" as const);
     const queue: RefreshQueue = {
       claim: vi.fn().mockResolvedValue(request),
       complete,
@@ -59,10 +59,30 @@ describe("RefreshRequestWorker", () => {
     );
   });
 
+  it("reports a scheduled retry separately from a terminal failure", async () => {
+    const complete = vi.fn().mockResolvedValue("retry_scheduled" as const);
+    const queue: RefreshQueue = {
+      claim: vi.fn().mockResolvedValue(request),
+      complete,
+    };
+    const worker = new RefreshRequestWorker(
+      queue,
+      { execute: vi.fn().mockRejectedValue(new Error("temporary failure")) },
+      "worker-1",
+    );
+
+    await expect(worker.runOnce()).resolves.toBe("retry_scheduled");
+    expect(complete).toHaveBeenCalledWith(
+      "request-1",
+      false,
+      "temporary failure",
+    );
+  });
+
   it("does nothing when the queue is empty", async () => {
     const queue: RefreshQueue = {
       claim: vi.fn().mockResolvedValue(undefined),
-      complete: vi.fn().mockResolvedValue(undefined),
+      complete: vi.fn().mockResolvedValue("succeeded" as const),
     };
     const execute = vi.fn();
     const executor: RefreshExecutor = { execute };
@@ -99,6 +119,27 @@ describe("SupabaseRefreshQueue authentication", () => {
     const headers = new Headers(fetch.mock.calls[0]?.[1]?.headers);
     expect(headers.get("apikey")).toBe("sb_secret_test-key");
     expect(headers.has("Authorization")).toBe(false);
+  });
+
+  it("maps a pending completion to a scheduled retry", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+      new Response(JSON.stringify([{ status: "PENDING" }]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const queue = new SupabaseRefreshQueue({
+      url: "https://project.supabase.co",
+      secretKey: "sb_secret_test-key",
+      fetch,
+    });
+
+    await expect(
+      queue.complete("request-1", false, "temporary failure"),
+    ).resolves.toBe("retry_scheduled");
+    expect(fetch.mock.calls[0]?.[0]).toBe(
+      "https://project.supabase.co/rest/v1/rpc/complete_refresh_request?select=status",
+    );
   });
 });
 

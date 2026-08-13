@@ -8,12 +8,13 @@ export interface JobDispatcher {
 }
 
 export interface JobWorker {
-  runOnce(): Promise<"idle" | "succeeded" | "failed">;
+  runOnce(): Promise<"idle" | "succeeded" | "retry_scheduled" | "failed">;
 }
 
 export interface SchedulerTickResult extends DispatchResult {
   processed: number;
   succeeded: number;
+  retried: number;
   failed: number;
   idle: boolean;
 }
@@ -28,6 +29,7 @@ export class ScheduledIngestionRunner {
     const dispatched = await this.dispatcher.dispatchDue();
     let processed = 0;
     let succeeded = 0;
+    let retried = 0;
     let failed = 0;
     let idle = false;
 
@@ -39,10 +41,11 @@ export class ScheduledIngestionRunner {
       }
       processed += 1;
       if (outcome === "succeeded") succeeded += 1;
+      else if (outcome === "retry_scheduled") retried += 1;
       else failed += 1;
     }
 
-    return { ...dispatched, processed, succeeded, failed, idle };
+    return { ...dispatched, processed, succeeded, retried, failed, idle };
   }
 }
 

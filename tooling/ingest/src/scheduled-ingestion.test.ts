@@ -28,6 +28,7 @@ describe("ScheduledIngestionRunner", () => {
       maxJobsPerTick: 10,
       processed: 3,
       succeeded: 2,
+      retried: 0,
       failed: 1,
       idle: true,
     });
@@ -49,7 +50,32 @@ describe("ScheduledIngestionRunner", () => {
     }).runTick();
 
     expect(result.processed).toBe(2);
+    expect(result.retried).toBe(0);
     expect(result.idle).toBe(false);
+  });
+
+  it("counts scheduled retries without treating them as terminal failures", async () => {
+    const dispatcher: JobDispatcher = {
+      dispatchDue: vi
+        .fn()
+        .mockResolvedValue({ enqueuedCount: 0, maxJobsPerTick: 10 }),
+    };
+    const runOnce = vi
+      .fn<JobWorker["runOnce"]>()
+      .mockResolvedValueOnce("retry_scheduled")
+      .mockResolvedValueOnce("idle");
+
+    await expect(
+      new ScheduledIngestionRunner(dispatcher, { runOnce }).runTick(),
+    ).resolves.toEqual({
+      enqueuedCount: 0,
+      maxJobsPerTick: 10,
+      processed: 1,
+      succeeded: 0,
+      retried: 1,
+      failed: 0,
+      idle: true,
+    });
   });
 });
 
