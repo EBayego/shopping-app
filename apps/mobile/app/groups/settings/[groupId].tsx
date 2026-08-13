@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, Share, StyleSheet, Text, View } from "react-native";
 
 import { AppButton } from "../../../components/app-button";
 import { AppInput } from "../../../components/app-input";
@@ -17,6 +17,12 @@ import { isValidSpanishPostalCode } from "../../../features/groups/validation";
 import { getErrorMessage } from "../../../lib/errors";
 import { createOperationId } from "../../../lib/operation-id";
 import { useThemedStyles } from "../../../features/theme/theme-context";
+import { supermarketAccuracyWarning } from "../../../features/supermarkets/messages";
+import {
+  useSetSupermarketEnabledMutation,
+  useSupermarketsQuery,
+} from "../../../features/supermarkets/queries";
+import type { SupermarketPreference } from "../../../features/supermarkets/types";
 import { spacing, type ThemeColors } from "../../../lib/theme";
 
 function firstParameter(value: string | string[] | undefined): string {
@@ -40,6 +46,10 @@ export default function GroupSettingsScreen() {
   const activeList = detail.data?.lists.find(
     (list) => list.id === activeListId,
   );
+  const supermarkets = useSupermarketsQuery(activeListId);
+  const setSupermarketEnabled = useSetSupermarketEnabledMutation(activeListId);
+  const [supermarketWarning, setSupermarketWarning] =
+    useState<SupermarketPreference | null>(null);
 
   useEffect(() => {
     setPostalCode(activeList?.postal_code ?? "");
@@ -179,6 +189,84 @@ export default function GroupSettingsScreen() {
         ) : null}
       </View>
 
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Supermercados</Text>
+        <Text style={styles.muted}>
+          Elige qué supermercados se muestran en esta lista y en su comparación
+          de precios.
+        </Text>
+        {activeListId === null ? (
+          <Text style={styles.muted}>Este grupo todavía no tiene listas.</Text>
+        ) : supermarkets.isLoading ? (
+          <Text style={styles.muted}>Cargando supermercados…</Text>
+        ) : supermarkets.isError ? (
+          <View style={styles.inlineError}>
+            <Text style={styles.error}>
+              {getErrorMessage(supermarkets.error)}
+            </Text>
+            <AppButton
+              tone="secondary"
+              onPress={() => void supermarkets.refetch()}
+            >
+              Reintentar
+            </AppButton>
+          </View>
+        ) : supermarkets.data?.length ? (
+          <View style={styles.supermarketList}>
+            {supermarkets.data.map((supermarket) => (
+              <View key={supermarket.retailerId} style={styles.supermarketRow}>
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: supermarket.enabled }}
+                  accessibilityLabel={`${supermarket.name} ${
+                    supermarket.enabled ? "activado" : "desactivado"
+                  }`}
+                  disabled={setSupermarketEnabled.isPending}
+                  onPress={() =>
+                    setSupermarketEnabled.mutate({
+                      retailerId: supermarket.retailerId,
+                      enabled: !supermarket.enabled,
+                    })
+                  }
+                  style={styles.supermarketToggle}
+                >
+                  <View
+                    style={[
+                      styles.checkbox,
+                      supermarket.enabled && styles.checkboxChecked,
+                    ]}
+                  >
+                    {supermarket.enabled ? (
+                      <Text style={styles.checkmark}>✓</Text>
+                    ) : null}
+                  </View>
+                  <Text style={styles.supermarketName}>{supermarket.name}</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel={`Información sobre los precios de ${supermarket.name}`}
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={() => setSupermarketWarning(supermarket)}
+                  style={({ pressed }) => [
+                    styles.warningIcon,
+                    pressed && styles.warningIconPressed,
+                  ]}
+                >
+                  <Text style={styles.warningIconText}>!</Text>
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.muted}>No hay supermercados disponibles.</Text>
+        )}
+        {setSupermarketEnabled.error ? (
+          <Text style={styles.error}>
+            {getErrorMessage(setSupermarketEnabled.error)}
+          </Text>
+        ) : null}
+      </View>
+
       {isOwner ? (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Invitaciones</Text>
@@ -232,6 +320,39 @@ export default function GroupSettingsScreen() {
           </Text>
         ))}
       </View>
+
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setSupermarketWarning(null)}
+        transparent
+        visible={supermarketWarning !== null}
+      >
+        <Pressable
+          accessibilityLabel="Cerrar aviso de precisión de precios"
+          accessibilityRole="button"
+          onPress={() => setSupermarketWarning(null)}
+          style={styles.modalBackdrop}
+        >
+          <View accessibilityViewIsModal style={styles.warningCard}>
+            <View style={styles.warningHeading}>
+              <View style={styles.warningIcon}>
+                <Text style={styles.warningIconText}>!</Text>
+              </View>
+              <Text style={styles.warningTitle}>
+                {supermarketWarning?.name}
+              </Text>
+            </View>
+            <Text style={styles.warningMessage}>
+              {supermarketWarning
+                ? supermarketAccuracyWarning(supermarketWarning.code)
+                : ""}
+            </Text>
+            <Text style={styles.warningDismissHint}>
+              Toca cualquier parte de la pantalla para cerrar.
+            </Text>
+          </View>
+        </Pressable>
+      </Modal>
     </Screen>
   );
 }
@@ -262,6 +383,80 @@ const createStyles = (colors: ThemeColors) =>
     tabText: { color: colors.text },
     activeTabText: { color: "#FFFFFF", fontWeight: "700" },
     inviteResult: { gap: spacing.sm },
+    inlineError: { gap: spacing.sm },
+    supermarketList: {
+      borderColor: colors.border,
+      borderRadius: 12,
+      borderWidth: 1,
+      overflow: "hidden",
+    },
+    supermarketRow: {
+      alignItems: "center",
+      borderBottomColor: colors.border,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      minHeight: 56,
+      paddingHorizontal: spacing.md,
+    },
+    supermarketToggle: {
+      alignItems: "center",
+      flex: 1,
+      flexDirection: "row",
+      gap: spacing.sm,
+      minHeight: 56,
+    },
+    supermarketName: { color: colors.text, flex: 1, fontWeight: "600" },
+    checkbox: {
+      alignItems: "center",
+      borderColor: colors.border,
+      borderRadius: 6,
+      borderWidth: 2,
+      height: 24,
+      justifyContent: "center",
+      width: 24,
+    },
+    checkboxChecked: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    checkmark: { color: "#FFFFFF", fontSize: 16, fontWeight: "900" },
+    warningIcon: {
+      alignItems: "center",
+      borderColor: "#F79009",
+      borderRadius: 999,
+      borderWidth: 2,
+      height: 26,
+      justifyContent: "center",
+      width: 26,
+    },
+    warningIconPressed: { opacity: 0.6 },
+    warningIconText: { color: "#F79009", fontSize: 16, fontWeight: "900" },
+    modalBackdrop: {
+      alignItems: "center",
+      backgroundColor: "rgba(0, 0, 0, 0.55)",
+      flex: 1,
+      justifyContent: "center",
+      padding: spacing.lg,
+    },
+    warningCard: {
+      backgroundColor: colors.surface,
+      borderColor: "#F79009",
+      borderRadius: 16,
+      borderWidth: 1,
+      gap: spacing.md,
+      maxWidth: 420,
+      padding: spacing.lg,
+      width: "100%",
+    },
+    warningHeading: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: spacing.sm,
+    },
+    warningTitle: { color: colors.text, fontSize: 20, fontWeight: "800" },
+    warningMessage: { color: colors.text, fontSize: 16, lineHeight: 23 },
+    warningDismissHint: { color: colors.muted, fontSize: 13 },
     code: {
       backgroundColor: colors.successBackground,
       color: colors.text,

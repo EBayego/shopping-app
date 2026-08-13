@@ -58,8 +58,9 @@ export class MercadonaMapper {
       name: dto.displayName,
       ...(dto.brand === undefined ? {} : { brand: dto.brand }),
       ...(dto.ean === undefined ? {} : { gtin: dto.ean, ean: dto.ean }),
-      ...(packageSize === undefined ? {} : { packageSize }),
-      ...(packageUnit === undefined ? {} : { packageUnit }),
+      ...(packageSize === undefined || packageUnit === undefined
+        ? {}
+        : { packageSize, packageUnit }),
       ...(dto.priceInstructions.totalUnits === undefined
         ? {}
         : { packageCount: dto.priceInstructions.totalUnits }),

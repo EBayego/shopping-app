@@ -3,6 +3,71 @@ import { describe, expect, it, vi } from "vitest";
 import { SupabaseIngestionStore } from "./supabase-store.js";
 
 describe("SupabaseIngestionStore preflight observability", () => {
+  it("paginates price refresh candidates beyond the Supabase row cap", async () => {
+    const candidate = (index: number) => ({
+      retailer_product_external_id: String(index).padStart(5, "0"),
+      offer_observed_at: null,
+      in_active_list: false,
+      last_used_at: null,
+    });
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse(
+          Array.from({ length: 1_000 }, (_, index) => candidate(index)),
+        ),
+      )
+      .mockResolvedValueOnce(jsonResponse([candidate(1_000)]));
+    const store = new SupabaseIngestionStore({
+      url: "https://project.supabase.co",
+      secretKey: "sb_secret_test-key",
+      fetch,
+    });
+
+    const candidates = await store.listPriceRefreshCandidates({
+      retailerId: "retailer-1",
+      marketId: "market-1",
+    });
+
+    expect(candidates).toHaveLength(1_001);
+    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get("Range")).toBe(
+      "0-999",
+    );
+    expect(new Headers(fetch.mock.calls[1]?.[1]?.headers).get("Range")).toBe(
+      "1000-1999",
+    );
+  });
+
+  it("deactivates unique products confirmed missing", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValue(new Response("1", { status: 200 }));
+    const store = new SupabaseIngestionStore({
+      url: "https://project.supabase.co",
+      secretKey: "sb_secret_test-key",
+      fetch,
+    });
+
+    await store.deactivateProducts(
+      { retailerId: "retailer-1", marketId: "market-1" },
+      ["16663", "16663"],
+    );
+
+    expect(fetch.mock.calls[0]?.[0]).toBe(
+      "https://project.supabase.co/rest/v1/rpc/deactivate_retailer_products",
+    );
+    const requestBody = fetch.mock.calls[0]?.[1]?.body;
+    expect(typeof requestBody).toBe("string");
+    if (typeof requestBody !== "string") {
+      throw new TypeError("Expected a JSON request body");
+    }
+    expect(JSON.parse(requestBody)).toEqual({
+      target_retailer_id: "retailer-1",
+      target_market_id: "market-1",
+      target_external_ids: ["16663"],
+    });
+  });
+
   it("persists a failed run and provider health without a market", async () => {
     const fetch = vi
       .fn<typeof globalThis.fetch>()

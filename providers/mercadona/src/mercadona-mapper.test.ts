@@ -90,4 +90,33 @@ describe("MercadonaMapper", () => {
       },
     ]);
   });
+
+  it("omite la forma de envase cuando Mercadona informa unidad sin tamaño", () => {
+    const mapper = new MercadonaMapper();
+    const market = mapper.toMarket(
+      new MercadonaMarketContext({ postalCode: "50009", warehouse: "4491" }),
+    );
+    const dto = parseMercadonaProduct(PRODUCT_FIXTURE);
+    expect(dto).toBeDefined();
+    if (dto === undefined) return;
+    const priceInstructions = { ...dto.priceInstructions };
+    delete priceInstructions.unitSize;
+
+    const product = mapper.toProduct(
+      {
+        ...dto,
+        id: "62048",
+        priceInstructions: {
+          ...priceInstructions,
+          isPack: false,
+          sizeFormat: "kg",
+        },
+      },
+      market,
+      OBSERVED_AT,
+    );
+
+    expect(product).not.toHaveProperty("packageSize");
+    expect(product).not.toHaveProperty("packageUnit");
+  });
 });

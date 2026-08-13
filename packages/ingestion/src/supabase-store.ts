@@ -25,6 +25,8 @@ interface IdRow {
   id: string;
 }
 
+const PRICE_REFRESH_CANDIDATE_PAGE_SIZE = 1_000;
+
 export class SupabaseIngestionStore implements PriceRefreshStore {
   private readonly baseUrl: string;
   private readonly secretKey: string;
@@ -93,20 +95,30 @@ export class SupabaseIngestionStore implements PriceRefreshStore {
   async listPriceRefreshCandidates(
     scope: IngestionScope,
   ): Promise<readonly PriceRefreshCandidate[]> {
-    const rows = await this.request<
-      Array<{
-        retailer_product_external_id: string;
-        offer_observed_at: string | null;
-        in_active_list: boolean;
-        last_used_at: string | null;
-      }>
-    >("/rest/v1/rpc/list_price_refresh_candidates", {
-      method: "POST",
-      body: JSON.stringify({
-        target_retailer_id: scope.retailerId,
-        target_market_id: scope.marketId,
-      }),
-    });
+    type CandidateRow = {
+      retailer_product_external_id: string;
+      offer_observed_at: string | null;
+      in_active_list: boolean;
+      last_used_at: string | null;
+    };
+    const rows: CandidateRow[] = [];
+    for (let offset = 0; ; offset += PRICE_REFRESH_CANDIDATE_PAGE_SIZE) {
+      const page = await this.request<CandidateRow[]>(
+        "/rest/v1/rpc/list_price_refresh_candidates",
+        {
+          method: "POST",
+          headers: {
+            Range: `${offset}-${offset + PRICE_REFRESH_CANDIDATE_PAGE_SIZE - 1}`,
+          },
+          body: JSON.stringify({
+            target_retailer_id: scope.retailerId,
+            target_market_id: scope.marketId,
+          }),
+        },
+      );
+      rows.push(...page);
+      if (page.length < PRICE_REFRESH_CANDIDATE_PAGE_SIZE) break;
+    }
     return rows.map((row) => ({
       retailerProductExternalId: row.retailer_product_external_id,
       ...(row.offer_observed_at === null
@@ -117,6 +129,21 @@ export class SupabaseIngestionStore implements PriceRefreshStore {
         ? {}
         : { lastUsedAt: new Date(row.last_used_at) }),
     }));
+  }
+
+  async deactivateProducts(
+    scope: IngestionScope,
+    externalIds: readonly string[],
+  ): Promise<void> {
+    if (externalIds.length === 0) return;
+    await this.request("/rest/v1/rpc/deactivate_retailer_products", {
+      method: "POST",
+      body: JSON.stringify({
+        target_retailer_id: scope.retailerId,
+        target_market_id: scope.marketId,
+        target_external_ids: [...new Set(externalIds)],
+      }),
+    });
   }
 
   async getOfferFreshnessConfig(): Promise<{

@@ -1,4 +1,5 @@
 import type { ProviderHealth } from "@shopping-app/domain";
+import { ProductNotFoundError } from "@shopping-app/retailer-contracts";
 
 import { silentLogger } from "./logger.js";
 import { ObservedIngestionError } from "./observed-ingestion-error.js";
@@ -87,6 +88,7 @@ export class PriceRefreshPipeline {
         dryRun: true,
         attempted: selected.length,
         failures: [],
+        retiredProductIds: [],
         status: "succeeded",
       };
     }
@@ -127,6 +129,11 @@ export class PriceRefreshPipeline {
             }
             return { offers, candidate } as const;
           } catch (error) {
+            if (error instanceof ProductNotFoundError) {
+              return {
+                retiredProductId: candidate.retailerProductExternalId,
+              } as const;
+            }
             return {
               failure: {
                 retailerProductExternalId: candidate.retailerProductExternalId,
@@ -143,6 +150,10 @@ export class PriceRefreshPipeline {
       const failures = outcomes.flatMap((outcome) =>
         "failure" in outcome ? [outcome.failure] : [],
       );
+      const retiredProductIds = outcomes.flatMap((outcome) =>
+        "retiredProductId" in outcome ? [outcome.retiredProductId] : [],
+      );
+      await this.store.deactivateProducts(session, retiredProductIds);
       const status =
         failures.length === 0
           ? "succeeded"
@@ -167,6 +178,8 @@ export class PriceRefreshPipeline {
         {
           attempted: selected.length,
           failed: failures.length,
+          retired: retiredProductIds.length,
+          retiredProductIds,
           failureProductIds: failures.map(
             (failure) => failure.retailerProductExternalId,
           ),
@@ -182,6 +195,7 @@ export class PriceRefreshPipeline {
         attempted: selected.length,
         succeeded: offers.length,
         failed: failures.length,
+        retired: retiredProductIds.length,
         ...(failures.length === 0 ? {} : { failures }),
       });
       return {
@@ -193,6 +207,7 @@ export class PriceRefreshPipeline {
         syncRunId: session.runId,
         attempted: selected.length,
         failures,
+        retiredProductIds,
         status,
       };
     } catch (error) {

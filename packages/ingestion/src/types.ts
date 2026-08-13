@@ -161,6 +161,10 @@ export interface PriceRefreshCandidateSource {
   listPriceRefreshCandidates(
     scope: IngestionScope,
   ): Promise<readonly PriceRefreshCandidate[]>;
+  deactivateProducts(
+    scope: IngestionScope,
+    externalIds: readonly string[],
+  ): Promise<void>;
 }
 
 export type PriceRefreshStore = IngestionStore & PriceRefreshCandidateSource;
@@ -177,6 +181,7 @@ export interface PriceRefreshFailure {
 export interface PriceRefreshResult extends IngestionResult {
   attempted: number;
   failures: readonly PriceRefreshFailure[];
+  retiredProductIds: readonly string[];
   status: "succeeded" | "partial" | "failed";
 }
 

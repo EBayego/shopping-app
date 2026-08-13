@@ -123,6 +123,14 @@ class FakeRefreshStore implements PriceRefreshStore {
   recordCatalogProductMisses(): Promise<void> {
     return Promise.resolve();
   }
+  deactivateProducts(
+    _scope: IngestionScope,
+    externalIds: readonly string[],
+  ): Promise<void> {
+    this.deactivatedProductIds.push(...externalIds);
+    return Promise.resolve();
+  }
+  readonly deactivatedProductIds: string[] = [];
   finishSyncRun(input: FinishSyncRunInput): Promise<void> {
     this.finished.push(input);
     return Promise.resolve();
@@ -150,7 +158,7 @@ const staleCandidates: PriceRefreshCandidate[] = [
 ];
 
 describe("PriceRefreshPipeline", () => {
-  it("persists successes and records partial without marking the provider unavailable", async () => {
+  it("persists successes and retires confirmed missing products", async () => {
     const provider = new FakeRefreshProvider((id) =>
       id === "bad"
         ? Promise.reject(new ProductNotFoundError("DIA", id))
@@ -163,13 +171,14 @@ describe("PriceRefreshPipeline", () => {
       { now: () => now },
     ).refresh({ postalCode: "50009" });
 
-    expect(result.status).toBe("partial");
-    expect(result.failures).toHaveLength(1);
+    expect(result.status).toBe("succeeded");
+    expect(result.failures).toHaveLength(0);
+    expect(result.retiredProductIds).toEqual(["bad"]);
+    expect(store.deactivatedProductIds).toEqual(["bad"]);
     expect(store.persistedOffers.map((item) => item.retailerProductId)).toEqual(
       ["good"],
     );
-    expect(store.finished[0]?.status).toBe("partial");
-    expect(store.health[0]?.status).toBe("degraded");
+    expect(store.finished[0]?.status).toBe("succeeded");
   });
 
   it("reuses 429 Retry-After resilience", async () => {

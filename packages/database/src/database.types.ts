@@ -929,6 +929,45 @@ export type Database = {
           },
         ]
       }
+      shopping_list_retailer_preferences: {
+        Row: {
+          created_at: string
+          enabled: boolean
+          retailer_id: string
+          shopping_list_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean
+          retailer_id: string
+          shopping_list_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean
+          retailer_id?: string
+          shopping_list_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_list_retailer_preferences_retailer_id_fkey"
+            columns: ["retailer_id"]
+            isOneToOne: false
+            referencedRelation: "retailers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopping_list_retailer_preferences_shopping_list_id_fkey"
+            columns: ["shopping_list_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shopping_lists: {
         Row: {
           created_at: string
@@ -1304,6 +1343,14 @@ export type Database = {
           shopping_list_id: string
         }[]
       }
+      deactivate_retailer_products: {
+        Args: {
+          target_external_ids: string[]
+          target_market_id: string
+          target_retailer_id: string
+        }
+        Returns: number
+      }
       dispatch_due_provider_jobs: {
         Args: never
         Returns: {
@@ -1452,6 +1499,14 @@ export type Database = {
       search_products_for_list: {
         Args: { query: string; result_limit?: number; shopping_list_id: string }
         Returns: Json
+      }
+      set_shopping_list_retailer_enabled: {
+        Args: {
+          target_enabled: boolean
+          target_retailer_id: string
+          target_shopping_list_id: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

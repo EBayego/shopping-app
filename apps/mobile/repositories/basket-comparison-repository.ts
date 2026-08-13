@@ -9,6 +9,7 @@ import {
 } from "@shopping-app/domain";
 
 import { getSupabaseClient } from "../services/supabase";
+import { listSupermarketsForShoppingList } from "./supermarket-preferences-repository";
 
 interface ComparisonInputs {
   retailers: readonly string[];
@@ -19,14 +20,29 @@ interface ComparisonInputs {
 export async function getBasketComparisons(
   shoppingListId: string,
 ): Promise<readonly BasketComparison[]> {
-  const { data, error } = await getSupabaseClient().rpc(
-    "get_basket_comparison_inputs",
-    { shopping_list_id: shoppingListId },
-  );
+  const [{ data, error }, supermarkets] = await Promise.all([
+    getSupabaseClient().rpc("get_basket_comparison_inputs", {
+      shopping_list_id: shoppingListId,
+    }),
+    listSupermarketsForShoppingList(shoppingListId),
+  ]);
   if (error) throw error;
   const inputs = decodeInputs(data);
-  const retailers = inputs.retailers.filter(isRetailer);
-  return compareBaskets(inputs.intents, inputs.candidates, retailers);
+  const enabledRetailers = new Set(
+    supermarkets
+      .filter((supermarket) => supermarket.enabled)
+      .map((supermarket) => supermarket.code),
+  );
+  const retailers = inputs.retailers
+    .filter(isRetailer)
+    .filter((retailer) => enabledRetailers.has(retailer));
+  return compareBaskets(
+    inputs.intents,
+    inputs.candidates.filter((candidate) =>
+      enabledRetailers.has(candidate.retailer),
+    ),
+    retailers,
+  );
 }
 
 function decodeInputs(value: Json): ComparisonInputs {
