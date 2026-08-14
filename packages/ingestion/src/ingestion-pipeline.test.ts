@@ -162,6 +162,59 @@ class PartialCatalogProvider extends FakeCatalogProvider {
   }
 }
 
+class LargeCatalogProvider extends FakeCatalogProvider {
+  activeCategories = 0;
+  maxActiveCategories = 0;
+  requestedCategories = 0;
+
+  constructor(private readonly categoryCount: number) {
+    super();
+  }
+
+  override getCategories(): Promise<RetailerCategory[]> {
+    return Promise.resolve(
+      Array.from({ length: this.categoryCount }, (_, index) => ({
+        externalId: `category-${index}`,
+        name: `Category ${index}`,
+      })),
+    );
+  }
+
+  override async getProductsByCategory(
+    categoryId: string,
+  ): Promise<RetailerSearchResult> {
+    this.requestedCategories += 1;
+    this.activeCategories += 1;
+    this.maxActiveCategories = Math.max(
+      this.maxActiveCategories,
+      this.activeCategories,
+    );
+    try {
+      await Promise.resolve();
+      const externalId = `product-${categoryId}`;
+      return {
+        products: [
+          {
+            ...product,
+            retailer: "MERCADONA",
+            externalId,
+            marketId: this.market.externalId,
+          },
+        ],
+        offers: [
+          {
+            ...offer,
+            retailerProductId: externalId,
+            marketId: this.market.externalId,
+          },
+        ],
+      };
+    } finally {
+      this.activeCategories -= 1;
+    }
+  }
+}
+
 class FakeStore implements IngestionStore {
   readonly products = new Map<string, RetailerProduct>();
   readonly offers = new Map<string, ProductOffer>();
@@ -169,7 +222,10 @@ class FakeStore implements IngestionStore {
   readonly finished: FinishSyncRunInput[] = [];
   productBatches = 0;
   offerBatches = 0;
+  largestProductBatch = 0;
+  largestOfferBatch = 0;
   readonly catalogMissRuns: string[] = [];
+  readonly catalogMissProductIds: string[][] = [];
 
   resolveRetailer(): Promise<string> {
     return Promise.resolve("retailer-id");
@@ -185,6 +241,10 @@ class FakeStore implements IngestionStore {
     products: readonly RetailerProduct[],
   ): Promise<void> {
     this.productBatches += 1;
+    this.largestProductBatch = Math.max(
+      this.largestProductBatch,
+      products.length,
+    );
     for (const item of products) this.products.set(item.externalId, item);
     return Promise.resolve();
   }
@@ -193,6 +253,7 @@ class FakeStore implements IngestionStore {
     offers: readonly ProductOffer[],
   ): Promise<void> {
     this.offerBatches += 1;
+    this.largestOfferBatch = Math.max(this.largestOfferBatch, offers.length);
     for (const item of offers) {
       const key = `${item.retailerProductId}:${item.marketId}`;
       const previous = this.offers.get(key);
@@ -212,8 +273,10 @@ class FakeStore implements IngestionStore {
   recordCatalogProductMisses(
     _scope: IngestionScope,
     syncRunId: string,
+    seenExternalIds: readonly string[],
   ): Promise<void> {
     this.catalogMissRuns.push(syncRunId);
+    this.catalogMissProductIds.push([...seenExternalIds]);
     return Promise.resolve();
   }
   finishSyncRun(input: FinishSyncRunInput): Promise<void> {
@@ -246,6 +309,10 @@ describe("RetailerIngestionPipeline", () => {
   it("ingests a CATALOG provider with no SEARCH through the same persistence core", async () => {
     const store = new FakeStore();
     const persistSpy = vi.spyOn(IngestionPersistenceCore.prototype, "persist");
+    const completeSpy = vi.spyOn(
+      IngestionPersistenceCore.prototype,
+      "complete",
+    );
     const searchPipeline = new RetailerIngestionPipeline(
       new SearchIngestionStrategy(new FakeSearchProvider()),
       store,
@@ -268,8 +335,36 @@ describe("RetailerIngestionPipeline", () => {
     expect(store.products.has("milk-1")).toBe(true);
     expect(store.products.has("catalog-milk-1")).toBe(true);
     expect(store.catalogMissRuns).toEqual(["run-catalog_sync"]);
-    expect(persistSpy).toHaveBeenCalledTimes(2);
+    expect(persistSpy).toHaveBeenCalledTimes(1);
+    expect(completeSpy).toHaveBeenCalledTimes(2);
     persistSpy.mockRestore();
+    completeSpy.mockRestore();
+  });
+
+  it("streams a large catalog with bounded category concurrency and persistence batches", async () => {
+    const categoryCount = 4_000;
+    const store = new FakeStore();
+    const provider = new LargeCatalogProvider(categoryCount);
+
+    const result = await new RetailerIngestionPipeline(
+      new CatalogIngestionStrategy(provider),
+      store,
+      { batchSize: 50 },
+    ).ingest({ postalCode: "50009" });
+
+    expect(result).toMatchObject({
+      status: "succeeded",
+      productsSeen: categoryCount,
+      offersSeen: categoryCount,
+    });
+    expect(provider.requestedCategories).toBe(categoryCount);
+    expect(provider.maxActiveCategories).toBe(2);
+    expect(store.largestProductBatch).toBeLessThanOrEqual(50);
+    expect(store.largestOfferBatch).toBeLessThanOrEqual(50);
+    expect(store.productBatches).toBe(categoryCount / 50);
+    expect(store.offerBatches).toBe(categoryCount / 50);
+    expect(store.finished).toHaveLength(1);
+    expect(store.catalogMissProductIds[0]).toHaveLength(categoryCount);
   });
 
   it("does not record catalog misses for a partial category scan", async () => {

@@ -25,6 +25,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm ingest:scheduler
         env:
+          NODE_OPTIONS: --max-old-space-size=4096
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
           REFRESH_WORKER_ID: github-actions:${{ github.run_id }}:${{ github.run_attempt }}

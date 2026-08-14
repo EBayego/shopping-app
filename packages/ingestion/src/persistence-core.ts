@@ -9,6 +9,7 @@ import type { RetailerObservationSet } from "@shopping-app/retailer-contracts";
 import { safeError } from "./resilience.js";
 import type {
   IngestionSession,
+  IngestionScope,
   IngestionStore,
   IngestionStrategyKind,
   PreparedObservationSet,
@@ -67,28 +68,63 @@ export class IngestionPersistenceCore {
       errorMessage?: string;
     } = {},
   ): Promise<void> {
-    const scope = {
-      retailerId: session.retailerId,
-      marketId: session.marketId,
-    };
+    await this.persistBatch(session, observations);
+    await this.complete(
+      session,
+      health,
+      {
+        products: observations.products.length,
+        offers: observations.offers.length,
+      },
+      {
+        ...options,
+        seenProductExternalIds: observations.products.map(
+          (product) => product.externalId,
+        ),
+      },
+    );
+  }
+
+  async persistBatch(
+    session: IngestionSession,
+    observations: PreparedObservationSet,
+  ): Promise<void> {
+    const scope = this.scope(session);
     for (const batch of batches(observations.products, this.batchSize)) {
       await this.store.upsertProducts(scope, batch);
     }
+    for (const batch of batches(observations.offers, this.batchSize)) {
+      await this.store.upsertOffers(scope, batch);
+    }
+  }
+
+  async complete(
+    session: IngestionSession,
+    health: ProviderHealth,
+    counts: { products: number; offers: number },
+    options: {
+      recordCatalogMisses?: boolean;
+      seenProductExternalIds?: readonly string[];
+      status?: "succeeded" | "partial";
+      metadata?: Readonly<Record<string, unknown>>;
+      errorMessage?: string;
+    } = {},
+  ): Promise<void> {
     if (options.recordCatalogMisses === true) {
       await this.store.recordCatalogProductMisses(
-        scope,
+        this.scope(session),
         session.runId,
-        observations.products.map((product) => product.externalId),
+        options.seenProductExternalIds ?? [],
       );
     }
-    await this.persistOffers(
+    await this.finish(
       session,
-      observations.offers,
       health,
       options.status ?? "succeeded",
+      counts,
       {
         batchSize: this.batchSize,
-        productsSeen: observations.products.length,
+        productsSeen: counts.products,
         ...options.metadata,
       },
       options.errorMessage,
@@ -103,15 +139,34 @@ export class IngestionPersistenceCore {
     metadata: Readonly<Record<string, unknown>> = {},
     errorMessage?: string,
   ): Promise<void> {
-    const failedCount =
-      typeof metadata.failed === "number" ? metadata.failed : "Some";
-    const scope = {
-      retailerId: session.retailerId,
-      marketId: session.marketId,
-    };
+    const scope = this.scope(session);
     for (const batch of batches(offers, this.batchSize)) {
       await this.store.upsertOffers(scope, batch);
     }
+    await this.finish(
+      session,
+      health,
+      status,
+      {
+        products: Number(metadata.productsSeen ?? 0),
+        offers: offers.length,
+      },
+      { batchSize: this.batchSize, ...metadata },
+      errorMessage,
+    );
+  }
+
+  private async finish(
+    session: IngestionSession,
+    health: ProviderHealth,
+    status: "succeeded" | "partial" | "failed",
+    counts: { products: number; offers: number },
+    metadata: Readonly<Record<string, unknown>>,
+    errorMessage?: string,
+  ): Promise<void> {
+    const failedCount =
+      typeof metadata.failed === "number" ? metadata.failed : "Some";
+    const scope = this.scope(session);
     await this.store.updateProviderHealth(scope, health, {
       syncRunId: session.runId,
     });
@@ -119,15 +174,15 @@ export class IngestionPersistenceCore {
       runId: session.runId,
       status,
       finishedAt: this.now(),
-      productsSeen: Number(metadata.productsSeen ?? 0),
-      offersSeen: offers.length,
+      productsSeen: counts.products,
+      offersSeen: counts.offers,
       ...(status === "succeeded"
         ? {}
         : {
             errorMessage:
               errorMessage ?? `${failedCount} ingestion operations failed`,
           }),
-      metadata: { batchSize: this.batchSize, ...metadata },
+      metadata,
     });
   }
 
@@ -168,6 +223,13 @@ export class IngestionPersistenceCore {
       error: errorInfo,
       ...(finalizationErrors.length === 0 ? {} : { finalizationErrors }),
     });
+  }
+
+  private scope(session: IngestionSession): IngestionScope {
+    return {
+      retailerId: session.retailerId,
+      marketId: session.marketId,
+    };
   }
 }
 

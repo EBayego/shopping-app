@@ -124,6 +124,12 @@ export interface IngestionStrategy<TRequest extends IngestionRequest> {
     market: Market,
     runner: ProviderOperationRunner,
   ): Promise<IngestionCollectionResult>;
+  collectIncrementally?(
+    request: TRequest,
+    market: Market,
+    runner: ProviderOperationRunner,
+    consume: IngestionObservationConsumer,
+  ): Promise<IncrementalIngestionCollectionResult>;
   metadata(request: TRequest): Readonly<Record<string, unknown>>;
 }
 
@@ -137,6 +143,16 @@ export interface IngestionCollectionResult extends RetailerObservationSet {
   attemptedOperations: number;
   failures: readonly IngestionCollectionFailure[];
 }
+
+export interface IncrementalIngestionCollectionResult {
+  status: "succeeded" | "partial";
+  attemptedOperations: number;
+  failures: readonly IngestionCollectionFailure[];
+}
+
+export type IngestionObservationConsumer = (
+  observations: RetailerObservationSet,
+) => Promise<void>;
 
 export interface PreparedObservationSet {
   products: RetailerProduct[];
