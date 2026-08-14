@@ -22,6 +22,7 @@ import {
   useSetSupermarketEnabledMutation,
   useSupermarketsQuery,
 } from "../../../features/supermarkets/queries";
+import { SupermarketIcon } from "../../../features/supermarkets/supermarket-icon";
 import type { SupermarketPreference } from "../../../features/supermarkets/types";
 import { spacing, type ThemeColors } from "../../../lib/theme";
 
@@ -240,6 +241,7 @@ export default function GroupSettingsScreen() {
                       <Text style={styles.checkmark}>✓</Text>
                     ) : null}
                   </View>
+                  <SupermarketIcon code={supermarket.code} />
                   <Text style={styles.supermarketName}>{supermarket.name}</Text>
                 </Pressable>
                 <Pressable
