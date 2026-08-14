@@ -54,10 +54,10 @@ export interface OfferRow {
   observed_at: string;
 }
 
-export interface MatchRow {
+export interface ProductClassificationRow {
   id: string;
   retailer_product_id: string;
-  canonical_product_id: string;
+  product_concept_id: string;
   method: string;
   score: number;
   confidence: "HIGH" | "MEDIUM" | "LOW";
@@ -66,18 +66,16 @@ export interface MatchRow {
   updated_at: string;
 }
 
-export interface CanonicalProductRow {
+export interface ProductConceptRow {
   id: string;
   name: string;
   base_name: string;
   category: string | null;
-  brand: string | null;
-  variant: string | null;
-  gtin: string | null;
-  package_size: number | null;
-  package_unit: string | null;
-  package_count: number | null;
-  total_amount: number | null;
+  aliases: string[];
+  default_dimension: "COUNT" | "MASS" | "VOLUME";
+  default_amount: number | null;
+  default_unit: string | null;
+  selection_policy: "CHEAPEST_COVERING" | "CLOSEST_AMOUNT";
 }
 
 export interface RefreshRequestRow {

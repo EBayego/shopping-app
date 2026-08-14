@@ -2,6 +2,7 @@ import type {
   ShoppingIntentDraft,
   ShoppingIntentUnit,
 } from "@shopping-app/voice-parser";
+import { parseShoppingIntents } from "@shopping-app/voice-parser";
 
 import type { AddShoppingIntentInput } from "../groups/types";
 import { normalizeShoppingItemInput } from "../groups/validation";
@@ -39,6 +40,13 @@ export function voiceDraftToIntentInput(
       : { brandPreference: draft.brandPreference }),
     ...(draft.variant === undefined ? {} : { variant: draft.variant }),
   };
+}
+
+export function textToIntentInput(rawText: string): AddShoppingIntentInput {
+  const drafts = parseShoppingIntents(rawText);
+  const draft = drafts.length === 1 ? drafts[0] : undefined;
+  if (draft?.product) return voiceDraftToIntentInput(draft);
+  return normalizeShoppingItemInput(rawText);
 }
 
 function normalizeAmount(

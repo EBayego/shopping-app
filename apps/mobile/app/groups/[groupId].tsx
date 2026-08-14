@@ -22,7 +22,10 @@ import { useGroupRealtime } from "../../features/groups/realtime";
 import { resultName } from "../../features/search/formatting";
 import { ProductSearchPanel } from "../../features/search/product-search-panel";
 import type { ProductSearchResult } from "../../features/search/types";
-import { voiceDraftToIntentInput } from "../../features/voice/voice-intent-input";
+import {
+  textToIntentInput,
+  voiceDraftToIntentInput,
+} from "../../features/voice/voice-intent-input";
 import { VoiceShoppingPanel } from "../../features/voice/voice-shopping-panel";
 import { VoiceDiscoveryModal } from "../../features/voice/voice-discovery-modal";
 import {
@@ -147,7 +150,7 @@ export default function GroupDetailScreen() {
   const addFreeItem = (text: string) => {
     if (!activeListId) return;
     try {
-      const normalized = normalizeShoppingItemInput(text);
+      const normalized = textToIntentInput(text);
       setInputError(null);
       addIntent.mutate({
         shoppingListId: activeListId,
@@ -163,10 +166,10 @@ export default function GroupDetailScreen() {
     if (!activeListId) return;
     try {
       const name = resultName(result);
-      const normalized = result.canonicalProduct
+      const normalized = result.concept
         ? {
             rawText: name,
-            normalizedName: result.canonicalProduct.normalizedName,
+            normalizedName: result.concept.normalizedName,
           }
         : normalizeShoppingItemInput(name);
       setInputError(null);
@@ -174,7 +177,7 @@ export default function GroupDetailScreen() {
         shoppingListId: activeListId,
         operationId: createOperationId(),
         ...normalized,
-        canonicalProductId: result.canonicalProduct?.id ?? null,
+        productConceptId: result.concept?.id ?? null,
       });
     } catch (error) {
       setInputError(getErrorMessage(error));

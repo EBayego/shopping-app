@@ -45,40 +45,44 @@ export class AdminActions {
 
   acceptMatch(matchId: string): Promise<unknown> {
     assertUuid(matchId, "matchId");
-    return this.client.rpc("admin_accept_product_match", {
-      target_match_id: matchId,
+    return this.client.rpc("admin_accept_product_classification", {
+      target_classification_id: matchId,
       actor: this.actor,
     });
   }
 
   rejectMatch(matchId: string): Promise<unknown> {
     assertUuid(matchId, "matchId");
-    return this.client.rpc("admin_reject_product_match", {
-      target_match_id: matchId,
+    return this.client.rpc("admin_reject_product_classification", {
+      target_classification_id: matchId,
       actor: this.actor,
     });
   }
 
-  reassignMatch(matchId: string, canonicalProductId: string): Promise<unknown> {
-    assertUuid(matchId, "matchId");
-    assertUuid(canonicalProductId, "canonicalProductId");
-    return this.client.rpc("admin_reassign_product_match", {
-      target_match_id: matchId,
-      target_canonical_product_id: canonicalProductId,
+  classifyProduct(
+    retailerProductId: string,
+    productConceptId: string,
+  ): Promise<unknown> {
+    assertUuid(retailerProductId, "retailerProductId");
+    assertUuid(productConceptId, "productConceptId");
+    return this.client.rpc("admin_classify_retailer_product", {
+      target_retailer_product_id: retailerProductId,
+      target_product_concept_id: productConceptId,
+      target_is_standard: true,
       actor: this.actor,
     });
   }
 
-  updateCanonical(
-    canonicalProductId: string,
+  updateConcept(
+    productConceptId: string,
     changes: Record<string, unknown>,
   ): Promise<unknown> {
-    assertUuid(canonicalProductId, "canonicalProductId");
+    assertUuid(productConceptId, "productConceptId");
     if (Object.keys(changes).length === 0) {
-      throw new TypeError("No canonical changes supplied");
+      throw new TypeError("No concept changes supplied");
     }
-    return this.client.rpc("admin_update_canonical_product", {
-      target_canonical_product_id: canonicalProductId,
+    return this.client.rpc("admin_update_product_concept", {
+      target_product_concept_id: productConceptId,
       changes,
       actor: this.actor,
     });

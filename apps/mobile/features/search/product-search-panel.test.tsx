@@ -41,17 +41,14 @@ vi.mock("./queries", () => ({
 }));
 
 const result: ProductSearchResult = {
-  canonicalProduct: {
-    id: "canonical-1",
+  concept: {
+    id: "concept-1",
     name: "Leche semidesnatada",
     normalizedName: "leche semidesnatada",
-    brand: null,
     category: "Lácteos",
-    variant: "semidesnatada",
-    gtin: null,
-    packageSize: 1,
-    packageUnit: "l",
-    packageCount: null,
+    defaultAmount: 1,
+    defaultUnit: "l",
+    selectionPolicy: "CHEAPEST_COVERING",
   },
   retailerProducts: [
     {
@@ -66,8 +63,8 @@ const result: ProductSearchResult = {
       packageCount: null,
       imageUrl: "https://example.test/milk.png",
       productUrl: null,
-      matchType: "EXACT",
-      matchConfidence: "HIGH",
+      classificationConfidence: "HIGH",
+      standard: true,
     },
   ],
   offers: [
@@ -126,7 +123,7 @@ describe("ProductSearchPanel interactions", () => {
     expect(screenText(renderer)).toContain("como item libre");
   });
 
-  it("selects a canonical product", async () => {
+  it("selects a product concept", async () => {
     mocks.state.data = [result];
     const onSelectProduct = vi.fn();
     const renderer = await searchedPanel("leche", { onSelectProduct });

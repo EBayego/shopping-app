@@ -17,9 +17,6 @@ insert into public.group_members (group_id, profile_id, role, added_by)
 values ('80000000-0000-4000-8000-000000000001', '81111111-1111-4111-8111-111111111111', 'owner', '81111111-1111-4111-8111-111111111111');
 insert into public.shopping_lists (id, group_id, name, postal_code, created_by)
 values ('80000000-0000-4000-8000-000000000002', '80000000-0000-4000-8000-000000000001', 'Product list', '28001', '81111111-1111-4111-8111-111111111111');
-insert into public.canonical_products (id, name, normalized_name, base_name)
-values ('80000000-0000-4000-8000-000000000003', 'Leche semidesnatada', 'leche semidesnatada', 'leche');
-
 select set_config('request.jwt.claims', '{"sub":"81111111-1111-4111-8111-111111111111","role":"authenticated","is_anonymous":true}', true);
 set local role authenticated;
 
@@ -28,10 +25,10 @@ select extensions.is(
     '80000000-0000-4000-8000-000000000011',
     '80000000-0000-4000-8000-000000000002',
     'Leche semidesnatada', 'leche semidesnatada',
-    '80000000-0000-4000-8000-000000000003'
-  ) ->> 'canonical_product_id',
-  '80000000-0000-4000-8000-000000000003',
-  'a searched product is associated with its canonical product'
+    '10000000-0000-4000-8000-000000000001'
+  ) ->> 'product_concept_id',
+  '10000000-0000-4000-8000-000000000001',
+  'a searched product is associated with its concept'
 );
 
 select extensions.is(
@@ -39,9 +36,9 @@ select extensions.is(
     '80000000-0000-4000-8000-000000000012',
     '80000000-0000-4000-8000-000000000002',
     'Regalo para Marta', 'regalo para marta', null
-  ) ->> 'canonical_product_id',
+  ) ->> 'product_concept_id',
   null,
-  'a free item remains valid without a canonical association'
+  'a free item remains valid without a concept association'
 );
 
 with voice_intent as (

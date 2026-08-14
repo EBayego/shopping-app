@@ -72,8 +72,8 @@ function decodeIntent(value: Json): BasketIntent {
   return {
     id: value.id,
     name: value.name,
-    ...(isString(value.canonicalProductId)
-      ? { canonicalProductId: value.canonicalProductId }
+    ...(isString(value.productConceptId)
+      ? { productConceptId: value.productConceptId }
       : {}),
     ...optionalNumber(value, "requestedQuantity"),
     ...optionalUnit(value, "requestedUnit"),
@@ -81,6 +81,15 @@ function decodeIntent(value: Json): BasketIntent {
     ...optionalNumber(value, "packageSize"),
     ...optionalUnit(value, "packageUnit"),
     ...optionalNumber(value, "totalAmount"),
+    ...(isString(value.brandPreference)
+      ? { brandPreference: value.brandPreference }
+      : {}),
+    ...(isString(value.variant) ? { variant: value.variant } : {}),
+    ...optionalNumber(value, "defaultAmount"),
+    ...optionalUnit(value, "defaultUnit"),
+    ...(isSelectionPolicy(value.selectionPolicy)
+      ? { selectionPolicy: value.selectionPolicy }
+      : {}),
   };
 }
 
@@ -92,8 +101,9 @@ function decodeCandidate(value: Json): BasketOfferCandidate {
     !isRetailer(value.retailer) ||
     !isString(value.productId) ||
     !isString(value.productName) ||
-    !isMatchConfidence(value.matchConfidence) ||
-    typeof value.matchAccepted !== "boolean" ||
+    !isClassificationConfidence(value.classificationConfidence) ||
+    typeof value.classificationAccepted !== "boolean" ||
+    typeof value.standard !== "boolean" ||
     typeof value.variableWeight !== "boolean" ||
     !isNumber(value.normalPrice) ||
     typeof value.requiresMembership !== "boolean" ||
@@ -107,8 +117,10 @@ function decodeCandidate(value: Json): BasketOfferCandidate {
     retailer: value.retailer,
     productId: value.productId,
     productName: value.productName,
-    matchConfidence: value.matchConfidence,
-    matchAccepted: value.matchAccepted,
+    ...(isString(value.brand) ? { brand: value.brand } : {}),
+    classificationConfidence: value.classificationConfidence,
+    classificationAccepted: value.classificationAccepted,
+    standard: value.standard,
     variableWeight: value.variableWeight,
     normalPrice: value.normalPrice,
     requiresMembership: value.requiresMembership,
@@ -165,10 +177,16 @@ function isProductUnit(value: Json | undefined): value is ProductUnit {
   );
 }
 
-function isMatchConfidence(
+function isClassificationConfidence(
   value: Json | undefined,
 ): value is "HIGH" | "MEDIUM" | "LOW" {
   return value === "HIGH" || value === "MEDIUM" || value === "LOW";
+}
+
+function isSelectionPolicy(
+  value: Json | undefined,
+): value is "CHEAPEST_COVERING" | "CLOSEST_AMOUNT" {
+  return value === "CHEAPEST_COVERING" || value === "CLOSEST_AMOUNT";
 }
 
 function isFreshness(

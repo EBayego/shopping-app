@@ -55,13 +55,13 @@ values ('50000000-0000-4000-8000-000000000003', '50000000-0000-4000-8000-0000000
 
 insert into public.shopping_intents (
   id, shopping_list_id, raw_text, normalized_name, requested_quantity,
-  requested_unit, canonical_product_id, created_by
+  requested_unit, product_concept_id, created_by
 )
 values (
   '50000000-0000-4000-8000-000000000004',
   '50000000-0000-4000-8000-000000000003',
   'Leche semidesnatada', 'leche semidesnatada', 1, 'l',
-  'd2000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
   '50000000-0000-4000-8000-000000000001'
 );
 
@@ -76,8 +76,8 @@ select extensions.is(
   public.search_products_for_list(
     '50000000-0000-4000-8000-000000000003',
     'leche semidesnatada'
-  )->0->'canonicalProduct'->>'name',
-  'Leche semidesnatada 1 l',
+  )->0->'concept'->>'name',
+  'Leche',
   'the expected beta search works from fixtures'
 );
 

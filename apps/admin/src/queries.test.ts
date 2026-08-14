@@ -81,7 +81,7 @@ describe("critical admin queries", () => {
     );
     expect(
       new URL(unmatchedUrl ?? "https://invalid.local").searchParams.get(
-        "product_matches",
+        "retailer_product_concepts",
       ),
     ).toBe("is.null");
   });

@@ -100,6 +100,13 @@ describe("parseShoppingIntents", () => {
         totalAmount: 2,
         confidence: "HIGH",
       });
+      expect(parseShoppingIntents("leche 2L")[0]).toMatchObject({
+        product: "leche",
+        requestedQuantity: 2,
+        requestedUnit: "l",
+        totalAmount: 2,
+        confidence: "HIGH",
+      });
     });
 
     it("parses counted bottles with their individual size and total", () => {

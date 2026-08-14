@@ -25,7 +25,7 @@ describe("product search repository", () => {
   it("uses only the authorized backend RPC with list context", async () => {
     const data = [
       {
-        canonicalProduct: { id: "canonical-1" },
+        concept: { id: "concept-1" },
         retailerProducts: [],
         offers: [],
       },
@@ -48,7 +48,7 @@ describe("product search repository", () => {
   it("removes products and offers from disabled supermarkets", async () => {
     const data = [
       {
-        canonicalProduct: null,
+        concept: null,
         retailerProducts: [
           { retailerId: "retailer-1" },
           { retailerId: "retailer-2" },

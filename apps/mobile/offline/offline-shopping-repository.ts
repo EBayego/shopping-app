@@ -66,7 +66,7 @@ export function createLocalIntent(input: {
   shoppingListId: string;
   rawText: string;
   normalizedName: string;
-  canonicalProductId?: string | null;
+  productConceptId?: string | null;
   requestedQuantity?: number;
   requestedUnit?: string;
   packageCount?: number;
@@ -90,7 +90,9 @@ export function createLocalIntent(input: {
     total_amount: input.totalAmount ?? null,
     brand_preference: input.brandPreference ?? null,
     variant: input.variant ?? null,
-    canonical_product_id: input.canonicalProductId ?? null,
+    product_concept_id: input.productConceptId ?? null,
+    concept_resolution_method: null,
+    concept_resolution_score: null,
     checked: false,
     created_by: null,
     created_at: now,

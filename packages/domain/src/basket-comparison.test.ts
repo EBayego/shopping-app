@@ -14,8 +14,9 @@ const freshOffer = (
   retailer: "DIA",
   productId: `${intentId}-dia`,
   productName: `Producto ${intentId}`,
-  matchConfidence: "HIGH",
-  matchAccepted: true,
+  classificationConfidence: "HIGH",
+  classificationAccepted: true,
+  standard: true,
   packageSize: 1,
   packageUnit: "unit",
   variableWeight: false,
@@ -221,8 +222,8 @@ describe("compareBaskets", () => {
   it("rechaza unidades incompatibles y matches LOW o no revisados", () => {
     const offers = [
       freshOffer("leche", { packageSize: 1, packageUnit: "kg" }),
-      freshOffer("pan", { matchConfidence: "LOW" }),
-      freshOffer("huevos", { matchAccepted: false }),
+      freshOffer("pan", { classificationConfidence: "LOW" }),
+      freshOffer("huevos", { classificationAccepted: false }),
     ];
     const result = compareBaskets(
       [
@@ -238,5 +239,113 @@ describe("compareBaskets", () => {
       "NO_CONFIDENT_MATCH",
       "NO_CONFIDENT_MATCH",
     ]);
+  });
+
+  it("convierte envases solicitados al formato por defecto del concepto", () => {
+    const result = compareBaskets(
+      [
+        intent("leche", {
+          requestedQuantity: 6,
+          requestedUnit: "unit",
+          defaultAmount: 1,
+          defaultUnit: "l",
+          selectionPolicy: "CHEAPEST_COVERING",
+        }),
+      ],
+      [
+        freshOffer("leche", {
+          productName: "Leche 1 l",
+          packageSize: 1,
+          packageUnit: "l",
+          normalPrice: 0.9,
+        }),
+        freshOffer("leche", {
+          productId: "leche-pack",
+          productName: "Leche pack 6 x 1 l",
+          packageSize: 1,
+          packageUnit: "l",
+          packageCount: 6,
+          normalPrice: 5.1,
+        }),
+      ],
+      ["DIA"],
+    );
+    expect(result[0]?.lines[0]).toMatchObject({
+      productId: "leche-pack",
+      commercialUnits: 1,
+      suppliedAmount: 6,
+      suppliedUnit: "l",
+      estimatedLineTotal: 5.1,
+    });
+  });
+
+  it("prioriza el peso variable más cercano antes que el precio", () => {
+    const result = compareBaskets(
+      [
+        intent("carne", {
+          requestedQuantity: 400,
+          requestedUnit: "g",
+          selectionPolicy: "CLOSEST_AMOUNT",
+        }),
+      ],
+      [
+        freshOffer("carne", {
+          productId: "bandeja-390",
+          packageSize: 390,
+          packageUnit: "g",
+          variableWeight: true,
+          normalPrice: 3.8,
+        }),
+        freshOffer("carne", {
+          productId: "bandeja-1000",
+          packageSize: 1,
+          packageUnit: "kg",
+          variableWeight: true,
+          normalPrice: 3.2,
+        }),
+      ],
+      ["DIA"],
+    );
+    expect(result[0]?.lines[0]?.productId).toBe("bandeja-390");
+  });
+
+  it("calcula un producto al peso aunque no tenga peso de bandeja", () => {
+    const result = compareBaskets(
+      [
+        intent("carne", {
+          requestedQuantity: 400,
+          requestedUnit: "g",
+          selectionPolicy: "CLOSEST_AMOUNT",
+        }),
+      ],
+      [
+        {
+          intentId: "carne",
+          retailer: "DIA",
+          productId: "carne-al-peso",
+          productName: "Carne fresca al peso",
+          classificationConfidence: "HIGH",
+          classificationAccepted: true,
+          standard: true,
+          variableWeight: true,
+          normalPrice: 8,
+          pricePerUnit: 8,
+          referenceUnit: "kg",
+          requiresMembership: false,
+          available: true,
+          freshness: "FRESH",
+        },
+      ],
+      ["DIA"],
+    );
+
+    expect(result[0]?.lines[0]).toMatchObject({
+      status: "MATCHED",
+      commercialUnits: 1,
+      suppliedAmount: 400,
+      suppliedUnit: "g",
+      estimatedLineTotal: 3.2,
+      approximate: true,
+    });
   });
 });

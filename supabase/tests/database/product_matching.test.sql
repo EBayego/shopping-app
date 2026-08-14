@@ -1,246 +1,92 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
+select extensions.plan(17);
 
-select extensions.plan(21);
-
-select extensions.has_extension('pg_trgm', 'pg_trgm is enabled for candidate retrieval');
-
+select extensions.has_table('public', 'product_concepts', 'product concepts are stored independently from retailer SKUs');
+select extensions.has_table('public', 'retailer_product_concepts', 'retailer SKUs are classified under concepts');
 select extensions.has_index(
-  'public',
-  'canonical_products',
-  'canonical_products_normalized_name_trgm_idx',
-  'canonical product names have a targeted trigram index'
+  'public', 'product_concepts', 'product_concepts_normalized_name_trgm_idx',
+  'concept names have a trigram search index'
 );
+select extensions.has_column('public', 'product_concepts', 'aliases', 'concept aliases are persisted');
+select extensions.has_column('public', 'product_concepts', 'selection_policy', 'each concept owns its selection policy');
 
 insert into public.retailer_markets (id, retailer_id, external_id, name)
-select
-  '10000000-0000-4000-8000-000000000001',
-  id,
-  'matching-test-market',
-  'Matching test market'
-from public.retailers
-where code = 'DIA';
+select '10000000-0000-4000-8000-000000000001', id, 'classification-test-market', 'Classification test market'
+from public.retailers where code = 'DIA';
 
 insert into public.retailer_products (
   id, retailer_id, market_id, external_id, name, brand, package_size,
   package_unit, category, observed_at, last_seen_at
 )
-select
-  product.id, retailer.id, '10000000-0000-4000-8000-000000000001',
-  product.external_id, product.name, product.brand, product.package_size,
+select product.id, retailer.id, '10000000-0000-4000-8000-000000000001',
+  product.external_id, product.name, 'DIA', product.package_size,
   product.package_unit, product.category, now(), now()
 from public.retailers retailer
 cross join (values
-  ('20000000-0000-4000-8000-000000000001'::uuid, 'dia-milk', 'Leche semidesnatada Dia Lactea 1 L', 'DIA Lactea', 1::numeric, 'l', 'Leche'),
-  ('20000000-0000-4000-8000-000000000002'::uuid, 'dia-cola', 'Coca-Cola Zero 2 L', 'Coca-Cola', 2::numeric, 'l', 'Refrescos')
-) product(id, external_id, name, brand, package_size, package_unit, category)
+  ('20000000-0000-4000-8000-000000000001'::uuid, 'milk-standard', 'Leche semidesnatada DIA 1 L', 1::numeric, 'l', 'Leche'),
+  ('20000000-0000-4000-8000-000000000002'::uuid, 'milk-special', 'Leche sin lactosa DIA 1 L', 1::numeric, 'l', 'Leche'),
+  ('20000000-0000-4000-8000-000000000003'::uuid, 'body-milk', 'Leche corporal hidratante', 400::numeric, 'ml', 'Higiene corporal'),
+  ('20000000-0000-4000-8000-000000000004'::uuid, 'weak-name', 'Leche experimental', 1::numeric, 'l', 'Otros')
+) product(id, external_id, name, package_size, package_unit, category)
 where retailer.code = 'DIA';
 
-insert into public.canonical_products (
-  id, name, normalized_name, base_name, category, normalized_category,
-  brand, normalized_brand, variant, gtin, package_size, package_unit
-)
-values
-  (
-    '30000000-0000-4000-8000-000000000001', 'Leche semidesnatada',
-    'leche semidesnatada', 'leche', 'Leche', 'leche', 'Hacendado',
-    'hacendado', 'semidesnatada', null, 1, 'l'
-  ),
-  (
-    '30000000-0000-4000-8000-000000000002', 'Coca-Cola Zero',
-    'coca cola zero', 'coca cola', 'Refrescos', 'refrescos', 'Coca-Cola',
-    'coca cola', 'zero', '4006381333931', 2, 'l'
-  );
-
 select extensions.is(
-  (
-    select count(*)
-    from public.search_product_match_candidates(null, 'leche semidesnatada', 'leche', 10)
-    where id = '30000000-0000-4000-8000-000000000001'
-  ),
-  1::bigint,
-  'trigram candidate retrieval finds normalized milk'
+  (select count(*) from public.product_concepts), 5::bigint,
+  'the first five broad shopping concepts are seeded'
 );
-
 select extensions.is(
-  (
-    select id
-    from public.search_product_match_candidates('4006381333931', 'nombre irrelevante', null, 10)
-    limit 1
-  ),
-  '30000000-0000-4000-8000-000000000002'::uuid,
-  'exact GTIN candidate has precedence over text'
+  (select product_concept_id from public.retailer_product_concepts where retailer_product_id = '20000000-0000-4000-8000-000000000001'),
+  '10000000-0000-4000-8000-000000000001'::uuid,
+  'catalog ingestion classifies ordinary milk automatically'
 );
-
-insert into public.product_matches (
-  id, canonical_product_id, retailer_product_id, match_type, method,
-  score, confidence, reasons
-)
-values (
-  '40000000-0000-4000-8000-000000000001',
-  '30000000-0000-4000-8000-000000000001',
-  '20000000-0000-4000-8000-000000000001',
-  'SUBSTITUTE', 'CATEGORY_NAME_FORMAT', 0.78, 'MEDIUM',
-  '[{"feature":"brand","matched":false}]'
-);
-
 select extensions.is(
-  (select status from public.product_matches where id = '40000000-0000-4000-8000-000000000001'),
-  'PROPOSED',
-  'new candidate starts proposed'
+  (select status from public.retailer_product_concepts where retailer_product_id = '20000000-0000-4000-8000-000000000001'),
+  'ACCEPTED', 'high-confidence classifications are immediately usable'
 );
-
 select extensions.is(
-  (select reviewed from public.product_matches where id = '40000000-0000-4000-8000-000000000001'),
-  false,
-  'new candidate starts unreviewed'
+  (select is_standard from public.retailer_product_concepts where retailer_product_id = '20000000-0000-4000-8000-000000000001'),
+  true, 'ordinary milk is a standard candidate'
+);
+select extensions.is(
+  (select is_standard from public.retailer_product_concepts where retailer_product_id = '20000000-0000-4000-8000-000000000002'),
+  false, 'specialty variants are retained but marked non-standard'
+);
+select extensions.is(
+  (select count(*) from public.retailer_product_concepts where retailer_product_id = '20000000-0000-4000-8000-000000000003'),
+  0::bigint, 'excluded terms prevent body-care false positives'
+);
+select extensions.is(
+  (select status from public.retailer_product_concepts where retailer_product_id = '20000000-0000-4000-8000-000000000004'),
+  'PROPOSED', 'weak name-only evidence is queued for review'
 );
 
 select extensions.lives_ok(
-  $$select * from public.accept_product_match('40000000-0000-4000-8000-000000000001')$$,
-  'a proposed match can be accepted'
+  $$select * from public.accept_retailer_product_concept((select id from public.retailer_product_concepts where retailer_product_id = '20000000-0000-4000-8000-000000000004'))$$,
+  'a proposed classification can be accepted'
 );
-
 select extensions.is(
-  (select status from public.product_matches where id = '40000000-0000-4000-8000-000000000001'),
-  'ACCEPTED',
-  'acceptance persists accepted status'
+  (select reviewed from public.retailer_product_concepts where retailer_product_id = '20000000-0000-4000-8000-000000000004'),
+  true, 'manual acceptance records review state'
 );
-
-select extensions.is(
-  (select reviewed from public.product_matches where id = '40000000-0000-4000-8000-000000000001'),
-  true,
-  'acceptance marks the match reviewed'
-);
-
-select extensions.ok(
-  (select reviewed_at is not null from public.product_matches where id = '40000000-0000-4000-8000-000000000001'),
-  'acceptance records review time'
-);
-
 select extensions.lives_ok(
-  $$select * from public.reject_product_match('40000000-0000-4000-8000-000000000001')$$,
-  'an accepted match can be rejected'
+  $$select * from public.change_retailer_product_concept(
+    '10000000-0000-4000-8000-000000000002',
+    '20000000-0000-4000-8000-000000000004',
+    'MANUAL', 1, 'HIGH', '[]'::jsonb, true
+  )$$,
+  'a retailer SKU can be reassigned atomically'
 );
-
 select extensions.is(
-  (select status from public.product_matches where id = '40000000-0000-4000-8000-000000000001'),
-  'REJECTED',
-  'rejection persists rejected status'
+  (select product_concept_id from public.retailer_product_concepts where retailer_product_id = '20000000-0000-4000-8000-000000000004' and status = 'ACCEPTED'),
+  '10000000-0000-4000-8000-000000000002'::uuid,
+  'reassignment leaves one accepted target concept'
 );
-
-select extensions.lives_ok(
-  $$
-    select * from public.change_product_match(
-      '30000000-0000-4000-8000-000000000002',
-      '20000000-0000-4000-8000-000000000001',
-      'SUBSTITUTE', 'MANUAL', 0.7, 'MEDIUM', '[]'::jsonb
-    )
-  $$,
-  'a retailer product association can be changed atomically'
-);
-
 select extensions.is(
-  (
-    select canonical_product_id
-    from public.product_matches
-    where retailer_product_id = '20000000-0000-4000-8000-000000000001'
-      and status = 'ACCEPTED'
-  ),
-  '30000000-0000-4000-8000-000000000002'::uuid,
-  'change accepts the replacement canonical product'
-);
-
-select extensions.is(
-  (
-    select count(*)
-    from public.product_matches
-    where retailer_product_id = '20000000-0000-4000-8000-000000000001'
-      and status = 'ACCEPTED'
-  ),
-  1::bigint,
-  'only one accepted canonical association exists per retailer SKU'
-);
-
-select extensions.throws_ok(
-  $$
-    insert into public.product_matches (
-      canonical_product_id, retailer_product_id, match_type, method,
-      score, confidence, status, reviewed, reviewed_at
-    ) values (
-      '30000000-0000-4000-8000-000000000001',
-      '20000000-0000-4000-8000-000000000001',
-      'SUBSTITUTE', 'MANUAL', 0.8, 'MEDIUM', 'ACCEPTED', true, now()
-    )
-  $$,
-  '23505',
-  null::text,
-  'database prevents a second accepted association for one retailer SKU'
-);
-
-select extensions.lives_ok(
-  $$
-    insert into public.product_matches (
-      canonical_product_id, retailer_product_id, match_type, method,
-      score, confidence, reasons
-    ) values (
-      '30000000-0000-4000-8000-000000000001',
-      '20000000-0000-4000-8000-000000000002',
-      'SUBSTITUTE', 'TEXT_SIMILARITY', 0.5, 'LOW', '[]'
-    )
-  $$,
-  'LOW confidence may be stored for review'
-);
-
-select extensions.is(
-  (
-    select status
-    from public.product_matches
-    where retailer_product_id = '20000000-0000-4000-8000-000000000002'
-  ),
-  'PROPOSED',
-  'LOW confidence is not automatically accepted'
-);
-
-select extensions.throws_ok(
-  $$
-    insert into public.product_matches (
-      canonical_product_id, retailer_product_id, match_type, method, score,
-      confidence, status, reviewed
-    ) values (
-      '30000000-0000-4000-8000-000000000002',
-      '20000000-0000-4000-8000-000000000002',
-      'EXACT_MATCH', 'GTIN_EXACT', 1, 'HIGH', 'ACCEPTED', false
-    )
-  $$,
-  '23514',
-  null::text,
-  'accepted matches must be reviewed consistently'
-);
-
-select extensions.is(
-  (
-    select count(*)
-    from public.product_matches
-    where canonical_product_id = '30000000-0000-4000-8000-000000000002'
-      and status = 'ACCEPTED'
-  ),
-  1::bigint,
-  'equivalent-product query shape has one accepted association'
-);
-
-select extensions.is(
-  (
-    select method
-    from public.product_matches
-    where retailer_product_id = '20000000-0000-4000-8000-000000000001'
-      and status = 'ACCEPTED'
-  ),
-  'MANUAL',
-  'changed match preserves its explainable method'
+  (select count(*) from public.retailer_product_concepts where retailer_product_id = '20000000-0000-4000-8000-000000000004' and status = 'ACCEPTED'),
+  1::bigint, 'only one accepted classification can exist per retailer SKU'
 );
 
 select * from extensions.finish();
-
 rollback;

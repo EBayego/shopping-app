@@ -68,20 +68,20 @@ export function useAddIntentMutation(groupId: string) {
       shoppingListId,
       rawText,
       normalizedName,
-      canonicalProductId,
+      productConceptId,
       operationId,
       ...structured
     }: {
       shoppingListId: string;
       operationId: string;
-      canonicalProductId?: string | null;
+      productConceptId?: string | null;
     } & AddShoppingIntentInput) => {
       const localIntent = createLocalIntent({
         operationId,
         shoppingListId,
         rawText,
         normalizedName,
-        ...(canonicalProductId === undefined ? {} : { canonicalProductId }),
+        ...(productConceptId === undefined ? {} : { productConceptId }),
         ...structured,
       });
       return enqueueShoppingOperation({

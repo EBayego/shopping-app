@@ -23,35 +23,6 @@ values
 on conflict (retailer_id, postal_code) do update
 set market_id = excluded.market_id;
 
-insert into public.canonical_products (
-  id, name, normalized_name, base_name, category, normalized_category,
-  variant, package_size, package_unit, package_count, total_amount
-)
-values (
-  'd2000000-0000-4000-8000-000000000001',
-  'Leche semidesnatada 1 l',
-  'leche semidesnatada',
-  'leche',
-  'Lácteos',
-  'lacteos',
-  'semidesnatada',
-  1,
-  'l',
-  1,
-  1
-)
-on conflict (id) do update
-set name = excluded.name,
-    normalized_name = excluded.normalized_name,
-    base_name = excluded.base_name,
-    category = excluded.category,
-    normalized_category = excluded.normalized_category,
-    variant = excluded.variant,
-    package_size = excluded.package_size,
-    package_unit = excluded.package_unit,
-    package_count = excluded.package_count,
-    total_amount = excluded.total_amount;
-
 insert into public.retailer_products (
   id, retailer_id, market_id, external_id, name, brand, package_size,
   package_unit, package_count, total_amount, category, raw_data, observed_at,
@@ -69,25 +40,6 @@ set name = excluded.name,
     observed_at = excluded.observed_at,
     last_seen_at = excluded.last_seen_at,
     active = true;
-
-insert into public.product_matches (
-  canonical_product_id, retailer_product_id, match_type, method, score,
-  confidence, reasons, status, reviewed, reviewed_at
-)
-values
-  ('d2000000-0000-4000-8000-000000000001', 'd3000000-0000-4000-8000-000000000001', 'EXACT_MATCH', 'DEMO_FIXTURE', 1, 'HIGH', '["demo fixture"]', 'ACCEPTED', true, now()),
-  ('d2000000-0000-4000-8000-000000000001', 'd3000000-0000-4000-8000-000000000002', 'EXACT_MATCH', 'DEMO_FIXTURE', 1, 'HIGH', '["demo fixture"]', 'ACCEPTED', true, now()),
-  ('d2000000-0000-4000-8000-000000000001', 'd3000000-0000-4000-8000-000000000003', 'SUBSTITUTE', 'DEMO_FIXTURE', 0.88, 'MEDIUM', '["demo fixture"]', 'ACCEPTED', true, now()),
-  ('d2000000-0000-4000-8000-000000000001', 'd3000000-0000-4000-8000-000000000004', 'SUBSTITUTE', 'DEMO_FIXTURE', 0.88, 'MEDIUM', '["demo fixture"]', 'ACCEPTED', true, now())
-on conflict (canonical_product_id, retailer_product_id) do update
-set match_type = excluded.match_type,
-    method = excluded.method,
-    score = excluded.score,
-    confidence = excluded.confidence,
-    reasons = excluded.reasons,
-    status = excluded.status,
-    reviewed = excluded.reviewed,
-    reviewed_at = excluded.reviewed_at;
 
 insert into public.product_offers (
   id, retailer_id, retailer_product_id, market_id, normal_price, promo_price,

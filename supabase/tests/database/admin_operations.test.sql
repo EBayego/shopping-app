@@ -10,10 +10,10 @@ select has_function('public', 'admin_set_provider_status', array['uuid', 'provid
 select has_function('public', 'admin_request_refresh', array['uuid', 'refresh_request_type', 'text', 'text[]', 'text'], 'refresh request RPC exists');
 select has_function('public', 'claim_refresh_request', array['text'], 'worker claim RPC exists');
 select has_function('public', 'complete_refresh_request', array['uuid', 'boolean', 'text'], 'worker completion RPC exists');
-select has_function('public', 'admin_accept_product_match', array['uuid', 'text'], 'audited accept RPC exists');
-select has_function('public', 'admin_reject_product_match', array['uuid', 'text'], 'audited reject RPC exists');
-select has_function('public', 'admin_reassign_product_match', array['uuid', 'uuid', 'text'], 'audited reassign RPC exists');
-select has_function('public', 'admin_update_canonical_product', array['uuid', 'jsonb', 'text'], 'audited canonical correction RPC exists');
+select has_function('public', 'admin_accept_product_classification', array['uuid', 'text'], 'audited accept RPC exists');
+select has_function('public', 'admin_reject_product_classification', array['uuid', 'text'], 'audited reject RPC exists');
+select has_function('public', 'admin_classify_retailer_product', array['uuid', 'uuid', 'boolean', 'text'], 'audited classification RPC exists');
+select has_function('public', 'admin_update_product_concept', array['uuid', 'jsonb', 'text'], 'audited concept correction RPC exists');
 
 select is((select relrowsecurity from pg_class where oid = 'public.refresh_requests'::regclass), true, 'refresh queue has RLS enabled');
 select is((select relrowsecurity from pg_class where oid = 'public.admin_audit_log'::regclass), true, 'audit trail has RLS enabled');
@@ -79,46 +79,36 @@ insert into public.retailer_products (
   '81000000-0000-4000-8000-000000000001',
   'admin-match-sku', 'Leche admin', now(), now()
 );
-insert into public.canonical_products (
-  id, name, normalized_name, base_name
-) values
-  ('83000000-0000-4000-8000-000000000001', 'Leche uno', 'leche uno', 'leche'),
-  ('83000000-0000-4000-8000-000000000002', 'Leche dos', 'leche dos', 'leche');
-insert into public.product_matches (
-  id, canonical_product_id, retailer_product_id, method, score, confidence
-) values (
-  '84000000-0000-4000-8000-000000000001',
-  '83000000-0000-4000-8000-000000000001',
-  '82000000-0000-4000-8000-000000000001',
-  'TEXT_SIMILARITY', 0.6, 'LOW'
-);
+update public.retailer_product_concepts
+set status = 'PROPOSED', confidence = 'LOW', reviewed = false, reviewed_at = null
+where retailer_product_id = '82000000-0000-4000-8000-000000000001';
 
 select lives_ok(
-  $$select * from public.admin_accept_product_match('84000000-0000-4000-8000-000000000001', 'operator@example.com')$$,
-  'admin accepts a match through audited RPC'
+  $$select * from public.admin_accept_product_classification((select id from public.retailer_product_concepts where retailer_product_id = '82000000-0000-4000-8000-000000000001'), 'operator@example.com')$$,
+  'admin accepts a classification through audited RPC'
 );
-select is((select status from public.product_matches where id = '84000000-0000-4000-8000-000000000001'), 'ACCEPTED', 'match is accepted');
+select is((select status from public.retailer_product_concepts where retailer_product_id = '82000000-0000-4000-8000-000000000001'), 'ACCEPTED', 'classification is accepted');
 select lives_ok(
-  $$select * from public.admin_reject_product_match('84000000-0000-4000-8000-000000000001', 'operator@example.com')$$,
-  'admin rejects a match through audited RPC'
+  $$select * from public.admin_reject_product_classification((select id from public.retailer_product_concepts where retailer_product_id = '82000000-0000-4000-8000-000000000001'), 'operator@example.com')$$,
+  'admin rejects a classification through audited RPC'
 );
-select is((select status from public.product_matches where id = '84000000-0000-4000-8000-000000000001'), 'REJECTED', 'match is rejected');
+select is((select status from public.retailer_product_concepts where retailer_product_id = '82000000-0000-4000-8000-000000000001'), 'REJECTED', 'classification is rejected');
 select lives_ok(
-  $$select * from public.admin_reassign_product_match('84000000-0000-4000-8000-000000000001', '83000000-0000-4000-8000-000000000002', 'operator@example.com')$$,
-  'admin reassigns a retailer product to another canonical'
+  $$select * from public.admin_classify_retailer_product('82000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000002', true, 'operator@example.com')$$,
+  'admin assigns a retailer product to another concept'
 );
 select is(
-  (select canonical_product_id from public.product_matches where retailer_product_id = '82000000-0000-4000-8000-000000000001' and status = 'ACCEPTED'),
-  '83000000-0000-4000-8000-000000000002'::uuid,
-  'replacement canonical is accepted'
+  (select product_concept_id from public.retailer_product_concepts where retailer_product_id = '82000000-0000-4000-8000-000000000001' and status = 'ACCEPTED'),
+  '10000000-0000-4000-8000-000000000002'::uuid,
+  'replacement concept is accepted'
 );
 select lives_ok(
-  $$select * from public.admin_update_canonical_product('83000000-0000-4000-8000-000000000002', '{"name":"Leche corregida","base_name":"leche","brand":"Marca admin"}', 'operator@example.com')$$,
-  'admin corrects a canonical product'
+  $$select * from public.admin_update_product_concept('10000000-0000-4000-8000-000000000002', '{"name":"Huevos corregidos","base_name":"huevo","aliases":["huevo","huevos"]}', 'operator@example.com')$$,
+  'admin corrects a product concept'
 );
-select is((select name from public.canonical_products where id = '83000000-0000-4000-8000-000000000002'), 'Leche corregida', 'canonical correction is persisted');
-select ok((select count(*) >= 4 from public.admin_audit_log where action like 'product_match.%' or action = 'canonical_product.updated'), 'matching actions are audited');
-select ok((select bool_and(before_data is not null and after_data is not null) from public.admin_audit_log where action in ('provider.status_changed', 'product_match.accepted', 'product_match.rejected', 'product_match.reassigned', 'canonical_product.updated')), 'before and after data are stored where appropriate');
+select is((select name from public.product_concepts where id = '10000000-0000-4000-8000-000000000002'), 'Huevos corregidos', 'concept correction is persisted');
+select ok((select count(*) >= 4 from public.admin_audit_log where action like 'product_classification.%' or action = 'product_concept.updated'), 'classification actions are audited');
+select ok((select bool_and(before_data is not null and after_data is not null) from public.admin_audit_log where action in ('provider.status_changed', 'product_classification.accepted', 'product_classification.rejected', 'product_classification.assigned', 'product_concept.updated')), 'before and after data are stored where appropriate');
 select throws_ok(
   $$insert into public.admin_audit_log(actor, action, entity_type, entity_id, after_data) values ('operator', 'unsafe', 'test', '1', '{"token":"do-not-store"}')$$,
   '23514',

@@ -2,7 +2,7 @@ import type { OfferFreshness, ProductSearchResult } from "./types";
 
 export function resultName(result: ProductSearchResult): string {
   return (
-    result.canonicalProduct?.name ??
+    result.concept?.name ??
     result.retailerProducts[0]?.name ??
     "Producto"
   );
@@ -10,15 +10,13 @@ export function resultName(result: ProductSearchResult): string {
 
 export function resultBrand(result: ProductSearchResult): string | null {
   return (
-    result.canonicalProduct?.brand ??
     result.retailerProducts.find((product) => product.brand)?.brand ??
     null
   );
 }
 
 export function resultFormat(result: ProductSearchResult): string | null {
-  const source =
-    result.canonicalProduct ?? result.retailerProducts[0] ?? undefined;
+  const source = result.retailerProducts[0];
   if (!source?.packageSize || !source.packageUnit) return null;
   const amount = formatNumber(source.packageSize);
   const unit = formatUnit(source.packageUnit);

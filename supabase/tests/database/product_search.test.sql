@@ -33,15 +33,6 @@ values
   ('00000000-0000-4000-8000-000000000001', '70000000-0000-4000-8000-000000000012', '08001'),
   ('00000000-0000-4000-8000-000000000002', '70000000-0000-4000-8000-000000000013', '28001');
 
-insert into public.canonical_products (
-  id, name, normalized_name, base_name, category, normalized_category,
-  package_size, package_unit
-)
-values (
-  '70000000-0000-4000-8000-000000000021', 'Leche entera', 'leche entera',
-  'leche', 'Lácteos', 'lacteos', 1, 'l'
-);
-
 insert into public.retailer_products (
   id, retailer_id, market_id, external_id, name, brand, package_size,
   package_unit, category, observed_at, last_seen_at
@@ -52,15 +43,9 @@ values
   ('70000000-0000-4000-8000-000000000033', '00000000-0000-4000-8000-000000000001', '70000000-0000-4000-8000-000000000012', 'dia-leche', 'Leche entera DIA 1 L', 'DIA', 1, 'l', 'Lácteos', now(), now()),
   ('70000000-0000-4000-8000-000000000034', '00000000-0000-4000-8000-000000000001', '70000000-0000-4000-8000-000000000011', 'dia-low', 'Leche baja en lactosa DIA', 'DIA', 1, 'l', 'Lácteos', now(), now());
 
-insert into public.product_matches (
-  canonical_product_id, retailer_product_id, match_type, method, score,
-  confidence, status, reviewed, reviewed_at
-)
-values
-  ('70000000-0000-4000-8000-000000000021', '70000000-0000-4000-8000-000000000031', 'EXACT_MATCH', 'GTIN_EXACT', 1, 'HIGH', 'ACCEPTED', true, now()),
-  ('70000000-0000-4000-8000-000000000021', '70000000-0000-4000-8000-000000000032', 'SUBSTITUTE', 'MANUAL', 0.8, 'MEDIUM', 'ACCEPTED', true, now()),
-  ('70000000-0000-4000-8000-000000000021', '70000000-0000-4000-8000-000000000033', 'EXACT_MATCH', 'GTIN_EXACT', 1, 'HIGH', 'ACCEPTED', true, now()),
-  ('70000000-0000-4000-8000-000000000021', '70000000-0000-4000-8000-000000000034', 'SUBSTITUTE', 'TEXT_SIMILARITY', 0.5, 'LOW', 'ACCEPTED', true, now());
+update public.retailer_product_concepts
+set status = 'PROPOSED', confidence = 'LOW', reviewed = false, reviewed_at = null
+where retailer_product_id = '70000000-0000-4000-8000-000000000034';
 
 insert into public.product_offers (
   retailer_id, retailer_product_id, market_id, normal_price, promo_price,
@@ -77,15 +62,15 @@ select set_config('request.jwt.claims', '{"sub":"71111111-1111-4111-8111-1111111
 set local role authenticated;
 
 select extensions.is(
-  public.search_products_for_list('70000000-0000-4000-8000-000000000002', 'leche entera')->0->'canonicalProduct'->>'name',
-  'Leche entera',
-  'exact canonical search returns the canonical product'
+  public.search_products_for_list('70000000-0000-4000-8000-000000000002', 'leche entera')->0->'concept'->>'name',
+  'Leche',
+  'exact product wording resolves to its broad concept'
 );
 
 select extensions.is(
-  public.search_products_for_list('70000000-0000-4000-8000-000000000002', 'leche enteraa')->0->'canonicalProduct'->>'name',
-  'Leche entera',
-  'a small typo still finds the canonical product'
+  public.search_products_for_list('70000000-0000-4000-8000-000000000002', 'lechee')->0->'concept'->>'name',
+  'Leche',
+  'a small typo still finds the concept'
 );
 
 select extensions.is(
@@ -120,23 +105,23 @@ select extensions.is(
 select extensions.ok(
   jsonb_path_exists(
     public.search_products_for_list('70000000-0000-4000-8000-000000000002', 'leche entera'),
-    '$[*].retailerProducts[*] ? (@.matchType == "EXACT")'
+    '$[*].retailerProducts[*] ? (@.classificationConfidence == "HIGH" && @.standard == true)'
   ),
-  'exact matches are exposed as EXACT'
+  'search exposes accepted standard classifications'
 );
 
 select extensions.ok(
-  jsonb_path_exists(
+  not jsonb_path_exists(
     public.search_products_for_list('70000000-0000-4000-8000-000000000002', 'leche entera'),
-    '$[*].retailerProducts[*] ? (@.matchType == "SUBSTITUTE")'
+    '$[*].retailerProducts[*] ? (@.id == "70000000-0000-4000-8000-000000000034")'
   ),
-  'substitute matches remain distinguishable'
+  'proposed classifications are not exposed as confirmed equivalents'
 );
 
 select extensions.is(
-  public.search_products_for_list('70000000-0000-4000-8000-000000000002', 'leche baja')->0->'canonicalProduct',
+  public.search_products_for_list('70000000-0000-4000-8000-000000000002', 'leche baja')->0->'concept',
   'null'::jsonb,
-  'LOW confidence is not presented as a confirmed canonical equivalence'
+  'an unconfirmed SKU remains searchable without claiming concept equivalence'
 );
 
 select extensions.has_index(

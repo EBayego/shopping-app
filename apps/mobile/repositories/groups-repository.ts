@@ -129,7 +129,7 @@ export async function addShoppingIntent(
   input: {
     rawText: string;
     normalizedName: string;
-    canonicalProductId?: string | null;
+    productConceptId?: string | null;
     requestedQuantity?: number;
     requestedUnit?: string;
     packageCount?: number;
@@ -148,9 +148,9 @@ export async function addShoppingIntent(
       shopping_list_id: shoppingListId,
       raw_text: input.rawText,
       normalized_name: input.normalizedName,
-      ...(input.canonicalProductId == null
+      ...(input.productConceptId == null
         ? {}
-        : { canonical_product_id: input.canonicalProductId }),
+        : { product_concept_id: input.productConceptId }),
       ...(input.requestedQuantity === undefined
         ? {}
         : { requested_quantity: input.requestedQuantity }),
@@ -316,7 +316,7 @@ export const shoppingSyncBackend: ShoppingSyncBackend = {
           {
             rawText: operation.localIntent.raw_text,
             normalizedName: operation.localIntent.normalized_name,
-            canonicalProductId: operation.localIntent.canonical_product_id,
+            productConceptId: operation.localIntent.product_concept_id,
             ...(operation.localIntent.requested_quantity === null
               ? {}
               : {

@@ -26,8 +26,8 @@ function actionService() {
     requestRefresh: vi.fn().mockResolvedValue(undefined),
     acceptMatch: vi.fn().mockResolvedValue(undefined),
     rejectMatch: vi.fn().mockResolvedValue(undefined),
-    reassignMatch: vi.fn().mockResolvedValue(undefined),
-    updateCanonical: vi.fn().mockResolvedValue(undefined),
+    classifyProduct: vi.fn().mockResolvedValue(undefined),
+    updateConcept: vi.fn().mockResolvedValue(undefined),
   };
 }
 

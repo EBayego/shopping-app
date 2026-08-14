@@ -49,26 +49,13 @@ values (
   'Active list',
   '50009'
 );
-insert into public.canonical_products (id, name, normalized_name, base_name)
-values ('40000000-0000-4000-8000-000000000001', 'Leche', 'leche', 'leche');
-insert into public.product_matches (
-  canonical_product_id, retailer_product_id, status, reviewed, reviewed_at
-)
-select
-  '40000000-0000-4000-8000-000000000001',
-  id,
-  'ACCEPTED',
-  true,
-  now()
-from public.retailer_products
-where external_id = 'milk-1';
 insert into public.shopping_intents (
-  shopping_list_id, raw_text, normalized_name, canonical_product_id, checked
+  shopping_list_id, raw_text, normalized_name, product_concept_id, checked
 ) values (
   '30000000-0000-4000-8000-000000000001',
   'leche',
   'leche',
-  '40000000-0000-4000-8000-000000000001',
+  '10000000-0000-4000-8000-000000000001',
   false
 );
 select is(

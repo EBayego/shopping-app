@@ -3,7 +3,7 @@ import type { AuditRow } from "./models.js";
 import type {
   CatalogView,
   MatchingFilter,
-  MatchView,
+  ClassificationView,
   ProviderSummary,
   RefreshRequestView,
   SyncRunView,
@@ -119,7 +119,7 @@ export function renderCatalog(
 }
 
 export function renderMatching(
-  rows: MatchView[],
+  rows: ClassificationView[],
   filter: MatchingFilter,
 ): string {
   const filters: Array<[MatchingFilter, string]> = [
@@ -140,7 +140,7 @@ export function renderMatching(
       [
         "Provider",
         "Retailer product",
-        "Canonical",
+        "Concepto",
         "Method",
         "Score",
         "Confidence",
@@ -151,13 +151,13 @@ export function renderMatching(
       rows.map((row) => [
         row.provider,
         row.retailerProduct,
-        row.canonicalProduct ?? "—",
+        row.productConcept ?? "—",
         row.method ?? "—",
         row.score === null ? "—" : row.score.toFixed(3),
         row.confidence === null ? "—" : badge(row.confidence),
         badge(row.status),
         date(row.updatedAt),
-        renderMatchActions(row),
+        renderClassificationActions(row),
       ]),
     )}`,
   );
@@ -284,17 +284,19 @@ function renderRefreshForms(row: ProviderSummary): string {
   return price + catalog;
 }
 
-function renderMatchActions(row: MatchView): string {
-  if (row.status === "UNMATCHED") return "—";
+function renderClassificationActions(row: ClassificationView): string {
+  const assignment = `<details><summary>Asignar concepto</summary><form method="post" action="/actions/match-reassign"><input type="hidden" name="retailerProductId" value="${escapeHtml(row.retailerProductId)}"><input name="productConceptId" aria-label="UUID del concepto" placeholder="UUID del concepto" required><button>Asignar</button></form></details>`;
+  if (row.status === "UNMATCHED") {
+    return `<div class="actions">${assignment}</div>`;
+  }
   const matchId = escapeHtml(row.id);
   const decisions = `<form method="post" action="/actions/match-accept"><input type="hidden" name="matchId" value="${matchId}"><button>Aceptar</button></form><form method="post" action="/actions/match-reject"><input type="hidden" name="matchId" value="${matchId}"><button class="danger">Rechazar</button></form>`;
-  const reassign = `<details><summary>Reasignar</summary><form method="post" action="/actions/match-reassign"><input type="hidden" name="matchId" value="${matchId}"><input name="canonicalProductId" aria-label="Canonical product UUID" placeholder="Canonical UUID" required><button>Reasignar</button></form></details>`;
-  const canonical = row.canonical;
+  const concept = row.concept;
   const correction =
-    canonical === null
+    concept === null
       ? ""
-      : `<details><summary>Corregir canonical</summary><form class="edit-form" method="post" action="/actions/canonical-update"><input type="hidden" name="canonicalProductId" value="${escapeHtml(canonical.id)}"><label>Nombre <input name="name" value="${escapeHtml(canonical.name)}" required></label><label>Nombre base <input name="base_name" value="${escapeHtml(canonical.base_name)}" required></label><label>Categoría <input name="category" value="${escapeHtml(canonical.category ?? "")}"></label><label>Marca <input name="brand" value="${escapeHtml(canonical.brand ?? "")}"></label><label>Variante <input name="variant" value="${escapeHtml(canonical.variant ?? "")}"></label><label>GTIN <input name="gtin" value="${escapeHtml(canonical.gtin ?? "")}"></label><label>Tamaño <input name="package_size" type="number" min="0" step="any" value="${canonical.package_size ?? ""}"></label><label>Unidad <select name="package_unit"><option value="">—</option>${["unit", "g", "kg", "ml", "l"].map((unit) => `<option${canonical.package_unit === unit ? " selected" : ""}>${unit}</option>`).join("")}</select></label><label>Bultos <input name="package_count" type="number" min="1" step="1" value="${canonical.package_count ?? ""}"></label><label>Total <input name="total_amount" type="number" min="0" step="any" value="${canonical.total_amount ?? ""}"></label><button>Guardar canonical</button></form></details>`;
-  return `<div class="actions">${decisions}${reassign}${correction}</div>`;
+      : `<details><summary>Corregir concepto</summary><form class="edit-form" method="post" action="/actions/concept-update"><input type="hidden" name="productConceptId" value="${escapeHtml(concept.id)}"><label>Nombre <input name="name" value="${escapeHtml(concept.name)}" required></label><label>Nombre base <input name="base_name" value="${escapeHtml(concept.base_name)}" required></label><label>Categoría <input name="category" value="${escapeHtml(concept.category ?? "")}"></label><label>Aliases <input name="aliases" value="${escapeHtml(concept.aliases.join(", "))}"></label><label>Dimensión <select name="default_dimension">${["COUNT", "MASS", "VOLUME"].map((dimension) => `<option${concept.default_dimension === dimension ? " selected" : ""}>${dimension}</option>`).join("")}</select></label><label>Cantidad por defecto <input name="default_amount" type="number" min="0" step="any" value="${concept.default_amount ?? ""}"></label><label>Unidad <select name="default_unit"><option value="">—</option>${["unit", "g", "kg", "ml", "l"].map((unit) => `<option${concept.default_unit === unit ? " selected" : ""}>${unit}</option>`).join("")}</select></label><label>Selección <select name="selection_policy">${["CHEAPEST_COVERING", "CLOSEST_AMOUNT"].map((policy) => `<option${concept.selection_policy === policy ? " selected" : ""}>${policy}</option>`).join("")}</select></label><button>Guardar concepto</button></form></details>`;
+  return `<div class="actions">${decisions}${assignment}${correction}</div>`;
 }
 
 function compactJson(value: unknown): string {

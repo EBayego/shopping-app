@@ -1,8 +1,8 @@
 import type {
   AuditRow,
-  CanonicalProductRow,
+  ProductConceptRow,
   HealthRow,
-  MatchRow,
+  ProductClassificationRow,
   OfferRow,
   PriceHistoryRow,
   ProductRow,
@@ -42,12 +42,13 @@ export interface CatalogView extends ProductRow {
 export type MatchingFilter =
   "unmatched" | "low" | "pending" | "accepted" | "rejected";
 
-export interface MatchView {
+export interface ClassificationView {
   id: string;
+  retailerProductId: string;
   provider: string;
   retailerProduct: string;
-  canonicalProduct: string | null;
-  canonical: CanonicalProductRow | null;
+  productConcept: string | null;
+  concept: ProductConceptRow | null;
   method: string | null;
   score: number | null;
   confidence: string | null;
@@ -169,25 +170,26 @@ export class AdminQueries {
     });
   }
 
-  async matching(filter: MatchingFilter): Promise<MatchView[]> {
+  async matching(filter: MatchingFilter): Promise<ClassificationView[]> {
     const retailers = await this.retailers();
     const retailerNames = new Map(retailers.map((row) => [row.id, row.code]));
     if (filter === "unmatched") {
       const products = await this.client.select<
-        ProductRow & { product_matches: [] }
+        ProductRow & { retailer_product_concepts: [] }
       >("retailer_products", {
         select:
-          "id,retailer_id,external_id,name,brand,active,last_seen_at,package_size,package_unit,package_count,total_amount,product_matches!left(id)",
-        product_matches: "is.null",
+          "id,retailer_id,external_id,name,brand,active,last_seen_at,package_size,package_unit,package_count,total_amount,retailer_product_concepts!left(id)",
+        retailer_product_concepts: "is.null",
         order: "last_seen_at.desc",
         limit: ROW_LIMIT,
       });
       return products.map((product) => ({
         id: product.id,
+        retailerProductId: product.id,
         provider: retailerNames.get(product.retailer_id) ?? product.retailer_id,
         retailerProduct: `${product.name} (${product.external_id})`,
-        canonicalProduct: null,
-        canonical: null,
+        productConcept: null,
+        concept: null,
         method: null,
         score: null,
         confidence: null,
@@ -198,7 +200,7 @@ export class AdminQueries {
 
     const matchParameters: Record<string, string> = {
       select:
-        "id,retailer_product_id,canonical_product_id,method,score,confidence,status,reviewed,updated_at",
+        "id,retailer_product_id,product_concept_id,method,score,confidence,status,reviewed,updated_at",
       order: "updated_at.desc",
       limit: ROW_LIMIT,
     };
@@ -206,20 +208,21 @@ export class AdminQueries {
     if (filter === "pending") matchParameters.status = "eq.PROPOSED";
     if (filter === "accepted") matchParameters.status = "eq.ACCEPTED";
     if (filter === "rejected") matchParameters.status = "eq.REJECTED";
-    const matches = await this.client.select<MatchRow>(
-      "product_matches",
+    const matches = await this.client.select<ProductClassificationRow>(
+      "retailer_product_concepts",
       matchParameters,
     );
-    const [products, canonical] = await Promise.all([
+    const [products, concepts] = await Promise.all([
       this.productsByIds(matches.map((match) => match.retailer_product_id)),
-      this.canonicalByIds(matches.map((match) => match.canonical_product_id)),
+      this.conceptsByIds(matches.map((match) => match.product_concept_id)),
     ]);
     const productsById = new Map(products.map((row) => [row.id, row]));
-    const canonicalById = new Map(canonical.map((row) => [row.id, row]));
+    const conceptsById = new Map(concepts.map((row) => [row.id, row]));
     return matches.map((match) => {
       const product = productsById.get(match.retailer_product_id);
       return {
         id: match.id,
+        retailerProductId: match.retailer_product_id,
         provider:
           product === undefined
             ? "—"
@@ -228,10 +231,10 @@ export class AdminQueries {
           product === undefined
             ? match.retailer_product_id
             : `${product.name} (${product.external_id})`,
-        canonicalProduct:
-          canonicalById.get(match.canonical_product_id)?.name ??
-          match.canonical_product_id,
-        canonical: canonicalById.get(match.canonical_product_id) ?? null,
+        productConcept:
+          conceptsById.get(match.product_concept_id)?.name ??
+          match.product_concept_id,
+        concept: conceptsById.get(match.product_concept_id) ?? null,
         method: match.method,
         score: match.score,
         confidence: match.confidence,
@@ -334,11 +337,11 @@ export class AdminQueries {
     });
   }
 
-  private canonicalByIds(ids: string[]): Promise<CanonicalProductRow[]> {
+  private conceptsByIds(ids: string[]): Promise<ProductConceptRow[]> {
     if (ids.length === 0) return Promise.resolve([]);
-    return this.client.select<CanonicalProductRow>("canonical_products", {
+    return this.client.select<ProductConceptRow>("product_concepts", {
       select:
-        "id,name,base_name,category,brand,variant,gtin,package_size,package_unit,package_count,total_amount",
+        "id,name,base_name,category,aliases,default_dimension,default_amount,default_unit,selection_policy",
       id: `in.(${unique(ids).join(",")})`,
     });
   }

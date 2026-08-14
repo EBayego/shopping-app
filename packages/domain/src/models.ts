@@ -34,44 +34,7 @@ export interface RetailerProduct {
   rawData?: unknown;
 }
 
-export type ProductMatchType = "EXACT_MATCH" | "SUBSTITUTE";
-export type ProductMatchConfidence = "HIGH" | "MEDIUM" | "LOW";
-export type ProductMatchStatus = "PROPOSED" | "ACCEPTED" | "REJECTED";
-
-export interface CanonicalProduct {
-  id: string;
-  name: string;
-  normalizedName: string;
-  baseName: string;
-  category?: string;
-  normalizedCategory?: string;
-  brand?: string;
-  normalizedBrand?: string;
-  variant?: string;
-  gtin?: string;
-  packageSize?: number;
-  packageUnit?: ProductUnit;
-  packageCount?: number;
-  totalAmount?: number;
-}
-
-export interface ProductMatchReason {
-  feature: string;
-  matched: boolean;
-  weight: number;
-  detail: string;
-}
-
-export interface ProductMatchCandidate {
-  canonicalProductId: string;
-  retailerProductId: string;
-  matchType: ProductMatchType;
-  method: string;
-  score: number;
-  confidence: ProductMatchConfidence;
-  reasons: readonly ProductMatchReason[];
-  autoAccept: boolean;
-}
+export type ProductClassificationConfidence = "HIGH" | "MEDIUM" | "LOW";
 
 export interface RetailerCategory {
   externalId: string;

@@ -168,18 +168,26 @@ function parseItem(
 
   const trailing = findTrailingQuantity(productTokens);
   if (trailing !== undefined) {
-    draft.packageSize = trailing.quantity.value;
-    draft.packageUnit = trailing.quantity.unit;
-    const count = draft.packageCount ?? draft.requestedQuantity ?? 1;
-    draft.totalAmount = count * trailing.quantity.value;
-    if (
-      draft.packageCount === undefined &&
-      draft.requestedUnit === "unit" &&
-      draft.requestedQuantity !== undefined
-    ) {
-      draft.packageCount = draft.requestedQuantity;
+    if (trailing.packaging) {
+      draft.packageSize = trailing.quantity.value;
+      draft.packageUnit = trailing.quantity.unit;
+      const count = draft.packageCount ?? draft.requestedQuantity ?? 1;
+      draft.totalAmount = count * trailing.quantity.value;
+      if (
+        draft.packageCount === undefined &&
+        draft.requestedUnit === "unit" &&
+        draft.requestedQuantity !== undefined
+      ) {
+        draft.packageCount = draft.requestedQuantity;
+      }
+      hasPackaging = true;
+    } else {
+      draft.requestedQuantity = trailing.quantity.value;
+      draft.requestedUnit = trailing.quantity.unit;
+      draft.totalAmount = trailing.quantity.value;
+      hasMeasurement = trailing.quantity.unit !== "unit";
+      hasCount = trailing.quantity.unit === "unit";
     }
-    hasPackaging = true;
     productTokens = productTokens.slice(0, trailing.start);
   }
 
@@ -272,14 +280,16 @@ function parseQuantity(
 
 function findTrailingQuantity(
   tokens: readonly string[],
-): { start: number; quantity: Quantity } | undefined {
+): { start: number; quantity: Quantity; packaging: boolean } | undefined {
   for (let index = tokens.length - 1; index >= 0; index -= 1) {
     const quantity = parseQuantity(tokens, index, false);
-    if (
-      quantity?.next === tokens.length &&
-      (index === 0 || tokens[index - 1] === "de")
-    ) {
-      return { start: index > 0 ? index - 1 : index, quantity };
+    if (quantity?.next === tokens.length) {
+      const packaging = index > 0 && tokens[index - 1] === "de";
+      return {
+        start: packaging ? index - 1 : index,
+        quantity,
+        packaging,
+      };
     }
   }
   return undefined;

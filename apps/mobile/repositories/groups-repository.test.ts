@@ -97,7 +97,7 @@ describe("groups repository RPCs", () => {
   it("asocia un resultado seleccionado con el producto canónico", async () => {
     const intent = {
       id: "intent-1",
-      canonical_product_id: "canonical-1",
+      product_concept_id: "concept-1",
     };
     const rpc = vi.fn().mockResolvedValue({ data: intent, error: null });
     useClient({ rpc });
@@ -108,7 +108,7 @@ describe("groups repository RPCs", () => {
         {
           rawText: "Leche semidesnatada",
           normalizedName: "leche semidesnatada",
-          canonicalProductId: "canonical-1",
+          productConceptId: "concept-1",
         },
         "operation-1",
       ),
@@ -118,7 +118,7 @@ describe("groups repository RPCs", () => {
       shopping_list_id: "list-1",
       raw_text: "Leche semidesnatada",
       normalized_name: "leche semidesnatada",
-      canonical_product_id: "canonical-1",
+      product_concept_id: "concept-1",
     });
   });
 

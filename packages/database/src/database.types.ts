@@ -42,63 +42,6 @@ export type Database = {
         }
         Relationships: []
       }
-      canonical_products: {
-        Row: {
-          base_name: string
-          brand: string | null
-          category: string | null
-          created_at: string
-          gtin: string | null
-          id: string
-          name: string
-          normalized_brand: string | null
-          normalized_category: string | null
-          normalized_name: string
-          package_count: number | null
-          package_size: number | null
-          package_unit: string | null
-          total_amount: number | null
-          updated_at: string
-          variant: string | null
-        }
-        Insert: {
-          base_name: string
-          brand?: string | null
-          category?: string | null
-          created_at?: string
-          gtin?: string | null
-          id?: string
-          name: string
-          normalized_brand?: string | null
-          normalized_category?: string | null
-          normalized_name: string
-          package_count?: number | null
-          package_size?: number | null
-          package_unit?: string | null
-          total_amount?: number | null
-          updated_at?: string
-          variant?: string | null
-        }
-        Update: {
-          base_name?: string
-          brand?: string | null
-          category?: string | null
-          created_at?: string
-          gtin?: string | null
-          id?: string
-          name?: string
-          normalized_brand?: string | null
-          normalized_category?: string | null
-          normalized_name?: string
-          package_count?: number | null
-          package_size?: number | null
-          package_unit?: string | null
-          total_amount?: number | null
-          updated_at?: string
-          variant?: string | null
-        }
-        Relationships: []
-      }
       group_members: {
         Row: {
           added_by: string | null
@@ -251,75 +194,70 @@ export type Database = {
           },
         ]
       }
-      product_matches: {
+      product_concepts: {
         Row: {
-          canonical_product_id: string
-          confidence: string
+          aliases: string[]
+          base_name: string
+          category: string | null
+          category_terms: string[]
           created_at: string
+          default_amount: number | null
+          default_dimension: string
+          default_unit: string | null
+          excluded_terms: string[]
           id: string
-          match_type: string
-          matched_by: string | null
-          method: string
-          reasons: Json
-          retailer_product_id: string
-          reviewed: boolean
-          reviewed_at: string | null
-          score: number
-          status: string
+          name: string
+          normalized_category: string | null
+          normalized_name: string
+          parent_id: string | null
+          selection_policy: string
+          specialty_terms: string[]
           updated_at: string
         }
         Insert: {
-          canonical_product_id: string
-          confidence?: string
+          aliases?: string[]
+          base_name: string
+          category?: string | null
+          category_terms?: string[]
           created_at?: string
+          default_amount?: number | null
+          default_dimension?: string
+          default_unit?: string | null
+          excluded_terms?: string[]
           id?: string
-          match_type?: string
-          matched_by?: string | null
-          method?: string
-          reasons?: Json
-          retailer_product_id: string
-          reviewed?: boolean
-          reviewed_at?: string | null
-          score?: number
-          status?: string
+          name: string
+          normalized_category?: string | null
+          normalized_name: string
+          parent_id?: string | null
+          selection_policy?: string
+          specialty_terms?: string[]
           updated_at?: string
         }
         Update: {
-          canonical_product_id?: string
-          confidence?: string
+          aliases?: string[]
+          base_name?: string
+          category?: string | null
+          category_terms?: string[]
           created_at?: string
+          default_amount?: number | null
+          default_dimension?: string
+          default_unit?: string | null
+          excluded_terms?: string[]
           id?: string
-          match_type?: string
-          matched_by?: string | null
-          method?: string
-          reasons?: Json
-          retailer_product_id?: string
-          reviewed?: boolean
-          reviewed_at?: string | null
-          score?: number
-          status?: string
+          name?: string
+          normalized_category?: string | null
+          normalized_name?: string
+          parent_id?: string | null
+          selection_policy?: string
+          specialty_terms?: string[]
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "product_matches_canonical_product_id_fkey"
-            columns: ["canonical_product_id"]
+            foreignKeyName: "product_concepts_parent_id_fkey"
+            columns: ["parent_id"]
             isOneToOne: false
-            referencedRelation: "canonical_products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_matches_matched_by_fkey"
-            columns: ["matched_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_matches_retailer_product_id_fkey"
-            columns: ["retailer_product_id"]
-            isOneToOne: false
-            referencedRelation: "retailer_products"
+            referencedRelation: "product_concepts"
             referencedColumns: ["id"]
           },
         ]
@@ -721,6 +659,85 @@ export type Database = {
           },
         ]
       }
+      retailer_product_concepts: {
+        Row: {
+          attributes: Json
+          classifier_version: string
+          confidence: string
+          created_at: string
+          id: string
+          is_standard: boolean
+          method: string
+          product_concept_id: string
+          reasons: Json
+          retailer_product_id: string
+          reviewed: boolean
+          reviewed_at: string | null
+          reviewed_by: string | null
+          score: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attributes?: Json
+          classifier_version?: string
+          confidence?: string
+          created_at?: string
+          id?: string
+          is_standard?: boolean
+          method?: string
+          product_concept_id: string
+          reasons?: Json
+          retailer_product_id: string
+          reviewed?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          score?: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attributes?: Json
+          classifier_version?: string
+          confidence?: string
+          created_at?: string
+          id?: string
+          is_standard?: boolean
+          method?: string
+          product_concept_id?: string
+          reasons?: Json
+          retailer_product_id?: string
+          reviewed?: boolean
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          score?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "retailer_product_concepts_product_concept_id_fkey"
+            columns: ["product_concept_id"]
+            isOneToOne: false
+            referencedRelation: "product_concepts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retailer_product_concepts_retailer_product_id_fkey"
+            columns: ["retailer_product_id"]
+            isOneToOne: false
+            referencedRelation: "retailer_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "retailer_product_concepts_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       retailer_products: {
         Row: {
           active: boolean
@@ -850,8 +867,9 @@ export type Database = {
       shopping_intents: {
         Row: {
           brand_preference: string | null
-          canonical_product_id: string | null
           checked: boolean
+          concept_resolution_method: string | null
+          concept_resolution_score: number | null
           created_at: string
           created_by: string | null
           id: string
@@ -859,6 +877,7 @@ export type Database = {
           package_count: number | null
           package_size: number | null
           package_unit: string | null
+          product_concept_id: string | null
           raw_text: string
           requested_quantity: number | null
           requested_unit: string | null
@@ -869,8 +888,9 @@ export type Database = {
         }
         Insert: {
           brand_preference?: string | null
-          canonical_product_id?: string | null
           checked?: boolean
+          concept_resolution_method?: string | null
+          concept_resolution_score?: number | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -878,6 +898,7 @@ export type Database = {
           package_count?: number | null
           package_size?: number | null
           package_unit?: string | null
+          product_concept_id?: string | null
           raw_text: string
           requested_quantity?: number | null
           requested_unit?: string | null
@@ -888,8 +909,9 @@ export type Database = {
         }
         Update: {
           brand_preference?: string | null
-          canonical_product_id?: string | null
           checked?: boolean
+          concept_resolution_method?: string | null
+          concept_resolution_score?: number | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -897,6 +919,7 @@ export type Database = {
           package_count?: number | null
           package_size?: number | null
           package_unit?: string | null
+          product_concept_id?: string | null
           raw_text?: string
           requested_quantity?: number | null
           requested_unit?: string | null
@@ -907,17 +930,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "shopping_intents_canonical_product_id_fkey"
-            columns: ["canonical_product_id"]
-            isOneToOne: false
-            referencedRelation: "canonical_products"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "shopping_intents_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopping_intents_product_concept_id_fkey"
+            columns: ["product_concept_id"]
+            isOneToOne: false
+            referencedRelation: "product_concepts"
             referencedColumns: ["id"]
           },
           {
@@ -1018,27 +1041,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      accept_product_match: {
-        Args: { target_match_id: string }
+      accept_retailer_product_concept: {
+        Args: { target_classification_id: string }
         Returns: {
-          canonical_product_id: string
+          attributes: Json
+          classifier_version: string
           confidence: string
           created_at: string
           id: string
-          match_type: string
-          matched_by: string | null
+          is_standard: boolean
           method: string
+          product_concept_id: string
           reasons: Json
           retailer_product_id: string
           reviewed: boolean
           reviewed_at: string | null
+          reviewed_by: string | null
           score: number
           status: string
           updated_at: string
         }[]
         SetofOptions: {
           from: "*"
-          to: "product_matches"
+          to: "retailer_product_concepts"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -1046,12 +1071,12 @@ export type Database = {
       add_shopping_product_operation: {
         Args: {
           brand_preference?: string
-          canonical_product_id?: string
           normalized_name: string
           operation_id: string
           package_count?: number
           package_size?: number
           package_unit?: string
+          product_concept_id?: string
           raw_text: string
           requested_quantity?: number
           requested_unit?: string
@@ -1061,81 +1086,88 @@ export type Database = {
         }
         Returns: Json
       }
-      admin_accept_product_match: {
-        Args: { actor: string; target_match_id: string }
+      admin_accept_product_classification: {
+        Args: { actor: string; target_classification_id: string }
         Returns: {
-          canonical_product_id: string
+          attributes: Json
+          classifier_version: string
           confidence: string
           created_at: string
           id: string
-          match_type: string
-          matched_by: string | null
+          is_standard: boolean
           method: string
+          product_concept_id: string
           reasons: Json
           retailer_product_id: string
           reviewed: boolean
           reviewed_at: string | null
+          reviewed_by: string | null
           score: number
           status: string
           updated_at: string
         }[]
         SetofOptions: {
           from: "*"
-          to: "product_matches"
+          to: "retailer_product_concepts"
           isOneToOne: false
           isSetofReturn: true
         }
       }
-      admin_reassign_product_match: {
+      admin_classify_retailer_product: {
         Args: {
           actor: string
-          target_canonical_product_id: string
-          target_match_id: string
+          target_is_standard: boolean
+          target_product_concept_id: string
+          target_retailer_product_id: string
         }
         Returns: {
-          canonical_product_id: string
+          attributes: Json
+          classifier_version: string
           confidence: string
           created_at: string
           id: string
-          match_type: string
-          matched_by: string | null
+          is_standard: boolean
           method: string
+          product_concept_id: string
           reasons: Json
           retailer_product_id: string
           reviewed: boolean
           reviewed_at: string | null
+          reviewed_by: string | null
           score: number
           status: string
           updated_at: string
         }[]
         SetofOptions: {
           from: "*"
-          to: "product_matches"
+          to: "retailer_product_concepts"
           isOneToOne: false
           isSetofReturn: true
         }
       }
-      admin_reject_product_match: {
-        Args: { actor: string; target_match_id: string }
+      admin_reject_product_classification: {
+        Args: { actor: string; target_classification_id: string }
         Returns: {
-          canonical_product_id: string
+          attributes: Json
+          classifier_version: string
           confidence: string
           created_at: string
           id: string
-          match_type: string
-          matched_by: string | null
+          is_standard: boolean
           method: string
+          product_concept_id: string
           reasons: Json
           retailer_product_id: string
           reviewed: boolean
           reviewed_at: string | null
+          reviewed_by: string | null
           score: number
           status: string
           updated_at: string
         }[]
         SetofOptions: {
           from: "*"
-          to: "product_matches"
+          to: "retailer_product_concepts"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -1195,33 +1227,34 @@ export type Database = {
           isSetofReturn: true
         }
       }
-      admin_update_canonical_product: {
+      admin_update_product_concept: {
         Args: {
           actor: string
           changes: Json
-          target_canonical_product_id: string
+          target_product_concept_id: string
         }
         Returns: {
+          aliases: string[]
           base_name: string
-          brand: string | null
           category: string | null
+          category_terms: string[]
           created_at: string
-          gtin: string | null
+          default_amount: number | null
+          default_dimension: string
+          default_unit: string | null
+          excluded_terms: string[]
           id: string
           name: string
-          normalized_brand: string | null
           normalized_category: string | null
           normalized_name: string
-          package_count: number | null
-          package_size: number | null
-          package_unit: string | null
-          total_amount: number | null
+          parent_id: string | null
+          selection_policy: string
+          specialty_terms: string[]
           updated_at: string
-          variant: string | null
         }[]
         SetofOptions: {
           from: "*"
-          to: "canonical_products"
+          to: "product_concepts"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -1247,35 +1280,37 @@ export type Database = {
         }
         Returns: Json
       }
-      change_product_match: {
+      change_retailer_product_concept: {
         Args: {
-          target_canonical_product_id: string
           target_confidence: string
-          target_match_type: string
+          target_is_standard?: boolean
           target_method: string
+          target_product_concept_id: string
           target_reasons: Json
           target_retailer_product_id: string
           target_score: number
         }
         Returns: {
-          canonical_product_id: string
+          attributes: Json
+          classifier_version: string
           confidence: string
           created_at: string
           id: string
-          match_type: string
-          matched_by: string | null
+          is_standard: boolean
           method: string
+          product_concept_id: string
           reasons: Json
           retailer_product_id: string
           reviewed: boolean
           reviewed_at: string | null
+          reviewed_by: string | null
           score: number
           status: string
           updated_at: string
         }[]
         SetofOptions: {
           from: "*"
-          to: "product_matches"
+          to: "retailer_product_concepts"
           isOneToOne: false
           isSetofReturn: true
         }
@@ -1439,59 +1474,29 @@ export type Database = {
         }
         Returns: number
       }
-      reject_product_match: {
-        Args: { target_match_id: string }
+      reject_retailer_product_concept: {
+        Args: { target_classification_id: string }
         Returns: {
-          canonical_product_id: string
+          attributes: Json
+          classifier_version: string
           confidence: string
           created_at: string
           id: string
-          match_type: string
-          matched_by: string | null
+          is_standard: boolean
           method: string
+          product_concept_id: string
           reasons: Json
           retailer_product_id: string
           reviewed: boolean
           reviewed_at: string | null
+          reviewed_by: string | null
           score: number
           status: string
           updated_at: string
         }[]
         SetofOptions: {
           from: "*"
-          to: "product_matches"
-          isOneToOne: false
-          isSetofReturn: true
-        }
-      }
-      search_product_match_candidates: {
-        Args: {
-          candidate_limit?: number
-          query_gtin: string
-          query_normalized_category?: string
-          query_normalized_name: string
-        }
-        Returns: {
-          base_name: string
-          brand: string | null
-          category: string | null
-          created_at: string
-          gtin: string | null
-          id: string
-          name: string
-          normalized_brand: string | null
-          normalized_category: string | null
-          normalized_name: string
-          package_count: number | null
-          package_size: number | null
-          package_unit: string | null
-          total_amount: number | null
-          updated_at: string
-          variant: string | null
-        }[]
-        SetofOptions: {
-          from: "*"
-          to: "canonical_products"
+          to: "retailer_product_concepts"
           isOneToOne: false
           isSetofReturn: true
         }

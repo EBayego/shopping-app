@@ -1,17 +1,12 @@
 export type OfferFreshness = "FRESH" | "STALE" | "VERY_STALE";
-export type SearchMatchType = "EXACT" | "SUBSTITUTE";
-
-export interface ProductSearchCanonicalProduct {
+export interface ProductSearchConcept {
   id: string;
   name: string;
   normalizedName: string;
-  brand: string | null;
   category: string | null;
-  variant: string | null;
-  gtin: string | null;
-  packageSize: number | null;
-  packageUnit: string | null;
-  packageCount: number | null;
+  defaultAmount: number | null;
+  defaultUnit: string | null;
+  selectionPolicy: "CHEAPEST_COVERING" | "CLOSEST_AMOUNT";
 }
 
 export interface ProductSearchRetailerProduct {
@@ -26,8 +21,8 @@ export interface ProductSearchRetailerProduct {
   packageCount: number | null;
   imageUrl: string | null;
   productUrl: string | null;
-  matchType: SearchMatchType | null;
-  matchConfidence: "HIGH" | "MEDIUM" | null;
+  classificationConfidence: "HIGH" | "MEDIUM" | null;
+  standard: boolean;
 }
 
 export interface ProductSearchOffer {
@@ -54,7 +49,7 @@ export interface ProductSearchOffer {
 }
 
 export interface ProductSearchResult {
-  canonicalProduct: ProductSearchCanonicalProduct | null;
+  concept: ProductSearchConcept | null;
   retailerProducts: readonly ProductSearchRetailerProduct[];
   offers: readonly ProductSearchOffer[];
 }

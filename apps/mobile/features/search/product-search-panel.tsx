@@ -120,7 +120,7 @@ export function ProductSearchPanel({
           {search.data?.map((result, index) => (
             <ProductResultCard
               key={
-                result.canonicalProduct?.id ??
+                result.concept?.id ??
                 result.retailerProducts[0]?.id ??
                 index
               }

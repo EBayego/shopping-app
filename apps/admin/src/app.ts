@@ -31,8 +31,8 @@ export interface AdminApplicationDependencies {
     | "requestRefresh"
     | "acceptMatch"
     | "rejectMatch"
-    | "reassignMatch"
-    | "updateCanonical"
+    | "classifyProduct"
+    | "updateConcept"
   >;
   logger?: Pick<Console, "error">;
 }
@@ -165,24 +165,22 @@ async function handleAction(
     return "/matching?status=rejected";
   }
   if (url.pathname === "/actions/match-reassign") {
-    await actions.reassignMatch(
-      requiredForm(form, "matchId"),
-      requiredForm(form, "canonicalProductId"),
+    await actions.classifyProduct(
+      requiredForm(form, "retailerProductId"),
+      requiredForm(form, "productConceptId"),
     );
     return "/matching?status=accepted";
   }
-  if (url.pathname === "/actions/canonical-update") {
-    await actions.updateCanonical(requiredForm(form, "canonicalProductId"), {
+  if (url.pathname === "/actions/concept-update") {
+    await actions.updateConcept(requiredForm(form, "productConceptId"), {
       name: requiredForm(form, "name"),
       base_name: requiredForm(form, "base_name"),
       category: optionalForm(form, "category"),
-      brand: optionalForm(form, "brand"),
-      variant: optionalForm(form, "variant"),
-      gtin: optionalForm(form, "gtin"),
-      package_size: optionalForm(form, "package_size"),
-      package_unit: optionalForm(form, "package_unit"),
-      package_count: optionalForm(form, "package_count"),
-      total_amount: optionalForm(form, "total_amount"),
+      aliases: parseProductIds(optionalForm(form, "aliases")),
+      default_dimension: requiredForm(form, "default_dimension"),
+      default_amount: optionalForm(form, "default_amount"),
+      default_unit: optionalForm(form, "default_unit"),
+      selection_policy: requiredForm(form, "selection_policy"),
     });
     return "/matching?status=accepted";
   }

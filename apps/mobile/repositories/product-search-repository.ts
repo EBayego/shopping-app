@@ -35,7 +35,7 @@ export async function searchProductsForList(
     }))
     .filter(
       (result) =>
-        result.canonicalProduct !== null ||
+        result.concept !== null ||
         result.retailerProducts.length > 0 ||
         result.offers.length > 0,
     );

@@ -1,4 +1,7 @@
-import type { ProductMatchConfidence, ProductUnit } from "./models.ts";
+import type {
+  ProductClassificationConfidence,
+  ProductUnit,
+} from "./models.ts";
 import type { Retailer } from "./retailer.ts";
 
 export type OfferFreshness = "FRESH" | "STALE" | "VERY_STALE";
@@ -8,13 +11,18 @@ export type BasketLineStatus =
 export interface BasketIntent {
   id: string;
   name: string;
-  canonicalProductId?: string;
+  productConceptId?: string;
   requestedQuantity?: number;
   requestedUnit?: ProductUnit;
   packageCount?: number;
   packageSize?: number;
   packageUnit?: ProductUnit;
   totalAmount?: number;
+  brandPreference?: string;
+  variant?: string;
+  defaultAmount?: number;
+  defaultUnit?: ProductUnit;
+  selectionPolicy?: "CHEAPEST_COVERING" | "CLOSEST_AMOUNT";
 }
 
 export interface BasketOfferCandidate {
@@ -22,8 +30,10 @@ export interface BasketOfferCandidate {
   retailer: Retailer;
   productId: string;
   productName: string;
-  matchConfidence: ProductMatchConfidence;
-  matchAccepted: boolean;
+  brand?: string;
+  classificationConfidence: ProductClassificationConfidence;
+  classificationAccepted: boolean;
+  standard: boolean;
   packageCount?: number;
   packageSize?: number;
   packageUnit?: ProductUnit;
@@ -92,6 +102,8 @@ interface Amount {
 interface EvaluatedCandidate {
   candidate: BasketOfferCandidate;
   line: BasketComparisonLine;
+  amountDifferenceRatio: number;
+  preferAmountFit: boolean;
 }
 
 export function compareBaskets(
@@ -182,18 +194,26 @@ function buildLine(
   candidates: readonly BasketOfferCandidate[],
   hasMembership: boolean,
 ): BasketComparisonLine {
-  const eligible = candidates.filter(
+  let eligible = candidates.filter(
     (candidate) =>
-      candidate.matchAccepted && candidate.matchConfidence !== "LOW",
+      candidate.classificationAccepted &&
+      candidate.classificationConfidence !== "LOW" &&
+      matchesPreference(intent.brandPreference, candidate.brand) &&
+      matchesPreference(intent.variant, candidate.productName),
   );
   if (eligible.length === 0) return unmatchedLine(intent, "NO_CONFIDENT_MATCH");
+
+  if (intent.brandPreference === undefined && intent.variant === undefined) {
+    const standard = eligible.filter((candidate) => candidate.standard);
+    if (standard.length > 0) eligible = standard;
+  }
 
   const available = eligible.filter((candidate) => candidate.available);
   if (available.length === 0) return unmatchedLine(intent, "UNAVAILABLE");
 
   const evaluated = available.flatMap((candidate) => {
-    const line = evaluateCandidate(intent, candidate, hasMembership);
-    return line === undefined ? [] : [{ candidate, line }];
+    const result = evaluateCandidate(intent, candidate, hasMembership);
+    return result === undefined ? [] : [{ candidate, ...result }];
   });
   if (evaluated.length === 0) {
     return unmatchedLine(intent, "INCOMPATIBLE_UNITS");
@@ -206,17 +226,24 @@ function evaluateCandidate(
   intent: BasketIntent,
   candidate: BasketOfferCandidate,
   hasMembership: boolean,
-): BasketComparisonLine | undefined {
+): Omit<EvaluatedCandidate, "candidate"> | undefined {
   const demand = requestedAmount(intent);
-  const supply = packageAmount(candidate);
+  const supply = packageAmount(candidate, demand);
   if (!compatible(demand.unit, supply.unit)) return undefined;
 
   const demandBase = toBase(demand);
   const supplyBase = toBase(supply);
+  const preferAmountFit = intent.selectionPolicy === "CLOSEST_AMOUNT";
+  const requestedCommercialUnits = demandBase.amount / supplyBase.amount;
   const commercialUnits = Math.max(
     1,
-    Math.ceil(demandBase.amount / supplyBase.amount),
+    preferAmountFit
+      ? Math.round(requestedCommercialUnits)
+      : Math.ceil(requestedCommercialUnits),
   );
+  const amountDifferenceRatio =
+    Math.abs(supplyBase.amount * commercialUnits - demandBase.amount) /
+    demandBase.amount;
   const membershipPriceNotApplied =
     candidate.promoPrice !== undefined &&
     candidate.requiresMembership &&
@@ -237,30 +264,41 @@ function evaluateCandidate(
     : effectiveUnitPrice * commercialUnits;
   const normalized = normalizedPrice(candidate, effectiveUnitPrice);
   return {
-    intentId: intent.id,
-    requestedName: intent.name,
-    status: "MATCHED",
-    productId: candidate.productId,
-    productName: candidate.productName,
-    commercialUnits,
-    suppliedAmount: roundQuantity(supply.amount * commercialUnits),
-    suppliedUnit: supply.unit,
-    normalPrice: candidate.normalPrice,
-    ...(candidate.promoPrice === undefined
-      ? {}
-      : { promoPrice: candidate.promoPrice }),
-    effectiveUnitPrice,
-    estimatedLineTotal: roundMoney(estimatedLineTotal),
-    ...(normalized === undefined
-      ? {}
-      : { normalizedPrice: normalized.price, normalizedUnit: normalized.unit }),
-    freshness: candidate.freshness,
-    requiresMembership: candidate.requiresMembership,
-    membershipPriceNotApplied,
-    ...(candidate.promotionText === undefined
-      ? {}
-      : { promotionText: candidate.promotionText }),
-    approximate: candidate.variableWeight,
+    line: {
+      intentId: intent.id,
+      requestedName: intent.name,
+      status: "MATCHED",
+      productId: candidate.productId,
+      productName: candidate.productName,
+      commercialUnits,
+      suppliedAmount: roundQuantity(supply.amount * commercialUnits),
+      suppliedUnit: supply.unit,
+      normalPrice: candidate.normalPrice,
+      ...(candidate.promoPrice === undefined
+        ? {}
+        : { promoPrice: candidate.promoPrice }),
+      effectiveUnitPrice,
+      estimatedLineTotal: roundMoney(estimatedLineTotal),
+      ...(normalized === undefined
+        ? {}
+        : {
+            normalizedPrice: normalized.price,
+            normalizedUnit: normalized.unit,
+          }),
+      freshness: candidate.freshness,
+      requiresMembership: candidate.requiresMembership,
+      membershipPriceNotApplied,
+      ...(candidate.promotionText === undefined
+        ? {}
+        : { promotionText: candidate.promotionText }),
+      approximate:
+        candidate.variableWeight ||
+        ((intent.requestedUnit ?? "unit") === "unit" &&
+          intent.defaultUnit !== undefined &&
+          intent.defaultUnit !== "unit"),
+    },
+    amountDifferenceRatio,
+    preferAmountFit,
   };
 }
 
@@ -278,13 +316,26 @@ function requestedAmount(intent: BasketIntent): Amount {
       unit: intent.packageUnit,
     };
   }
+  if (
+    (intent.requestedUnit ?? "unit") === "unit" &&
+    intent.defaultAmount !== undefined &&
+    intent.defaultUnit !== undefined
+  ) {
+    return {
+      amount: (intent.requestedQuantity ?? 1) * intent.defaultAmount,
+      unit: intent.defaultUnit,
+    };
+  }
   return {
     amount: intent.requestedQuantity ?? 1,
     unit: intent.requestedUnit ?? "unit",
   };
 }
 
-function packageAmount(candidate: BasketOfferCandidate): Amount {
+function packageAmount(
+  candidate: BasketOfferCandidate,
+  requested?: Amount,
+): Amount {
   if (
     candidate.totalAmount !== undefined &&
     candidate.packageUnit !== undefined
@@ -302,6 +353,14 @@ function packageAmount(candidate: BasketOfferCandidate): Amount {
   }
   if (candidate.packageCount !== undefined) {
     return { amount: candidate.packageCount, unit: "unit" };
+  }
+  if (
+    candidate.variableWeight &&
+    requested !== undefined &&
+    candidate.referenceUnit !== undefined &&
+    compatible(requested.unit, candidate.referenceUnit)
+  ) {
+    return requested;
   }
   return { amount: 1, unit: "unit" };
 }
@@ -335,6 +394,10 @@ function compareCandidates(
   left: EvaluatedCandidate,
   right: EvaluatedCandidate,
 ): number {
+  if (left.preferAmountFit || right.preferAmountFit) {
+    const amountFit = left.amountDifferenceRatio - right.amountDifferenceRatio;
+    if (amountFit !== 0) return amountFit;
+  }
   const price =
     (left.line.estimatedLineTotal ?? Number.POSITIVE_INFINITY) -
     (right.line.estimatedLineTotal ?? Number.POSITIVE_INFINITY);
@@ -344,8 +407,8 @@ function compareCandidates(
     freshnessRank(right.candidate.freshness);
   if (freshness !== 0) return freshness;
   return (
-    confidenceRank(right.candidate.matchConfidence) -
-    confidenceRank(left.candidate.matchConfidence)
+    confidenceRank(right.candidate.classificationConfidence) -
+    confidenceRank(left.candidate.classificationConfidence)
   );
 }
 
@@ -399,8 +462,24 @@ function freshnessRank(value: OfferFreshness): number {
   return value === "FRESH" ? 0 : value === "STALE" ? 1 : 2;
 }
 
-function confidenceRank(value: ProductMatchConfidence): number {
+function confidenceRank(value: ProductClassificationConfidence): number {
   return value === "HIGH" ? 2 : value === "MEDIUM" ? 1 : 0;
+}
+
+function matchesPreference(
+  preference: string | undefined,
+  candidate: string | undefined,
+): boolean {
+  if (preference === undefined) return true;
+  if (candidate === undefined) return false;
+  return normalizeComparable(candidate).includes(normalizeComparable(preference));
+}
+
+function normalizeComparable(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es-ES");
 }
 
 function roundMoney(value: number): number {
