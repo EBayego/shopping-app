@@ -10,6 +10,25 @@ import {
 
 type Subscription = { remove(): void };
 
+const SHOPPING_CONTEXT = [
+  "gramos",
+  "kilos",
+  "litros",
+  "mililitros",
+  "unidades",
+  "botellas",
+  "latas",
+  "paquetes",
+  "bandejas",
+  "docena",
+  "sin lactosa",
+  "semidesnatada",
+  "Coca-Cola",
+  "eh",
+  "ehm",
+  "mmm",
+] as const;
+
 export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
   private cancelCurrent: (() => void) | null = null;
   private stopCurrent: (() => void) | null = null;
@@ -66,9 +85,6 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
       let interimTranscript = "";
       let stopRequested = false;
 
-      const transcript = (): string =>
-        joinTranscript(committedSegments.join(" "), interimTranscript);
-
       const result = (): SpeechRecognitionResult => {
         const segments = appendSegment(committedSegments, interimTranscript);
         return { transcript: segments.join(" "), segments };
@@ -91,7 +107,10 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
         ExpoSpeechRecognitionModule.addListener("result", (event) => {
           const recognized = event.results[0]?.transcript.trim() ?? "";
           if (event.isFinal) {
-            committedSegments = appendSegment(committedSegments, recognized);
+            committedSegments = appendSegment(
+              committedSegments,
+              bestFinalTranscript(recognized, interimTranscript),
+            );
             interimTranscript = "";
           } else {
             interimTranscript = recognized;
@@ -129,8 +148,13 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
             return;
           }
           if (event.error === "no-speech" || event.error === "speech-timeout") {
-            if (stopRequested && transcript().length === 0) {
-              finish({ error: emptyTranscriptError() });
+            if (stopRequested) {
+              const recognized = result();
+              finish(
+                recognized.transcript.length > 0
+                  ? { result: recognized }
+                  : { error: emptyTranscriptError() },
+              );
             }
             return;
           }
@@ -141,6 +165,11 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
                 "No se concedieron los permisos de voz.",
               ),
             });
+            return;
+          }
+          const recognized = result();
+          if (recognized.transcript.length > 0) {
+            finish({ result: recognized });
             return;
           }
           finish({
@@ -164,6 +193,7 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
         });
       };
       this.stopCurrent = () => {
+        if (stopRequested) return;
         stopRequested = true;
         try {
           ExpoSpeechRecognitionModule.stop();
@@ -202,6 +232,8 @@ function startNativeRecognition(
       interimResults: true,
       continuous: true,
       maxAlternatives: 1,
+      addsPunctuation: true,
+      contextualStrings: [...SHOPPING_CONTEXT],
       recordingOptions: { persist: false },
       volumeChangeEventOptions: { enabled: true, intervalMillis: 100 },
     });
@@ -214,25 +246,95 @@ function normalizeVolume(value: number): number {
   return Math.min(1, Math.max(0, (value + 2) / 12));
 }
 
-function joinTranscript(current: string, next: string): string {
-  const normalizedCurrent = current.trim();
-  const normalizedNext = next.trim();
-  if (!normalizedCurrent) return normalizedNext;
-  if (!normalizedNext) return normalizedCurrent;
-  if (normalizedNext.startsWith(normalizedCurrent)) return normalizedNext;
-  return `${normalizedCurrent} ${normalizedNext}`;
-}
-
 function appendSegment(current: readonly string[], next: string): string[] {
-  const normalizedNext = next.trim();
+  const normalizedNext = normalizeWhitespace(next);
   if (!normalizedNext) return [...current];
-  const fullTranscript = current.join(" ");
+  const fullTranscript = normalizeWhitespace(current.join(" "));
   if (normalizedNext === fullTranscript) return [...current];
-  if (fullTranscript && normalizedNext.startsWith(fullTranscript)) {
+  if (fullTranscript && startsWithWords(normalizedNext, fullTranscript)) {
     return [normalizedNext];
   }
-  if (current.at(-1) === normalizedNext) return [...current];
+  if (fullTranscript && startsWithWords(fullTranscript, normalizedNext)) {
+    return [...current];
+  }
+
+  const last = current.at(-1);
+  if (last === undefined) return [normalizedNext];
+  const normalizedLast = normalizeWhitespace(last);
+  if (normalizedLast === normalizedNext) return [...current];
+  if (startsWithWords(normalizedNext, normalizedLast)) {
+    return [...current.slice(0, -1), normalizedNext];
+  }
+  if (startsWithWords(normalizedLast, normalizedNext)) return [...current];
+
+  const lastWords = words(normalizedLast);
+  const nextWords = words(normalizedNext);
+  const overlap = overlappingWordCount(lastWords, nextWords);
+  const overlapWord = lastWords.at(-1)?.toLocaleLowerCase("es");
+  if (
+    overlap >= 2 ||
+    (overlap === 1 &&
+      (overlapWord === "de" ||
+        overlapWord === "del" ||
+        overlapWord === "y" ||
+        overlapWord === "con"))
+  ) {
+    return [
+      ...current.slice(0, -1),
+      [...lastWords, ...nextWords.slice(overlap)].join(" "),
+    ];
+  }
   return [...current, normalizedNext];
+}
+
+function bestFinalTranscript(finalText: string, interimText: string): string {
+  const normalizedFinal = normalizeWhitespace(finalText);
+  const normalizedInterim = normalizeWhitespace(interimText);
+  if (!normalizedFinal) return normalizedInterim;
+  if (!normalizedInterim) return normalizedFinal;
+  if (startsWithWords(normalizedInterim, normalizedFinal)) {
+    return normalizedInterim;
+  }
+  return normalizedFinal;
+}
+
+function startsWithWords(value: string, prefix: string): boolean {
+  const valueWords = words(value);
+  const prefixWords = words(prefix);
+  return prefixWords.every(
+    (word, index) =>
+      word.toLocaleLowerCase("es") ===
+      valueWords[index]?.toLocaleLowerCase("es"),
+  );
+}
+
+function overlappingWordCount(
+  previous: readonly string[],
+  next: readonly string[],
+): number {
+  const maximum = Math.min(previous.length, next.length);
+  for (let size = maximum; size > 0; size -= 1) {
+    const suffix = previous.slice(-size);
+    const prefix = next.slice(0, size);
+    if (
+      suffix.every(
+        (word, index) =>
+          word.toLocaleLowerCase("es") ===
+          prefix[index]?.toLocaleLowerCase("es"),
+      )
+    ) {
+      return size;
+    }
+  }
+  return 0;
+}
+
+function words(value: string): string[] {
+  return normalizeWhitespace(value).split(" ").filter(Boolean);
+}
+
+function normalizeWhitespace(value: string): string {
+  return value.trim().replace(/\s+/g, " ");
 }
 
 async function requestNativePermissions(): Promise<void> {

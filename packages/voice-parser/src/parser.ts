@@ -9,14 +9,23 @@ import {
   UNIT_ALIASES,
 } from "./lexicon.ts";
 import { parseNumberAt } from "./numbers.ts";
+import { removeSpeechNoise } from "./speech-noise.ts";
 import { splitTranscript } from "./splitter.ts";
 import type { ShoppingIntentDraft, ShoppingIntentUnit } from "./types.ts";
 
 const LEADING_FILLERS = new Set([
+  "agrega",
+  "anademe",
+  "apunta",
+  "apuntame",
+  "comprar",
   "quiero",
   "necesito",
   "compra",
   "comprame",
+  "dame",
+  "gustaria",
+  "me",
   "pon",
   "anade",
 ]);
@@ -88,7 +97,7 @@ function parseItem(
   allowUnknownBareProduct: boolean,
 ): ShoppingIntentDraft | undefined {
   const rawText = rawItem.trim();
-  let tokens = tokenize(rawText);
+  let tokens = removeSpeechNoise(tokenize(rawText));
   while (tokens[0] !== undefined && LEADING_FILLERS.has(tokens[0]))
     tokens = tokens.slice(1);
   if (tokens[0] === "de") tokens = tokens.slice(1);
@@ -152,17 +161,32 @@ function parseItem(
       !hasMeasurement &&
       !hasPackaging &&
       !hasCollective;
+  } else {
+    const implicitContainer = CONTAINER_ALIASES[tokens[cursor] ?? ""];
+    if (implicitContainer !== undefined) {
+      draft.packageCount = 1;
+      hasPackaging = true;
+      cursor += 1;
+      if (tokens[cursor] === "de" || tokens[cursor] === "del") cursor += 1;
+    }
   }
 
   let productTokens = tokens.slice(cursor);
   if (hasPackaging) {
-    const inner = parseQuantity(productTokens, 0, true);
-    if (inner !== undefined) {
-      draft.packageSize = inner.value;
-      draft.packageUnit = inner.unit;
-      draft.totalAmount = (draft.packageCount ?? 1) * inner.value;
-      productTokens = productTokens.slice(inner.next);
+    const nestedContainer = parseNestedContainer(productTokens);
+    if (nestedContainer !== undefined) {
+      draft.packageCount = (draft.packageCount ?? 1) * nestedContainer.count;
+      productTokens = productTokens.slice(nestedContainer.next);
       if (productTokens[0] === "de") productTokens = productTokens.slice(1);
+    } else {
+      const inner = parseQuantity(productTokens, 0, true);
+      if (inner !== undefined) {
+        draft.packageSize = inner.value;
+        draft.packageUnit = inner.unit;
+        draft.totalAmount = (draft.packageCount ?? 1) * inner.value;
+        productTokens = productTokens.slice(inner.next);
+        if (productTokens[0] === "de") productTokens = productTokens.slice(1);
+      }
     }
   }
 
@@ -197,12 +221,30 @@ function parseItem(
     draft.variant = variant.value;
     productTokens = removeVariantTokens(productTokens, variant.value);
   }
+  const explicitBrandCandidate = extractExplicitValue(productTokens, "marca");
+  const explicitBrandMatch =
+    explicitBrandCandidate === undefined
+      ? undefined
+      : findBrand(explicitBrandCandidate.valueTokens);
+  const explicitBrand =
+    explicitBrandCandidate !== undefined && explicitBrandMatch !== undefined
+      ? explicitBrandCandidate
+      : undefined;
   const brand = findBrand(productTokens);
-  if (brand !== undefined) {
+  if (explicitBrand !== undefined && explicitBrandMatch !== undefined) {
+    draft.brandPreference = explicitBrandMatch.value;
+    productTokens = explicitBrand.remainingTokens;
+  } else if (brand !== undefined) {
     draft.brandPreference = brand.value;
     if (brand.value !== "Coca-Cola") {
       productTokens = removeBrandTokens(productTokens, brand.value);
     }
+  }
+
+  const explicitVariant = extractExplicitVariant(productTokens);
+  if (draft.variant === undefined && explicitVariant !== undefined) {
+    draft.variant = explicitVariant.valueTokens.join(" ");
+    productTokens = explicitVariant.remainingTokens;
   }
 
   productTokens = trimConnectors(productTokens);
@@ -231,6 +273,8 @@ function parseItem(
     leadingNumber === undefined &&
     !knownBareProduct &&
     brand === undefined &&
+    explicitBrand === undefined &&
+    !hasPackaging &&
     !allowUnknownBareProduct
   )
     return undefined;
@@ -276,6 +320,25 @@ function parseQuantity(
   }
   if (!allowImplicitUnits) return undefined;
   return { value: number.value, unit: "unit", next, fraction: number.fraction };
+}
+
+function parseNestedContainer(
+  tokens: readonly string[],
+): { count: number; next: number } | undefined {
+  const number = parseNumberAt(tokens, 0);
+  if (number === undefined) return undefined;
+  const containerIndex = number.consumed;
+  if (CONTAINER_ALIASES[tokens[containerIndex] ?? ""] === undefined) {
+    return undefined;
+  }
+  const connector = tokens[containerIndex + 1];
+  return {
+    count: number.value,
+    next:
+      connector === "de" || connector === "del"
+        ? containerIndex + 2
+        : containerIndex + 1,
+  };
 }
 
 function findTrailingQuantity(
@@ -360,4 +423,34 @@ function removeVariantTokens(
     }
   }
   return removeSequence(tokens, normalize(variant));
+}
+
+interface ExplicitValue {
+  remainingTokens: string[];
+  valueTokens: string[];
+}
+
+function extractExplicitValue(
+  tokens: readonly string[],
+  marker: string,
+): ExplicitValue | undefined {
+  const markerIndex = tokens.indexOf(marker);
+  if (markerIndex < 0 || markerIndex === tokens.length - 1) return undefined;
+  let start = markerIndex;
+  if (tokens[start - 1] === "la") start -= 1;
+  if (tokens[start - 1] === "de") start -= 1;
+  return {
+    remainingTokens: [...tokens.slice(0, start)],
+    valueTokens: [...tokens.slice(markerIndex + 1)],
+  };
+}
+
+function extractExplicitVariant(
+  tokens: readonly string[],
+): ExplicitValue | undefined {
+  for (const marker of ["sabor", "variedad", "tipo"] as const) {
+    const extracted = extractExplicitValue(tokens, marker);
+    if (extracted !== undefined) return extracted;
+  }
+  return undefined;
 }

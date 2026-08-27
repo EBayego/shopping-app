@@ -1,4 +1,4 @@
-const CARDINALS: Readonly<Record<string, number>> = {
+const SMALL_CARDINALS: Readonly<Record<string, number>> = {
   un: 1,
   uno: 1,
   una: 1,
@@ -21,6 +21,48 @@ const CARDINALS: Readonly<Record<string, number>> = {
   dieciocho: 18,
   diecinueve: 19,
   veinte: 20,
+  veintiun: 21,
+  veintiuno: 21,
+  veintiuna: 21,
+  veintidos: 22,
+  veintitres: 23,
+  veinticuatro: 24,
+  veinticinco: 25,
+  veintiseis: 26,
+  veintisiete: 27,
+  veintiocho: 28,
+  veintinueve: 29,
+};
+
+const TENS: Readonly<Record<string, number>> = {
+  treinta: 30,
+  cuarenta: 40,
+  cincuenta: 50,
+  sesenta: 60,
+  setenta: 70,
+  ochenta: 80,
+  noventa: 90,
+};
+
+const HUNDREDS: Readonly<Record<string, number>> = {
+  cien: 100,
+  ciento: 100,
+  doscientos: 200,
+  doscientas: 200,
+  trescientos: 300,
+  trescientas: 300,
+  cuatrocientos: 400,
+  cuatrocientas: 400,
+  quinientos: 500,
+  quinientas: 500,
+  seiscientos: 600,
+  seiscientas: 600,
+  setecientos: 700,
+  setecientas: 700,
+  ochocientos: 800,
+  ochocientas: 800,
+  novecientos: 900,
+  novecientas: 900,
 };
 
 const FRACTIONS: Readonly<Record<string, number>> = {
@@ -43,16 +85,17 @@ export function parseNumberAt(
   if (token === undefined) return undefined;
 
   const numeric = parseNumericToken(token);
-  const cardinal = CARDINALS[token];
+  const integer = parseIntegerAt(tokens, index);
   const fraction = FRACTIONS[token];
-  const initial = numeric ?? cardinal ?? fraction;
+  const initial = numeric ?? integer?.value ?? fraction;
   if (initial === undefined || !Number.isFinite(initial) || initial <= 0) {
     return undefined;
   }
 
+  const initialConsumed = numeric !== undefined ? 1 : (integer?.consumed ?? 1);
   const isFraction = fraction !== undefined;
-  const conjunction = tokens[index + 1];
-  const trailingFraction = tokens[index + 2];
+  const conjunction = tokens[index + initialConsumed];
+  const trailingFraction = tokens[index + initialConsumed + 1];
   if (
     !isFraction &&
     conjunction === "y" &&
@@ -63,29 +106,31 @@ export function parseNumberAt(
     if (fractionValue === undefined) return undefined;
     return {
       value: initial + fractionValue,
-      consumed: 3,
+      consumed: initialConsumed + 2,
       fraction: false,
     };
   }
 
   if (
     !isFraction &&
-    tokens[index + 1] === "coma" &&
-    tokens[index + 2] !== undefined
+    (tokens[index + initialConsumed] === "coma" ||
+      tokens[index + initialConsumed] === "punto") &&
+    tokens[index + initialConsumed + 1] !== undefined
   ) {
-    const decimalToken = tokens[index + 2];
+    const decimalIndex = index + initialConsumed + 1;
+    const decimalToken = tokens[decimalIndex];
     if (decimalToken === undefined) return undefined;
     const decimalDigits = numberAsDigits(decimalToken);
     if (decimalDigits !== undefined) {
       return {
         value: Number(`${initial}.${decimalDigits}`),
-        consumed: 3,
+        consumed: initialConsumed + 2,
         fraction: false,
       };
     }
   }
 
-  return { value: initial, consumed: 1, fraction: isFraction };
+  return { value: initial, consumed: initialConsumed, fraction: isFraction };
 }
 
 export function isNumberStart(token: string | undefined): boolean {
@@ -99,6 +144,52 @@ function parseNumericToken(token: string): number | undefined {
 
 function numberAsDigits(token: string): string | undefined {
   if (/^\d+$/.test(token)) return token;
-  const value = CARDINALS[token];
+  const value = SMALL_CARDINALS[token];
   return value === undefined ? undefined : String(value);
+}
+
+function parseIntegerAt(
+  tokens: readonly string[],
+  index: number,
+): { value: number; consumed: number } | undefined {
+  const first = tokens[index];
+  if (first === undefined) return undefined;
+
+  const small = SMALL_CARDINALS[first];
+  if (small !== undefined) return { value: small, consumed: 1 };
+
+  const tens = TENS[first];
+  if (tens !== undefined) {
+    const unit = SMALL_CARDINALS[tokens[index + 2] ?? ""];
+    if (tokens[index + 1] === "y" && unit !== undefined && unit < 10) {
+      return { value: tens + unit, consumed: 3 };
+    }
+    return { value: tens, consumed: 1 };
+  }
+
+  const hundreds = HUNDREDS[first];
+  if (hundreds === undefined) return undefined;
+  const remainder = parseIntegerUnderHundred(tokens, index + 1);
+  return remainder === undefined
+    ? { value: hundreds, consumed: 1 }
+    : {
+        value: hundreds + remainder.value,
+        consumed: 1 + remainder.consumed,
+      };
+}
+
+function parseIntegerUnderHundred(
+  tokens: readonly string[],
+  index: number,
+): { value: number; consumed: number } | undefined {
+  const token = tokens[index];
+  if (token === undefined) return undefined;
+  const small = SMALL_CARDINALS[token];
+  if (small !== undefined) return { value: small, consumed: 1 };
+  const tens = TENS[token];
+  if (tens === undefined) return undefined;
+  const unit = SMALL_CARDINALS[tokens[index + 2] ?? ""];
+  return tokens[index + 1] === "y" && unit !== undefined && unit < 10
+    ? { value: tens + unit, consumed: 3 }
+    : { value: tens, consumed: 1 };
 }

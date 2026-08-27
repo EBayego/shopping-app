@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ExpoSpeechRecognitionService } from "./expo-speech-recognition-service";
+import { SpeechRecognitionError } from "../features/voice/speech-recognition-service";
 
 type NativeListener = (event: unknown) => void;
 
@@ -65,6 +66,25 @@ describe("ExpoSpeechRecognitionService", () => {
     expect(mocks.native.start).toHaveBeenCalledWith(
       expect.objectContaining({
         lang: "es-ES",
+        addsPunctuation: true,
+        contextualStrings: [
+          "gramos",
+          "kilos",
+          "litros",
+          "mililitros",
+          "unidades",
+          "botellas",
+          "latas",
+          "paquetes",
+          "bandejas",
+          "docena",
+          "sin lactosa",
+          "semidesnatada",
+          "Coca-Cola",
+          "eh",
+          "ehm",
+          "mmm",
+        ],
         continuous: true,
         interimResults: true,
         recordingOptions: { persist: false },
@@ -101,6 +121,178 @@ describe("ExpoSpeechRecognitionService", () => {
     await expect(recognition).resolves.toEqual({
       transcript: "pan seis huevos",
       segments: ["pan", "seis huevos"],
+    });
+  });
+
+  it("preserves an interim hypothesis when the native final is empty", async () => {
+    const service = new ExpoSpeechRecognitionService();
+    const recognition = service.recognize({ locale: "es-ES" });
+    await flushPromises();
+
+    emit("result", {
+      isFinal: false,
+      results: [{ transcript: "eeeh dos kilos de patatas" }],
+    });
+    emit("result", { isFinal: true, results: [{ transcript: "" }] });
+    service.stop();
+    emit("end", undefined);
+
+    await expect(recognition).resolves.toEqual({
+      transcript: "eeeh dos kilos de patatas",
+      segments: ["eeeh dos kilos de patatas"],
+    });
+  });
+
+  it("turns recognizer ends caused by pauses into stable segments", async () => {
+    const service = new ExpoSpeechRecognitionService();
+    const recognition = service.recognize({ locale: "es-ES" });
+    await flushPromises();
+
+    emit("result", {
+      isFinal: false,
+      results: [{ transcript: "un kilo de patatas" }],
+    });
+    emit("error", { error: "no-speech", message: "silence" });
+    emit("end", undefined);
+    expect(mocks.native.start).toHaveBeenCalledTimes(2);
+
+    emit("result", {
+      isFinal: true,
+      results: [{ transcript: "dos litros de leche" }],
+    });
+    service.stop();
+    emit("end", undefined);
+
+    await expect(recognition).resolves.toEqual({
+      transcript: "un kilo de patatas dos litros de leche",
+      segments: ["un kilo de patatas", "dos litros de leche"],
+    });
+  });
+
+  it("deduplicates cumulative native results", async () => {
+    const service = new ExpoSpeechRecognitionService();
+    const recognition = service.recognize({ locale: "es-ES" });
+    await flushPromises();
+
+    emit("result", {
+      isFinal: true,
+      results: [{ transcript: "pan y" }],
+    });
+    emit("result", {
+      isFinal: true,
+      results: [{ transcript: "pan y seis huevos" }],
+    });
+    service.stop();
+    emit("end", undefined);
+
+    await expect(recognition).resolves.toEqual({
+      transcript: "pan y seis huevos",
+      segments: ["pan y seis huevos"],
+    });
+  });
+
+  it("merges overlapping words emitted across recognition restarts", async () => {
+    const service = new ExpoSpeechRecognitionService();
+    const recognition = service.recognize({ locale: "es-ES" });
+    await flushPromises();
+
+    emit("result", {
+      isFinal: true,
+      results: [{ transcript: "un kilo de" }],
+    });
+    emit("end", undefined);
+    emit("result", {
+      isFinal: true,
+      results: [{ transcript: "de patatas" }],
+    });
+    service.stop();
+    emit("end", undefined);
+
+    await expect(recognition).resolves.toEqual({
+      transcript: "un kilo de patatas",
+      segments: ["un kilo de patatas"],
+    });
+  });
+
+  it("salvages recognized speech when Android reports a client error on stop", async () => {
+    const service = new ExpoSpeechRecognitionService();
+    const recognition = service.recognize({ locale: "es-ES" });
+    await flushPromises();
+
+    emit("result", {
+      isFinal: false,
+      results: [{ transcript: "tres botellas de agua" }],
+    });
+    service.stop();
+    emit("error", { error: "client", message: "native stop race" });
+
+    await expect(recognition).resolves.toEqual({
+      transcript: "tres botellas de agua",
+      segments: ["tres botellas de agua"],
+    });
+  });
+
+  it("returns partial useful speech instead of discarding it on a network error", async () => {
+    const service = new ExpoSpeechRecognitionService();
+    const recognition = service.recognize({ locale: "es-ES" });
+    await flushPromises();
+
+    emit("result", {
+      isFinal: false,
+      results: [{ transcript: "seis huevos" }],
+    });
+    emit("error", { error: "network", message: "connection lost" });
+
+    await expect(recognition).resolves.toEqual({
+      transcript: "seis huevos",
+      segments: ["seis huevos"],
+    });
+  });
+
+  it("keeps stop idempotent and reports a genuinely empty capture", async () => {
+    const service = new ExpoSpeechRecognitionService();
+    const recognition = service.recognize({ locale: "es-ES" });
+    await flushPromises();
+
+    service.stop();
+    service.stop();
+    expect(mocks.native.stop).toHaveBeenCalledOnce();
+    emit("error", { error: "speech-timeout", message: "silence" });
+
+    await expect(recognition).rejects.toMatchObject({
+      code: "EMPTY_TRANSCRIPT",
+    });
+  });
+
+  it("cancels an active capture without returning partial speech", async () => {
+    const service = new ExpoSpeechRecognitionService();
+    const recognition = service.recognize({ locale: "es-ES" });
+    await flushPromises();
+    emit("result", {
+      isFinal: false,
+      results: [{ transcript: "pan" }],
+    });
+
+    service.cancel();
+
+    expect(mocks.native.abort).toHaveBeenCalledOnce();
+    await expect(recognition).rejects.toEqual(
+      expect.objectContaining<Partial<SpeechRecognitionError>>({
+        code: "CANCELLED",
+      }),
+    );
+  });
+
+  it("rejects native errors when there is no useful transcript to recover", async () => {
+    const service = new ExpoSpeechRecognitionService();
+    const recognition = service.recognize({ locale: "es-ES" });
+    await flushPromises();
+
+    emit("error", { error: "audio-capture", message: "microphone failed" });
+
+    await expect(recognition).rejects.toMatchObject({
+      code: "NATIVE_ERROR",
+      message: "microphone failed",
     });
   });
 });
