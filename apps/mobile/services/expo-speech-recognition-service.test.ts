@@ -68,6 +68,11 @@ describe("ExpoSpeechRecognitionService", () => {
         lang: "es-ES",
         addsPunctuation: true,
         contextualStrings: [
+          "agua",
+          "tomate",
+          "tomate triturado",
+          "huevos",
+          "leche",
           "gramos",
           "kilos",
           "litros",
@@ -75,9 +80,12 @@ describe("ExpoSpeechRecognitionService", () => {
           "unidades",
           "botellas",
           "latas",
+          "cajas",
+          "garrafas",
           "paquetes",
           "bandejas",
           "docena",
+          "docenas",
           "sin lactosa",
           "semidesnatada",
           "Coca-Cola",
@@ -87,6 +95,7 @@ describe("ExpoSpeechRecognitionService", () => {
         ],
         continuous: true,
         interimResults: true,
+        maxAlternatives: 3,
         recordingOptions: { persist: false },
         volumeChangeEventOptions: { enabled: true, intervalMillis: 100 },
       }),
@@ -140,6 +149,27 @@ describe("ExpoSpeechRecognitionService", () => {
     await expect(recognition).resolves.toEqual({
       transcript: "eeeh dos kilos de patatas",
       segments: ["eeeh dos kilos de patatas"],
+    });
+  });
+
+  it("prefers a shopping-specific alternative over common recognition errors", async () => {
+    const service = new ExpoSpeechRecognitionService();
+    const recognition = service.recognize({ locale: "es-ES" });
+    await flushPromises();
+
+    emit("result", {
+      isFinal: true,
+      results: [
+        { transcript: "dos zonas de huevos", confidence: 0.9 },
+        { transcript: "dos docenas de huevos", confidence: 0.65 },
+      ],
+    });
+    service.stop();
+    emit("end", undefined);
+
+    await expect(recognition).resolves.toEqual({
+      transcript: "dos docenas de huevos",
+      segments: ["dos docenas de huevos"],
     });
   });
 

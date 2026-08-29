@@ -60,14 +60,12 @@ describe("VoiceShoppingPanel", () => {
         segments: ["pan y seis huevos"],
       }),
     );
-    const recognize = vi.fn(
-      (options: SpeechRecognitionOptions) => {
-        expect(options.locale).toBe("es-ES");
-        return new Promise<SpeechRecognitionResult>((resolve) => {
-          resolveRecognition = resolve;
-        });
-      },
-    );
+    const recognize = vi.fn((options: SpeechRecognitionOptions) => {
+      expect(options.locale).toBe("es-ES");
+      return new Promise<SpeechRecognitionResult>((resolve) => {
+        resolveRecognition = resolve;
+      });
+    });
     const service: SpeechRecognitionService = {
       recognize,
       stop,
@@ -142,6 +140,35 @@ describe("VoiceShoppingPanel", () => {
     expect(inputsByLabel(renderer, "Cantidad").map(inputValue)).toEqual([
       "1",
       "12",
+    ]);
+  });
+
+  it("renders four accurate cards for the noisy real-device transcript", async () => {
+    const transcript =
+      "quiero añadir tres garrafas de agua de 8 litros de dos cajas de un kilo de toma triturado y dos zonas de huevos y tres litros de leche";
+    const renderer = await renderPanel(serviceReturning(transcript));
+
+    expect(screenText(renderer)).toContain("Transcripción");
+    expect(resultSelectors(renderer)).toHaveLength(4);
+    expect(inputsByLabel(renderer, "Producto").map(inputValue)).toEqual([
+      "Agua",
+      "Tomate triturado",
+      "Huevo",
+      "Leche",
+    ]);
+    expect(inputsByLabel(renderer, "Envases").map(inputValue)).toEqual([
+      "3",
+      "2",
+    ]);
+    expect(inputsByLabel(renderer, "Tamaño").map(inputValue)).toEqual([
+      "8",
+      "1",
+    ]);
+    expect(inputsByLabel(renderer, "Cantidad").map(inputValue)).toEqual([
+      "",
+      "",
+      "24",
+      "3",
     ]);
   });
 

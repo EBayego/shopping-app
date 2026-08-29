@@ -84,12 +84,19 @@ function splitImplicitQuantityStarts(part: string): string[] {
     const previousIndex = previousMeaningfulIndex(normalizedWords, index - 1);
     const previous = normalizedWords[previousIndex];
     if (previous === undefined) continue;
-    if (
-      previous === "de" ||
-      previous === "del" ||
-      previous === "coma" ||
-      previous === "punto"
-    ) {
+    if (previous === "de" || previous === "del") {
+      if (
+        startsContainerItem(normalizedWords, index) &&
+        endsWithExplicitMeasurement(normalizedWords, previousIndex)
+      ) {
+        return [
+          words.slice(0, previousIndex).join(" "),
+          ...splitImplicitQuantityStarts(words.slice(previousIndex).join(" ")),
+        ];
+      }
+      continue;
+    }
+    if (previous === "coma" || previous === "punto") {
       continue;
     }
     if (isInsideNumber(normalizedWords, index)) continue;
@@ -100,6 +107,35 @@ function splitImplicitQuantityStarts(part: string): string[] {
     ];
   }
   return [part];
+}
+
+function startsContainerItem(words: readonly string[], index: number): boolean {
+  const number = parseNumberAt(words, index);
+  if (number === undefined) return false;
+  const quantityWord = words[index + number.consumed] ?? "";
+  return (
+    CONTAINER_ALIASES[quantityWord] !== undefined ||
+    COLLECTIVE_QUANTITIES[quantityWord] !== undefined
+  );
+}
+
+function endsWithExplicitMeasurement(
+  words: readonly string[],
+  end: number,
+): boolean {
+  for (let index = 0; index < end; index += 1) {
+    const number = parseNumberAt(words, index);
+    if (number === undefined) continue;
+    let unitIndex = index + number.consumed;
+    if (words[unitIndex] === "de") unitIndex += 1;
+    if (
+      UNIT_ALIASES[words[unitIndex] ?? ""] !== undefined &&
+      unitIndex + 1 === end
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function startsQuantifiedItem(
@@ -176,6 +212,7 @@ const SPEECH_PREAMBLE = new Set([
   "agrega",
   "anade",
   "anademe",
+  "anadir",
   "apunta",
   "apuntame",
   "bueno",
@@ -192,6 +229,7 @@ const SPEECH_PREAMBLE = new Set([
   "por",
   "quiero",
   "tambien",
+  "y",
 ]);
 
 function replaceSpokenSeparators(text: string): string {

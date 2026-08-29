@@ -9,7 +9,10 @@ import {
   UNIT_ALIASES,
 } from "./lexicon.ts";
 import { parseNumberAt } from "./numbers.ts";
-import { removeSpeechNoise } from "./speech-noise.ts";
+import {
+  correctLikelyRecognitionErrors,
+  removeSpeechNoise,
+} from "./speech-noise.ts";
 import { splitTranscript } from "./splitter.ts";
 import type { ShoppingIntentDraft, ShoppingIntentUnit } from "./types.ts";
 
@@ -25,6 +28,7 @@ const LEADING_FILLERS = new Set([
   "comprame",
   "dame",
   "gustaria",
+  "anadir",
   "me",
   "pon",
   "anade",
@@ -71,6 +75,11 @@ export function parseShoppingIntentSegments(
   const merged: string[] = [];
   let current = segments[0] ?? "";
   for (const next of segments.slice(1)) {
+    if (startsNewItemAfterSpuriousConnector(current, next)) {
+      merged.push(current.replace(/\s+(?:de|del)\s*$/i, ""));
+      current = next;
+      continue;
+    }
     if (isIncompleteSpeechSegment(current) || isContinuationSegment(next)) {
       current = `${current} ${next}`;
       continue;
@@ -97,9 +106,12 @@ function parseItem(
   allowUnknownBareProduct: boolean,
 ): ShoppingIntentDraft | undefined {
   const rawText = rawItem.trim();
-  let tokens = removeSpeechNoise(tokenize(rawText));
+  let tokens = correctLikelyRecognitionErrors(
+    removeSpeechNoise(tokenize(rawText)),
+  );
   while (tokens[0] !== undefined && LEADING_FILLERS.has(tokens[0]))
     tokens = tokens.slice(1);
+  if (tokens[0] === "y" && tokens.length > 1) tokens = tokens.slice(1);
   if (tokens[0] === "de") tokens = tokens.slice(1);
   if (tokens.length === 0 || NON_PRODUCT_PHRASES.has(tokens.join(" ")))
     return undefined;
@@ -248,6 +260,7 @@ function parseItem(
   }
 
   productTokens = trimConnectors(productTokens);
+  const unexpectedStructure = containsStructuredQuantity(productTokens);
   if (productTokens.length > 0)
     draft.product = normalizeProduct(productTokens.join(" "));
 
@@ -265,6 +278,7 @@ function parseItem(
     incomplete,
     ambiguousFraction,
     knownBareProduct,
+    unexpectedStructure,
   });
 
   if (draft.product === undefined && leadingNumber === undefined)
@@ -281,22 +295,87 @@ function parseItem(
   return { ...draft, confidence };
 }
 
+function containsStructuredQuantity(tokens: readonly string[]): boolean {
+  for (let index = 0; index < tokens.length; index += 1) {
+    const number = parseNumberAt(tokens, index);
+    if (number === undefined) continue;
+    let quantityIndex = index + number.consumed;
+    if (tokens[quantityIndex] === "de") quantityIndex += 1;
+    const quantityWord = tokens[quantityIndex] ?? "";
+    if (
+      UNIT_ALIASES[quantityWord] !== undefined ||
+      CONTAINER_ALIASES[quantityWord] !== undefined ||
+      COLLECTIVE_QUANTITIES[quantityWord] !== undefined
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function isIncompleteSpeechSegment(segment: string): boolean {
   const normalized = tokenize(segment);
   const last = normalized.at(-1);
-  if (last === "de" || last === "del" || last === "y") return true;
+  if (last === "y") return true;
+  if (last === "de" || last === "del") return true;
   const drafts = parseItems(segment, true);
   return (
     drafts.length === 0 || drafts.some((draft) => draft.product === undefined)
   );
 }
 
+function startsNewItemAfterSpuriousConnector(
+  current: string,
+  next: string,
+): boolean {
+  const currentTokens = tokenize(current);
+  if (!hasCompletedPackageBeforeTrailingConnector(currentTokens)) return false;
+  const nextTokens = tokenize(next);
+  let start = 0;
+  if (nextTokens[start] === "y") start += 1;
+  if (nextTokens[start] === "de" || nextTokens[start] === "del") start += 1;
+  return startsContainerOrCollectivePhrase(nextTokens, start);
+}
+
+function hasCompletedPackageBeforeTrailingConnector(
+  tokens: readonly string[],
+): boolean {
+  const last = tokens.at(-1);
+  if (last !== "de" && last !== "del") return false;
+  const completedDrafts = parseItems(tokens.slice(0, -1).join(" "), true);
+  const completedPackage = completedDrafts.at(-1);
+  return (
+    completedPackage?.product !== undefined &&
+    completedPackage.packageCount !== undefined &&
+    completedPackage.packageSize !== undefined &&
+    completedPackage.packageUnit !== undefined
+  );
+}
+
 function isContinuationSegment(segment: string): boolean {
-  const first = tokenize(segment)[0];
-  if (first === "de" || first === "del" || first === "con" || first === "sin") {
+  const tokens = tokenize(segment);
+  const first = tokens[0];
+  if (first === "de" || first === "del") {
+    if (startsContainerOrCollectivePhrase(tokens, 1)) return false;
+    return true;
+  }
+  if (first === "con" || first === "sin") {
     return true;
   }
   return parseItems(segment, true).length === 0;
+}
+
+function startsContainerOrCollectivePhrase(
+  tokens: readonly string[],
+  index: number,
+): boolean {
+  const number = parseNumberAt(tokens, index);
+  if (number === undefined) return false;
+  const quantityWord = tokens[index + number.consumed] ?? "";
+  return (
+    CONTAINER_ALIASES[quantityWord] !== undefined ||
+    COLLECTIVE_QUANTITIES[quantityWord] !== undefined
+  );
 }
 
 function parseQuantity(

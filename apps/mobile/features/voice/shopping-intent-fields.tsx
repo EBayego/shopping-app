@@ -120,7 +120,7 @@ export function ShoppingIntentFields({
             />
             <AppInput
               keyboardType="decimal-pad"
-              label="TamaÃ±o"
+              label="Tamaño"
               onChangeText={(packageSize) => onChange({ packageSize })}
               placeholder="Ej. 500"
               style={styles.rowInput}
@@ -164,7 +164,7 @@ export function fieldValuesToDraft(
 ): ShoppingIntentDraft {
   const product = values.product.trim();
   if (!product) {
-    throw new TypeError("El producto no puede estar vacÃ­o.");
+    throw new TypeError("El producto no puede estar vacío.");
   }
   const requestedQuantity = optionalPositiveNumber(
     values.requestedQuantity,
@@ -176,16 +176,16 @@ export function fieldValuesToDraft(
   }
   const packageCount = optionalPositiveInteger(
     values.packageCount,
-    "nÃºmero de envases",
+    "número de envases",
   );
   const packageSize = optionalPositiveNumber(
     values.packageSize,
-    "tamaÃ±o del envase",
+    "tamaño del envase",
   );
   const packageUnit = optionalUnit(values.packageUnit, "unidad del envase");
   if ((packageSize === undefined) !== (packageUnit === undefined)) {
     throw new TypeError(
-      "El tamaÃ±o y la unidad del envase deben indicarse juntos.",
+      "El tamaño y la unidad del envase deben indicarse juntos.",
     );
   }
   const totalAmount =
@@ -220,7 +220,7 @@ function optionalPositiveNumber(
   if (!value.trim()) return undefined;
   const parsed = Number(value.replace(",", "."));
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new TypeError(`La ${label} debe ser un nÃºmero mayor que cero.`);
+    throw new TypeError(`La ${label} debe ser un número mayor que cero.`);
   }
   return parsed;
 }
@@ -231,7 +231,7 @@ function optionalPositiveInteger(
 ): number | undefined {
   const parsed = optionalPositiveNumber(value, label);
   if (parsed !== undefined && !Number.isInteger(parsed)) {
-    throw new TypeError(`El ${label} debe ser un nÃºmero entero.`);
+    throw new TypeError(`El ${label} debe ser un número entero.`);
   }
   return parsed;
 }
@@ -244,7 +244,7 @@ function optionalUnit(
   if (!normalized) return undefined;
   const unit = UNIT_ALIASES[normalized] ?? normalized;
   if (!VALID_UNITS.has(unit as ShoppingIntentUnit)) {
-    throw new TypeError(`La ${label} no es vÃ¡lida.`);
+    throw new TypeError(`La ${label} no es válida.`);
   }
   return unit as ShoppingIntentUnit;
 }

@@ -8,6 +8,7 @@ export interface ConfidenceEvidence {
   incomplete: boolean;
   ambiguousFraction: boolean;
   knownBareProduct: boolean;
+  unexpectedStructure: boolean;
 }
 
 export function classifyConfidence(
@@ -16,7 +17,8 @@ export function classifyConfidence(
   if (
     !evidence.hasProduct ||
     evidence.incomplete ||
-    evidence.ambiguousFraction
+    evidence.ambiguousFraction ||
+    evidence.unexpectedStructure
   ) {
     return "LOW";
   }

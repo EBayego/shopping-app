@@ -34,6 +34,28 @@ export function removeSpeechNoise(tokens: readonly string[]): string[] {
   return withoutPhrases;
 }
 
+export function correctLikelyRecognitionErrors(
+  tokens: readonly string[],
+): string[] {
+  const corrected = [...tokens];
+  for (let index = 0; index < corrected.length; index += 1) {
+    const token = corrected[index];
+    const next = corrected[index + 1];
+    if (token === "toma" && (next === "triturado" || next === "triturada")) {
+      corrected[index] = "tomate";
+      continue;
+    }
+    if (
+      (token === "zona" || token === "zonas") &&
+      corrected[index + 1] === "de" &&
+      corrected[index + 2] === "huevos"
+    ) {
+      corrected[index] = token === "zona" ? "docena" : "docenas";
+    }
+  }
+  return corrected;
+}
+
 export function isSpeechFiller(token: string): boolean {
   return (
     FILLER_WORDS.has(token) || /^(?:e+h+m*|e+m+|h?m{2,}|u+h+m*)$/.test(token)

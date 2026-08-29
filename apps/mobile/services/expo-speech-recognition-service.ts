@@ -11,6 +11,11 @@ import {
 type Subscription = { remove(): void };
 
 const SHOPPING_CONTEXT = [
+  "agua",
+  "tomate",
+  "tomate triturado",
+  "huevos",
+  "leche",
   "gramos",
   "kilos",
   "litros",
@@ -18,9 +23,12 @@ const SHOPPING_CONTEXT = [
   "unidades",
   "botellas",
   "latas",
+  "cajas",
+  "garrafas",
   "paquetes",
   "bandejas",
   "docena",
+  "docenas",
   "sin lactosa",
   "semidesnatada",
   "Coca-Cola",
@@ -28,6 +36,11 @@ const SHOPPING_CONTEXT = [
   "ehm",
   "mmm",
 ] as const;
+
+interface RecognitionAlternative {
+  transcript: string;
+  confidence?: number;
+}
 
 export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
   private cancelCurrent: (() => void) | null = null;
@@ -105,7 +118,7 @@ export class ExpoSpeechRecognitionService implements SpeechRecognitionService {
 
       subscriptions.push(
         ExpoSpeechRecognitionModule.addListener("result", (event) => {
-          const recognized = event.results[0]?.transcript.trim() ?? "";
+          const recognized = selectRecognitionTranscript(event.results);
           if (event.isFinal) {
             committedSegments = appendSegment(
               committedSegments,
@@ -231,7 +244,7 @@ function startNativeRecognition(
       lang: locale,
       interimResults: true,
       continuous: true,
-      maxAlternatives: 1,
+      maxAlternatives: 3,
       addsPunctuation: true,
       contextualStrings: [...SHOPPING_CONTEXT],
       recordingOptions: { persist: false },
@@ -240,6 +253,59 @@ function startNativeRecognition(
   } catch (error) {
     finish({ error: nativeError(error) });
   }
+}
+
+function selectRecognitionTranscript(
+  alternatives: readonly RecognitionAlternative[],
+): string {
+  let bestTranscript = "";
+  let bestScore = Number.NEGATIVE_INFINITY;
+  alternatives.forEach((alternative, index) => {
+    const transcript = normalizeWhitespace(alternative.transcript);
+    if (!transcript) return;
+    const confidence = Number.isFinite(alternative.confidence)
+      ? (alternative.confidence ?? 0)
+      : 0;
+    const score =
+      confidence * 2 + shoppingVocabularyScore(transcript) - index * 0.05;
+    if (score > bestScore) {
+      bestTranscript = transcript;
+      bestScore = score;
+    }
+  });
+  return bestTranscript;
+}
+
+function shoppingVocabularyScore(transcript: string): number {
+  const normalized = transcript
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("es");
+  let score = 0;
+  for (const phrase of [
+    "tomate triturado",
+    "tomate triturada",
+    "docena de huevos",
+    "docenas de huevos",
+  ]) {
+    if (normalized.includes(phrase)) score += 4;
+  }
+  for (const phrase of [
+    "garrafa de agua",
+    "garrafas de agua",
+    "litro de leche",
+    "litros de leche",
+  ]) {
+    if (normalized.includes(phrase)) score += 1.5;
+  }
+  if (normalized.includes("toma triturado")) score -= 2;
+  if (
+    normalized.includes("zona de huevos") ||
+    normalized.includes("zonas de huevos")
+  ) {
+    score -= 2;
+  }
+  return score;
 }
 
 function normalizeVolume(value: number): number {

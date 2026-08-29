@@ -177,7 +177,7 @@ export function VoiceShoppingPanel({
 
       {transcript ? (
         <View style={styles.transcriptBox}>
-          <Text style={styles.label}>Transcript</Text>
+          <Text style={styles.label}>Transcripción</Text>
           <Text selectable style={styles.transcript}>
             {transcript}
           </Text>

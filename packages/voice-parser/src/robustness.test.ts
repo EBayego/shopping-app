@@ -59,6 +59,75 @@ describe("voice parser robustness", () => {
   });
 
   describe("pauses and product boundaries", () => {
+    const noisyLocalTranscript =
+      "quiero añadir tres garrafas de agua de 8 litros de dos cajas de un kilo de toma triturado y dos zonas de huevos y tres litros de leche";
+
+    it("recovers the four products from the noisy real-device transcript", () => {
+      expect(parseShoppingIntents(noisyLocalTranscript)).toEqual([
+        expect.objectContaining({
+          product: "agua",
+          packageCount: 3,
+          packageSize: 8,
+          packageUnit: "l",
+          totalAmount: 24,
+          confidence: "HIGH",
+        }),
+        expect.objectContaining({
+          product: "tomate triturado",
+          packageCount: 2,
+          packageSize: 1,
+          packageUnit: "kg",
+          totalAmount: 2,
+          confidence: "HIGH",
+        }),
+        expect.objectContaining({
+          product: "huevo",
+          requestedQuantity: 24,
+          requestedUnit: "unit",
+        }),
+        expect.objectContaining({
+          product: "leche",
+          requestedQuantity: 3,
+          requestedUnit: "l",
+          confidence: "HIGH",
+        }),
+      ]);
+    });
+
+    it("recovers the same products when native pauses split the transcript", () => {
+      expect(
+        parseShoppingIntentSegments([
+          "quiero añadir",
+          "tres garrafas de agua de 8 litros de",
+          "dos cajas de un kilo de toma triturado",
+          "y dos zonas de huevos",
+          "y tres litros de leche",
+        ]).map((draft) => draft.product),
+      ).toEqual(["agua", "tomate triturado", "huevo", "leche"]);
+    });
+
+    it("does not apply the recognition corrections outside grocery phrases", () => {
+      expect(
+        parseShoppingIntentSegments(["toma de corriente", "zonas de paso"]).map(
+          (draft) => draft.product,
+        ),
+      ).toEqual(["toma de corriente", "zonas de paso"]);
+    });
+
+    it("does not split genuinely nested containers", () => {
+      expect(
+        parseShoppingIntents("dos packs de tres cajas de leche"),
+      ).toHaveLength(1);
+    });
+
+    it("never marks an unseparated structured quantity as high confidence", () => {
+      expect(
+        parseShoppingIntents(
+          "tres garrafas de agua de ocho litros de referencia especial",
+        )[0],
+      ).toMatchObject({ confidence: "LOW" });
+    });
+
     it("uses native pauses to retain unknown multi-word products", () => {
       expect(
         parseShoppingIntentSegments([
