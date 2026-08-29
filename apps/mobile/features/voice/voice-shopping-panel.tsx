@@ -3,10 +3,17 @@ import {
   type ShoppingIntentDraft,
 } from "@shopping-app/voice-parser";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from "react-native";
 
 import { AppButton } from "../../components/app-button";
-import { useThemedStyles } from "../theme/theme-context";
+import { useThemedStyles, useTheme } from "../theme/theme-context";
 import { spacing, type ThemeColors } from "../../lib/theme";
 import {
   SpeechRecognitionError,
@@ -24,6 +31,7 @@ interface VoiceShoppingPanelProps {
   onClose: () => void;
   onConfirm: (drafts: readonly ShoppingIntentDraft[]) => Promise<void>;
   service: SpeechRecognitionService;
+  aiService?: SpeechRecognitionService;
 }
 
 interface EditableDraft extends ShoppingIntentFieldValues {
@@ -40,9 +48,14 @@ export function VoiceShoppingPanel({
   onClose,
   onConfirm,
   service,
+  aiService,
 }: VoiceShoppingPanelProps) {
+  const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [listening, setListening] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [showAiTooltip, setShowAiTooltip] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [drafts, setDrafts] = useState<EditableDraft[]>([]);
   const [message, setMessage] = useState<string | null>(null);
@@ -50,6 +63,7 @@ export function VoiceShoppingPanel({
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [waveform, setWaveform] = useState<readonly number[]>(EMPTY_WAVEFORM);
   const startedAt = useRef<number | null>(null);
+  const recognitionService = aiEnabled && aiService ? aiService : service;
 
   const handleVolumeChange = useCallback((level: number): void => {
     setWaveform((current) => [...current.slice(1), clamp(level, 0, 1)]);
@@ -57,6 +71,7 @@ export function VoiceShoppingPanel({
 
   const startListening = useCallback(async (): Promise<void> => {
     setListening(true);
+    setProcessing(false);
     setMessage(null);
     setBlockedPermission(false);
     setTranscript("");
@@ -65,9 +80,10 @@ export function VoiceShoppingPanel({
     setWaveform(EMPTY_WAVEFORM);
     startedAt.current = Date.now();
     try {
-      const recognized = await service.recognize({
+      const recognized = await recognitionService.recognize({
         locale: "es-ES",
         onVolumeChange: handleVolumeChange,
+        onProcessingChange: setProcessing,
       });
       if (recognized.transcript.trim().length === 0) {
         throw new SpeechRecognitionError(
@@ -97,7 +113,7 @@ export function VoiceShoppingPanel({
       startedAt.current = null;
       setListening(false);
     }
-  }, [handleVolumeChange, service]);
+  }, [handleVolumeChange, recognitionService]);
 
   useEffect(() => {
     if (!listening) return undefined;
@@ -112,11 +128,17 @@ export function VoiceShoppingPanel({
   }, [listening]);
 
   useEffect(() => {
+    if (aiService) return;
     void startListening();
-    return () => {
+  }, [aiService, startListening]);
+
+  useEffect(
+    () => () => {
       service.cancel();
-    };
-  }, [service, startListening]);
+      aiService?.cancel();
+    },
+    [aiService, service],
+  );
 
   const confirm = async (): Promise<void> => {
     setMessage(null);
@@ -155,19 +177,71 @@ export function VoiceShoppingPanel({
         </Pressable>
       </View>
 
+      {aiService ? (
+        <View style={styles.aiSection}>
+          <View style={styles.aiRow}>
+            <Pressable
+              accessibilityLabel="Información sobre la transcripción con AI"
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => setShowAiTooltip((visible) => !visible)}
+              style={styles.aiLabelRow}
+            >
+              <Text style={styles.aiLabel}>AI</Text>
+              <Text style={styles.infoIndicator}>ⓘ</Text>
+            </Pressable>
+            <Switch
+              accessibilityLabel="Usar transcripción con AI"
+              accessibilityRole="switch"
+              accessibilityState={{ checked: aiEnabled, disabled: listening }}
+              disabled={listening}
+              onValueChange={setAiEnabled}
+              thumbColor="#FFFFFF"
+              trackColor={{ false: colors.border, true: colors.primary }}
+              value={aiEnabled}
+            />
+          </View>
+          {showAiTooltip ? (
+            <View accessibilityRole="alert" style={styles.aiTooltip}>
+              <Text style={styles.aiTooltipText}>
+                Al activar AI, el audio se conecta de forma segura con un modelo
+                de IA para mejorar en gran proporción la calidad de la
+                transcripción.
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+
       {listening ? (
         <View style={styles.listeningBox}>
-          <Text style={styles.title}>Escuchando…</Text>
-          <Text style={styles.hint}>Di uno o varios productos.</Text>
-          <AudioWaveform durationSeconds={durationSeconds} levels={waveform} />
-          <AppButton
-            tone="secondary"
-            onPress={() => {
-              service.stop();
-            }}
-          >
-            Parar escucha
-          </AppButton>
+          <Text style={styles.title}>
+            {processing ? "Mejorando transcripción con AI…" : "Escuchando…"}
+          </Text>
+          {processing ? (
+            <View style={styles.processingRow}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={styles.hint}>
+                Esto suele tardar solo unos segundos.
+              </Text>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.hint}>Di uno o varios productos.</Text>
+              <AudioWaveform
+                durationSeconds={durationSeconds}
+                levels={waveform}
+              />
+              <AppButton
+                tone="secondary"
+                onPress={() => {
+                  recognitionService.stop();
+                }}
+              >
+                Parar escucha
+              </AppButton>
+            </>
+          )}
         </View>
       ) : (
         <AppButton onPress={() => void startListening()}>
@@ -209,7 +283,9 @@ export function VoiceShoppingPanel({
         </AppButton>
       ) : null}
       <Text style={styles.privacy}>
-        La app no guarda el audio; solo conserva el texto que confirmes.
+        {aiEnabled
+          ? "Con AI, el audio se envía temporalmente para transcribirlo y se elimina del dispositivo al terminar."
+          : "La app no guarda el audio; solo conserva el texto que confirmes."}
       </Text>
     </View>
   );
@@ -324,6 +400,8 @@ function messageForError(error: SpeechRecognitionError): string {
       return "El reconocimiento de voz no está disponible en este dispositivo.";
     case "EMPTY_TRANSCRIPT":
       return "No se ha reconocido ningún producto. Inténtalo de nuevo.";
+    case "AI_ERROR":
+      return error.message;
     case "NATIVE_ERROR":
       return `Error de reconocimiento: ${error.message}`;
   }
@@ -339,12 +417,38 @@ const createStyles = (colors: ThemeColors) =>
     },
     title: { color: colors.text, fontSize: 17, fontWeight: "700" },
     action: { color: colors.primary, fontWeight: "700" },
+    aiSection: { gap: spacing.sm },
+    aiRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      justifyContent: "space-between",
+    },
+    aiLabelRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: spacing.xs,
+    },
+    aiLabel: { color: colors.text, fontSize: 16, fontWeight: "800" },
+    infoIndicator: { color: colors.primary, fontSize: 16, fontWeight: "700" },
+    aiTooltip: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: 10,
+      borderWidth: 1,
+      padding: spacing.sm,
+    },
+    aiTooltipText: { color: colors.text, fontSize: 13, lineHeight: 18 },
     hint: { color: colors.muted, lineHeight: 20 },
     label: { color: colors.text, fontWeight: "700" },
     listeningBox: {
       backgroundColor: colors.successBackground,
       borderRadius: 12,
       padding: spacing.md,
+      gap: spacing.sm,
+    },
+    processingRow: {
+      alignItems: "center",
+      flexDirection: "row",
       gap: spacing.sm,
     },
     waveformRow: {

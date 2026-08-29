@@ -9,6 +9,12 @@
       "expo-router",
       "expo-secure-store",
       [
+        "expo-audio",
+        {
+          "microphonePermission": "Permite que shopping-app grabe audio para transcribir productos."
+        }
+      ],
+      [
         "expo-speech-recognition",
         {
           "microphonePermission": "Permite que shopping-app use el micrófono para añadir productos por voz.",

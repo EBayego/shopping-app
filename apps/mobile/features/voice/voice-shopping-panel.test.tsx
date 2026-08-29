@@ -21,6 +21,7 @@ vi.mock("react-native", () => ({
   ActivityIndicator: "ActivityIndicator",
   Pressable: "Pressable",
   StyleSheet: { create: <T,>(styles: T) => styles },
+  Switch: "Switch",
   Text: "Text",
   TextInput: "TextInput",
   View: "View",
@@ -88,6 +89,60 @@ describe("VoiceShoppingPanel", () => {
 
     expect(stop).toHaveBeenCalledOnce();
     expect(screenText(renderer)).toContain("pan y seis huevos");
+  });
+
+  it("explains and activates AI before starting the selected transcriber", async () => {
+    const nativeRecognize = vi
+      .fn()
+      .mockResolvedValue({ transcript: "transcripción nativa", segments: [] });
+    const aiRecognize = vi.fn().mockResolvedValue({
+      transcript: "dos litros de leche",
+      segments: ["dos litros de leche"],
+    });
+    const nativeService = serviceReturning(
+      "transcripción nativa",
+      [],
+      nativeRecognize,
+    );
+    const aiService = serviceReturning(
+      "dos litros de leche",
+      ["dos litros de leche"],
+      aiRecognize,
+    );
+    const renderer = await renderPanel(nativeService, { aiService });
+
+    expect(nativeRecognize).not.toHaveBeenCalled();
+    expect(aiRecognize).not.toHaveBeenCalled();
+
+    await pressAndFlush(
+      renderer.root.findByProps({
+        accessibilityLabel: "Información sobre la transcripción con AI",
+      }),
+    );
+    expect(normalizedScreenText(renderer)).toContain(
+      "mejorar en gran proporción la calidad de la transcripción",
+    );
+
+    const aiSwitch = renderer.root.findByProps({
+      accessibilityLabel: "Usar transcripción con AI",
+    });
+    await act(() => {
+      const onValueChange: unknown = aiSwitch.props.onValueChange;
+      if (typeof onValueChange !== "function") {
+        throw new TypeError("Missing onValueChange");
+      }
+      (onValueChange as (value: boolean) => void)(true);
+    });
+    expect(aiSwitch.props.accessibilityState).toEqual({
+      checked: true,
+      disabled: false,
+    });
+
+    await pressAndFlush(buttonByText(renderer, "Empezar a escuchar"));
+    expect(aiRecognize).toHaveBeenCalledOnce();
+    expect(nativeRecognize).not.toHaveBeenCalled();
+    expect(screenText(renderer)).toContain("dos litros de leche");
+    expect(screenText(renderer)).toContain("se elimina del dispositivo");
   });
 
   it("shows native errors without producing a preview", async () => {
@@ -243,9 +298,10 @@ describe("VoiceShoppingPanel", () => {
 function serviceReturning(
   transcript: string,
   segments: readonly string[] = [transcript],
+  recognize = vi.fn().mockResolvedValue({ transcript, segments }),
 ): SpeechRecognitionService {
   return {
-    recognize: vi.fn().mockResolvedValue({ transcript, segments }),
+    recognize,
     stop: vi.fn(),
     cancel: vi.fn(),
     openSettings: vi.fn().mockResolvedValue(undefined),

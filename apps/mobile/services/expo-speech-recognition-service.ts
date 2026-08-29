@@ -403,7 +403,7 @@ function normalizeWhitespace(value: string): string {
   return value.trim().replace(/\s+/g, " ");
 }
 
-async function requestNativePermissions(): Promise<void> {
+export async function requestNativePermissions(): Promise<void> {
   const microphone =
     await ExpoSpeechRecognitionModule.getMicrophonePermissionsAsync();
   const microphoneResult = microphone.granted

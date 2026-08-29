@@ -41,6 +41,7 @@ import { useThemedStyles, useTheme } from "../../features/theme/theme-context";
 import { spacing, type ThemeColors } from "../../lib/theme";
 import { useOfflineSync } from "../../offline/offline-sync-provider";
 import { speechRecognitionService } from "../../services/expo-speech-recognition-service";
+import { useGroqSpeechRecognitionService } from "../../services/groq-speech-recognition-service";
 
 function firstParameter(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -85,6 +86,7 @@ function capitalizeFirst(value: string): string {
 export default function GroupDetailScreen() {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
+  const groqSpeechRecognitionService = useGroqSpeechRecognitionService();
   const params = useLocalSearchParams<{
     groupId: string | string[];
     joinOutcome?: string | string[];
@@ -366,6 +368,7 @@ export default function GroupDetailScreen() {
                 onClose={() => setVoiceOpen(false)}
                 onConfirm={addVoiceDrafts}
                 service={speechRecognitionService}
+                aiService={groqSpeechRecognitionService}
               />
             ) : null}
             {inputError ? <Text style={styles.error}>{inputError}</Text> : null}

@@ -78,18 +78,19 @@ Hay ejemplos sin secretos en `.env.example`, `.env.development.example`,
 `.env.staging.example` y `.env.production.example`. Cada entorno necesita su
 propio Supabase y sus propias credenciales:
 
-| Variable                           | Dónde            | Sensibilidad              |
-| ---------------------------------- | ---------------- | ------------------------- |
-| `APP_ENV`                          | build Expo       | pública                   |
-| `EXPO_PUBLIC_APP_SCHEME`           | bundle móvil     | pública                   |
-| `EXPO_PUBLIC_SUPABASE_URL`         | bundle móvil     | pública                   |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY`    | bundle móvil     | pública, limitada por RLS |
-| `SUPABASE_URL`                     | ingest/admin     | servidor                  |
-| `SUPABASE_SECRET_KEY`              | ingest/scheduler | secreta                   |
-| `SUPABASE_SERVICE_ROLE_KEY`        | admin            | secreta                   |
-| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | admin            | secretas                  |
-| `REFRESH_WORKER_ID`                | workers          | no secreta                |
-| `RUN_LIVE_PROVIDER_TESTS`          | tests manuales   | no secreta                |
+| Variable                           | Dónde             | Sensibilidad              |
+| ---------------------------------- | ----------------- | ------------------------- |
+| `APP_ENV`                          | build Expo        | pública                   |
+| `EXPO_PUBLIC_APP_SCHEME`           | bundle móvil      | pública                   |
+| `EXPO_PUBLIC_SUPABASE_URL`         | bundle móvil      | pública                   |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY`    | bundle móvil      | pública, limitada por RLS |
+| `SUPABASE_URL`                     | ingest/admin      | servidor                  |
+| `SUPABASE_SECRET_KEY`              | ingest/scheduler  | secreta                   |
+| `SUPABASE_SERVICE_ROLE_KEY`        | admin             | secreta                   |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | admin             | secretas                  |
+| `REFRESH_WORKER_ID`                | workers           | no secreta                |
+| `RUN_LIVE_PROVIDER_TESTS`          | tests manuales    | no secreta                |
+| `GROQ_API_KEY`                     | Supabase Function | secreta                   |
 
 Nunca pongas secret/service-role bajo `EXPO_PUBLIC_*`. Los valores de staging y
 production deben vivir en el gestor de secretos del host, GitHub Environments y
@@ -130,12 +131,21 @@ pnpm exec supabase login
 pnpm exec supabase link --project-ref YOUR_PROJECT_REF
 pnpm exec supabase db push --dry-run
 pnpm exec supabase db push
+pnpm exec supabase secrets set GROQ_API_KEY=gsk_YOUR_KEY
+pnpm exec supabase functions deploy transcribe-audio
 ```
 
 Ejecuta primero contra staging, valida el checklist y repite el link/push con el
 project ref de production. Haz backup y revisa el plan SQL antes de production.
-Las credenciales backend se configuran en el runtime del admin/worker; no son
-Supabase Edge secrets porque estos procesos son Node externos.
+Las credenciales del admin/worker se configuran en sus runtimes Node. La
+`GROQ_API_KEY` es distinta: debe configurarse como secreto de Supabase y nunca
+como `EXPO_PUBLIC_*`, porque solo la Edge Function `transcribe-audio` la lee.
+Para probarla en local, crea un archivo ignorado `supabase/.env.local` con la
+clave y ejecuta en otro terminal:
+
+```powershell
+pnpm exec supabase functions serve transcribe-audio --env-file supabase/.env.local
+```
 
 ## Providers e ingestión
 
@@ -193,7 +203,11 @@ credenciales válidas.
 
 Voz requiere development build y dispositivo con reconocimiento disponible.
 Solo solicita permisos al empezar, muestra transcript/preview y añade únicamente
-las líneas confirmadas. No persiste audio.
+las líneas confirmadas. El switch `AI` usa
+`whisper-large-v3-turbo` a través de la función autenticada de Supabase. El
+audio AI se graba directamente con el micrófono en la caché del dispositivo, sin
+activar el transcriptor nativo; después se envía a Groq para transcribir y se
+elimina al terminar.
 
 ### Android
 

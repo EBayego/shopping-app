@@ -57,6 +57,10 @@ ejecutarse en producción.
 - [ ] Dicta “dos leches semidesnatadas y un pan”.
 - [ ] Se muestra preview editable; nada se añade antes de confirmar.
 - [ ] Selecciona/confirma las líneas y aparecen en la lista.
+- [ ] El indicador junto a `AI` muestra la explicación al pulsarlo.
+- [ ] Activa `AI`, dicta varios productos, para la grabación y verifica que la
+      transcripción de Whisper aparece antes del preview.
+- [ ] Desactiva `AI` y verifica que el transcriptor nativo continúa funcionando.
 - [ ] Denegar el permiso muestra una explicación recuperable y acceso a ajustes.
 
 ## Criterio de salida
