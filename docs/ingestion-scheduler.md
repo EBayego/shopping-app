@@ -3,8 +3,8 @@
 ## Scheduler elegido
 
 La automatización usa un workflow efímero de GitHub Actions
-(`.github/workflows/ingestion-scheduler.yml`) cada 30 minutos, en los minutos 7
-y 37 de cada hora. Cada invocación
+(`.github/workflows/ingestion-scheduler.yml`) una vez al día a las 03:17 UTC
+(05:17 en Madrid en verano, 04:17 en invierno). Cada invocación
 ejecuta `pnpm ingest:scheduler`, pide a Supabase que encole únicamente los
 trabajos vencidos y drena la cola hasta el límite configurado. No existe un
 servidor o worker residente.
@@ -20,20 +20,20 @@ La única fila de `ingestion_runtime_config` centraliza la política:
 
 | Campo                                 | Valor inicial | Uso                                            |
 | ------------------------------------- | ------------: | ---------------------------------------------- |
-| `price_refresh_interval_minutes`      |            60 | Cadencia de `PRICE_REFRESH`                    |
-| `catalog_sync_interval_minutes`       |          1440 | Cadencia de `CATALOG_SYNC`                     |
+| `price_refresh_interval_minutes`      |          4320 | Cadencia de `PRICE_REFRESH` (72 horas)         |
+| `catalog_sync_interval_minutes`       |          4320 | Cadencia de `CATALOG_SYNC` (72 horas)          |
 | `refresh_request_max_attempts`        |             3 | Máximo de intentos por solicitud               |
 | `refresh_request_retry_delay_minutes` |            15 | Espera entre intentos                          |
 | `max_jobs_per_tick`                   |            50 | Límite de trabajos por invocación              |
 | `running_timeout_minutes`             |           120 | Lease de recuperación de workers interrumpidos |
 
-`CATALOG_SYNC` debe conservar una frecuencia menor que `PRICE_REFRESH`; la base
+`CATALOG_SYNC` debe conservar una frecuencia menor o igual que `PRICE_REFRESH`; la base
 de datos valida esa relación. Para cambiar la política:
 
 ```sql
 update public.ingestion_runtime_config
-set price_refresh_interval_minutes = 30,
-    catalog_sync_interval_minutes = 1440,
+set price_refresh_interval_minutes = 4320,
+    catalog_sync_interval_minutes = 4320,
     refresh_request_max_attempts = 3
 where singleton;
 ```
@@ -56,6 +56,54 @@ En cada tick, los refreshes de precio seleccionan productos de listas activas,
 ofertas stale/very-stale y productos indicados en solicitudes manuales usando
 la política de frescura existente. Un catálogo completo solo se descarga cuando
 vence su cadencia de catálogo; no se descarga en cada tick.
+
+El pulso diario atiende solicitudes manuales y reintentos en el siguiente tick,
+aunque su delay configurado sea de 15 minutos. No se garantiza ejecución exacta
+a las 72 horas: un retraso o fallo de GitHub Actions desplaza el siguiente tick.
+Los precios pueden tener tres días de antigüedad; se conserva la política real
+de frescura y sus avisos. No se modifica `observed_at` para aparentar frescura.
+
+## Retención y liberación de espacio
+
+`dispatch_due_provider_jobs()` ejecuta automáticamente
+`private.cleanup_ingestion_history()` antes de encolar trabajos, incluso si
+no hay ingestas vencidas. No requiere habilitar `pg_cron`.
+
+- `price_history`: conserva 90 días desde `created_at`.
+- `provider_sync_runs`: elimina ejecuciones terminadas hace más de 30 días.
+- `refresh_requests`: elimina solicitudes `SUCCEEDED`/`FAILED` terminadas
+  hace más de 30 días; conserva `PENDING` y `RUNNING`.
+- `admin_audit_log`: conserva 90 días.
+
+Cada tick elimina hasta 5.000 filas por tabla, con locks que omiten filas en uso.
+La retención requiere ticks exitosos y no es un límite absoluto en MB: un volumen
+mayor que la limpieza diaria puede dejar un backlog. Los productos nuevos,
+mercados y datos de usuario también pueden aumentar el tamaño. No se eliminan
+catálogo actual, clasificaciones manuales, usuarios, grupos ni listas.
+
+La migración `20261003090000_ingestion_cadence_and_retention.sql` configura la
+cadencia y permite precios y catálogo con el mismo intervalo. Deja los schedules
+habilitados vencidos para que el primer tick los atienda. Aplícala con
+`pnpm exec supabase db push --linked` antes de activar el workflow modificado;
+también puede ejecutarse su contenido completo en el SQL Editor si no dispones
+de una conexión CLI. No crea otra automatización de limpieza.
+
+`TRUNCATE` ya devuelve el espacio ocupado por las tablas vaciadas; no necesita
+`VACUUM`. Después de `DELETE`, autovacuum permite reutilizar espacio. Si deseas
+ejecutar un vacuum manual, selecciona **una sola sentencia** y ejecútala sola:
+
+```sql
+vacuum (analyze) public.price_history;
+```
+
+Ejecuta las demás tablas por separado, sin `BEGIN`/`COMMIT` ni otras sentencias
+en la misma petición: PostgreSQL prohíbe `VACUUM` dentro de una transacción.
+`VACUUM FULL` solo se justifica tras medir bloat, durante mantenimiento y con
+espacio temporal disponible; bloquea la tabla. No se ejecuta desde la función.
+
+Si anteriormente se habilitó otro job de `pg_cron`, su histórico
+`cron.job_run_details` necesita retención independiente. Esta solución no
+crea registros en esa tabla.
 
 ## Entornos
 

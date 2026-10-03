@@ -7,9 +7,9 @@ select has_table('public', 'provider_job_schedules', 'provider schedules exist')
 select has_column('public', 'refresh_requests', 'next_attempt_at', 'refresh retries have a due time');
 select has_function('public', 'dispatch_due_provider_jobs', '{}'::text[], 'scheduler dispatch RPC exists');
 select is(
-  (select price_refresh_interval_minutes < catalog_sync_interval_minutes from public.ingestion_runtime_config),
+  (select price_refresh_interval_minutes <= catalog_sync_interval_minutes from public.ingestion_runtime_config),
   true,
-  'price refresh is configured more frequently than catalog sync'
+  'catalog sync is never configured more frequently than price refresh'
 );
 select is(
   (select refresh_request_max_attempts from public.ingestion_runtime_config),
