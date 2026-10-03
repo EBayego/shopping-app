@@ -3,6 +3,56 @@ import { describe, expect, it } from "vitest";
 import { formatShoppingIntent } from "./intent-formatting";
 
 describe("formatShoppingIntent", () => {
+  it("does not confuse a requested weight with the number of containers", () => {
+    expect(
+      formatShoppingIntent(
+        intent({
+          normalized_name: "arroz",
+          requested_quantity: 2,
+          requested_unit: "kg",
+          package_type: "bag",
+          package_size: 500,
+          package_unit: "g",
+        }),
+      ),
+    ).toEqual({ title: "Arroz", quantity: "2", unit: "Kg · Bolsa de 500 G" });
+  });
+
+  it("shows the requested brand without duplicating it in the product name", () => {
+    expect(
+      formatShoppingIntent(
+        intent({
+          normalized_name: "yogur",
+          requested_quantity: 2,
+          requested_unit: "unit",
+          brand_preference: "Danone",
+        }),
+      ).title,
+    ).toBe("Yogures Danone");
+    expect(
+      formatShoppingIntent(
+        intent({
+          normalized_name: "Coca-Cola",
+          brand_preference: "Coca-Cola",
+        }),
+      ).title,
+    ).toBe("Coca-Cola");
+  });
+
+  it("uses the stored container type even after raw text was edited", () => {
+    expect(
+      formatShoppingIntent(
+        intent({
+          raw_text: "leche",
+          normalized_name: "leche",
+          package_type: "carton",
+          package_count: 2,
+          package_size: 1,
+          package_unit: "l",
+        }),
+      ),
+    ).toEqual({ title: "Leche", quantity: "2", unit: "Briks de 1 L" });
+  });
   it.each([
     ["3 litros de leche", "leche", 3, "l", "Leche", "3", "L"],
     ["dos unidades de huevos", "huevo", 2, "unit", "Huevos", "2", "Uds."],

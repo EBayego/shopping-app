@@ -1,4 +1,5 @@
 import type { Database } from "@shopping-app/database";
+import type { ShoppingPackageType } from "@shopping-app/voice-parser";
 
 export type Group = Database["public"]["Tables"]["groups"]["Row"];
 export type ShoppingList =
@@ -49,6 +50,7 @@ export interface AddShoppingIntentInput {
   packageCount?: number;
   packageSize?: number;
   packageUnit?: string;
+  packageType?: ShoppingPackageType;
   totalAmount?: number;
   brandPreference?: string;
   variant?: string;
@@ -62,6 +64,7 @@ export interface EditShoppingIntentInput {
   packageCount: number | null;
   packageSize: number | null;
   packageUnit: string | null;
+  packageType?: ShoppingPackageType | null;
   totalAmount: number | null;
   brandPreference: string | null;
   variant: string | null;

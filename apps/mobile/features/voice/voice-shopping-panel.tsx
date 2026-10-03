@@ -1,5 +1,6 @@
 import {
   parseShoppingIntentSegments,
+  parseShoppingIntents,
   type ShoppingIntentDraft,
 } from "@shopping-app/voice-parser";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,6 +14,7 @@ import {
 } from "react-native";
 
 import { AppButton } from "../../components/app-button";
+import type { ShoppingIntentParser } from "./shopping-intent-parser";
 import { useThemedStyles, useTheme } from "../theme/theme-context";
 import { spacing, type ThemeColors } from "../../lib/theme";
 import {
@@ -31,7 +33,7 @@ interface VoiceShoppingPanelProps {
   onClose: () => void;
   onConfirm: (drafts: readonly ShoppingIntentDraft[]) => Promise<void>;
   service: SpeechRecognitionService;
-  aiService?: SpeechRecognitionService;
+  aiParser?: ShoppingIntentParser;
 }
 
 interface EditableDraft extends ShoppingIntentFieldValues {
@@ -48,12 +50,13 @@ export function VoiceShoppingPanel({
   onClose,
   onConfirm,
   service,
-  aiService,
+  aiParser,
 }: VoiceShoppingPanelProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
   const [listening, setListening] = useState(false);
-  const [processing, setProcessing] = useState(false);
+  const [extracting, setExtracting] = useState(false);
+  const [extractionFailed, setExtractionFailed] = useState(false);
   const [aiEnabled, setAiEnabled] = useState(false);
   const [showAiTooltip, setShowAiTooltip] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -63,15 +66,48 @@ export function VoiceShoppingPanel({
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [waveform, setWaveform] = useState<readonly number[]>(EMPTY_WAVEFORM);
   const startedAt = useRef<number | null>(null);
-  const recognitionService = aiEnabled && aiService ? aiService : service;
+  const activeRequest = useRef<AbortController | null>(null);
 
   const handleVolumeChange = useCallback((level: number): void => {
     setWaveform((current) => [...current.slice(1), clamp(level, 0, 1)]);
   }, []);
 
+  const interpretTranscript = useCallback(
+    async (text: string, controller: AbortController): Promise<void> => {
+      setExtracting(true);
+      setExtractionFailed(false);
+      try {
+        if (!aiParser)
+          throw new Error("La interpretación con AI no está disponible.");
+        const parsed = await aiParser.parse(text, controller.signal);
+        if (controller.signal.aborted) return;
+        setDrafts(parsed.map(toEditableDraft));
+        if (!parsed.length)
+          setMessage(
+            "No hemos identificado productos. Prueba de nuevo o usa el modo local.",
+          );
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setExtractionFailed(true);
+        setMessage(
+          error instanceof Error
+            ? error.message
+            : "No se pudo interpretar el texto con AI.",
+        );
+      } finally {
+        if (!controller.signal.aborted) setExtracting(false);
+      }
+    },
+    [aiParser],
+  );
+
   const startListening = useCallback(async (): Promise<void> => {
+    if (activeRequest.current) return;
+    const controller = new AbortController();
+    activeRequest.current = controller;
     setListening(true);
-    setProcessing(false);
+    setExtracting(false);
+    setExtractionFailed(false);
     setMessage(null);
     setBlockedPermission(false);
     setTranscript("");
@@ -80,24 +116,33 @@ export function VoiceShoppingPanel({
     setWaveform(EMPTY_WAVEFORM);
     startedAt.current = Date.now();
     try {
-      const recognized = await recognitionService.recognize({
+      const recognized = await service.recognize({
         locale: "es-ES",
         onVolumeChange: handleVolumeChange,
-        onProcessingChange: setProcessing,
       });
+      if (controller.signal.aborted) return;
+      startedAt.current = null;
       if (recognized.transcript.trim().length === 0) {
         throw new SpeechRecognitionError(
           "EMPTY_TRANSCRIPT",
           "No se ha reconocido ningún producto.",
         );
       }
-      const parsed = parseShoppingIntentSegments(recognized.segments);
       setTranscript(recognized.transcript);
-      setDrafts(parsed.map(toEditableDraft));
-      if (parsed.length === 0) {
-        setMessage("No hemos identificado productos. Prueba de nuevo.");
+      if (aiEnabled) {
+        await interpretTranscript(recognized.transcript, controller);
+      } else {
+        const parsed = parseShoppingIntentSegments(
+          recognized.segments.length
+            ? recognized.segments
+            : [recognized.transcript],
+        );
+        setDrafts(parsed.map(toEditableDraft));
+        if (parsed.length === 0)
+          setMessage("No hemos identificado productos. Prueba de nuevo.");
       }
     } catch (error) {
+      if (controller.signal.aborted) return;
       const speechError =
         error instanceof SpeechRecognitionError
           ? error
@@ -110,10 +155,15 @@ export function VoiceShoppingPanel({
       setBlockedPermission(speechError.code === "PERMISSION_BLOCKED");
       setMessage(messageForError(speechError));
     } finally {
-      startedAt.current = null;
-      setListening(false);
+      if (activeRequest.current === controller) {
+        activeRequest.current = null;
+        startedAt.current = null;
+        if (!controller.signal.aborted) {
+          setListening(false);
+        }
+      }
     }
-  }, [handleVolumeChange, recognitionService]);
+  }, [aiEnabled, handleVolumeChange, interpretTranscript, service]);
 
   useEffect(() => {
     if (!listening) return undefined;
@@ -128,17 +178,53 @@ export function VoiceShoppingPanel({
   }, [listening]);
 
   useEffect(() => {
-    if (aiService) return;
+    if (aiParser) return;
     void startListening();
-  }, [aiService, startListening]);
+  }, [aiParser, startListening]);
 
   useEffect(
     () => () => {
+      activeRequest.current?.abort();
       service.cancel();
-      aiService?.cancel();
     },
-    [aiService, service],
+    [service],
   );
+
+  const cancelWork = (): void => {
+    activeRequest.current?.abort();
+    activeRequest.current = null;
+    service.cancel();
+    startedAt.current = null;
+    setListening(false);
+    setExtracting(false);
+    setExtractionFailed(Boolean(transcript));
+    setMessage("Petición cancelada.");
+  };
+
+  const retryInterpretation = async (): Promise<void> => {
+    if (activeRequest.current) return;
+    const controller = new AbortController();
+    activeRequest.current = controller;
+    setListening(true);
+    setMessage(null);
+    try {
+      await interpretTranscript(transcript, controller);
+    } finally {
+      if (activeRequest.current === controller) {
+        activeRequest.current = null;
+        if (!controller.signal.aborted) setListening(false);
+      }
+    }
+  };
+
+  const useLocalInterpretation = (): void => {
+    const parsed = parseShoppingIntents(transcript);
+    setDrafts(parsed.map(toEditableDraft));
+    setExtractionFailed(false);
+    setMessage(
+      "Se ha utilizado el parser local. Revisa los resultados antes de añadirlos.",
+    );
+  };
 
   const confirm = async (): Promise<void> => {
     setMessage(null);
@@ -177,11 +263,11 @@ export function VoiceShoppingPanel({
         </Pressable>
       </View>
 
-      {aiService ? (
+      {aiParser ? (
         <View style={styles.aiSection}>
           <View style={styles.aiRow}>
             <Pressable
-              accessibilityLabel="Información sobre la transcripción con AI"
+              accessibilityLabel="Información sobre la interpretación con AI"
               accessibilityRole="button"
               hitSlop={8}
               onPress={() => setShowAiTooltip((visible) => !visible)}
@@ -191,7 +277,7 @@ export function VoiceShoppingPanel({
               <Text style={styles.infoIndicator}>ⓘ</Text>
             </Pressable>
             <Switch
-              accessibilityLabel="Usar transcripción con AI"
+              accessibilityLabel="Usar AI para interpretar la transcripción"
               accessibilityRole="switch"
               accessibilityState={{ checked: aiEnabled, disabled: listening }}
               disabled={listening}
@@ -204,9 +290,10 @@ export function VoiceShoppingPanel({
           {showAiTooltip ? (
             <View accessibilityRole="alert" style={styles.aiTooltip}>
               <Text style={styles.aiTooltipText}>
-                Al activar AI, el audio se conecta de forma segura con un modelo
-                de IA para mejorar en gran proporción la calidad de la
-                transcripción.
+                Activa AI para mejorar la interpretación de productos,
+                cantidades, formatos y marcas con modelos de OpenAI. La voz se
+                transcribe con el sistema nativo habitual. Requiere conexión y
+                solo envía el texto transcrito a OpenAI, nunca el audio.
               </Text>
             </View>
           ) : null}
@@ -216,9 +303,9 @@ export function VoiceShoppingPanel({
       {listening ? (
         <View style={styles.listeningBox}>
           <Text style={styles.title}>
-            {processing ? "Mejorando transcripción con AI…" : "Escuchando…"}
+            {extracting ? "Interpretando productos con AI…" : "Escuchando…"}
           </Text>
-          {processing ? (
+          {extracting ? (
             <View style={styles.processingRow}>
               <ActivityIndicator color={colors.primary} />
               <Text style={styles.hint}>
@@ -235,13 +322,16 @@ export function VoiceShoppingPanel({
               <AppButton
                 tone="secondary"
                 onPress={() => {
-                  recognitionService.stop();
+                  service.stop();
                 }}
               >
                 Parar escucha
               </AppButton>
             </>
           )}
+          <AppButton tone="secondary" onPress={cancelWork}>
+            Cancelar
+          </AppButton>
         </View>
       ) : (
         <AppButton onPress={() => void startListening()}>
@@ -268,6 +358,16 @@ export function VoiceShoppingPanel({
       ))}
 
       {message ? <Text style={styles.error}>{message}</Text> : null}
+      {extractionFailed && !listening ? (
+        <View style={styles.fields}>
+          <AppButton onPress={() => void retryInterpretation()}>
+            Reintentar interpretación con AI
+          </AppButton>
+          <AppButton tone="secondary" onPress={useLocalInterpretation}>
+            Usar parser local
+          </AppButton>
+        </View>
+      ) : null}
       {blockedPermission ? (
         <AppButton tone="secondary" onPress={() => void service.openSettings()}>
           Abrir Ajustes
@@ -284,7 +384,7 @@ export function VoiceShoppingPanel({
       ) : null}
       <Text style={styles.privacy}>
         {aiEnabled
-          ? "Con AI, el audio se envía temporalmente para transcribirlo y se elimina del dispositivo al terminar."
+          ? "La voz se transcribe con el sistema nativo habitual. Con AI, solo el texto se envía a OpenAI; nunca el audio. La app solo guarda los productos que confirmes."
           : "La app no guarda el audio; solo conserva el texto que confirmes."}
       </Text>
     </View>
@@ -302,11 +402,15 @@ function VoiceDraftEditor({
 }) {
   const styles = useThemedStyles(createStyles);
   const confidenceMessage =
-    draft.source.confidence === "HIGH"
-      ? "Resultado de alta confianza, preseleccionado."
-      : draft.source.confidence === "MEDIUM"
-        ? "Revisa y corrige los campos antes de seleccionarlo."
-        : "No estamos seguros. Corrige y confirma este producto claramente.";
+    draft.source.source === "AI"
+      ? draft.source.needsReview
+        ? `AI necesita revisión: ${draft.source.reviewReason ?? "comprueba los datos antes de seleccionar."}`
+        : "Interpretado con AI. Revisa los datos antes de añadir."
+      : draft.source.confidence === "HIGH"
+        ? "Resultado de alta confianza, preseleccionado."
+        : draft.source.confidence === "MEDIUM"
+          ? "Revisa y corrige los campos antes de seleccionarlo."
+          : "No estamos seguros. Corrige y confirma este producto claramente.";
   return (
     <View
       style={[styles.card, draft.source.confidence === "LOW" && styles.lowCard]}
@@ -340,7 +444,8 @@ function toEditableDraft(
   return {
     id: `${index}:${draft.rawText}`,
     source: draft,
-    selected: draft.confidence === "HIGH",
+    selected:
+      draft.source === "AI" ? !draft.needsReview : draft.confidence === "HIGH",
     ...draftToFieldValues(draft),
   };
 }
@@ -400,8 +505,6 @@ function messageForError(error: SpeechRecognitionError): string {
       return "El reconocimiento de voz no está disponible en este dispositivo.";
     case "EMPTY_TRANSCRIPT":
       return "No se ha reconocido ningún producto. Inténtalo de nuevo.";
-    case "AI_ERROR":
-      return error.message;
     case "NATIVE_ERROR":
       return `Error de reconocimiento: ${error.message}`;
   }
@@ -410,6 +513,7 @@ function messageForError(error: SpeechRecognitionError): string {
 const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     panel: { gap: spacing.md, marginVertical: spacing.sm },
+    fields: { gap: spacing.sm },
     heading: {
       flexDirection: "row",
       alignItems: "center",

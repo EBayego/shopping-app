@@ -13,9 +13,8 @@ export function voiceDraftToIntentInput(
   if (!draft.product) throw new TypeError("Falta el nombre del producto.");
   const normalized = normalizeShoppingItemInput(draft.product);
   const requested = normalizeAmount(
-    draft.requestedQuantity ?? draft.packageCount,
-    draft.requestedUnit ??
-      (draft.packageCount === undefined ? undefined : "unit"),
+    draft.packageCount ?? draft.requestedQuantity,
+    draft.packageCount === undefined ? draft.requestedUnit : "unit",
   );
   const packaging = normalizeAmount(draft.packageSize, draft.packageUnit);
   const totalUnit = draft.packageUnit ?? draft.requestedUnit;
@@ -34,6 +33,9 @@ export function voiceDraftToIntentInput(
       ? {}
       : { packageSize: packaging.amount }),
     ...(packaging.unit === undefined ? {} : { packageUnit: packaging.unit }),
+    ...(draft.packageType === undefined
+      ? {}
+      : { packageType: draft.packageType }),
     ...(total.amount === undefined ? {} : { totalAmount: total.amount }),
     ...(draft.brandPreference === undefined
       ? {}

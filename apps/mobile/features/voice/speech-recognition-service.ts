@@ -5,7 +5,6 @@ export type SpeechRecognitionErrorCode =
   | "TIMEOUT"
   | "UNAVAILABLE"
   | "EMPTY_TRANSCRIPT"
-  | "AI_ERROR"
   | "NATIVE_ERROR";
 
 export class SpeechRecognitionError extends Error {
@@ -21,7 +20,6 @@ export class SpeechRecognitionError extends Error {
 export interface SpeechRecognitionOptions {
   locale: string;
   onVolumeChange?: (level: number) => void;
-  onProcessingChange?: (processing: boolean) => void;
 }
 
 export interface SpeechRecognitionResult {

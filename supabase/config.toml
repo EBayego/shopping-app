@@ -390,7 +390,7 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
-[functions.transcribe-audio]
+[functions.extract-shopping-intents]
 verify_jwt = true
 
 # [edge_runtime.secrets]

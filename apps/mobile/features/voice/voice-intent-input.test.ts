@@ -12,6 +12,7 @@ describe("voiceDraftToIntentInput", () => {
         packageCount: 2,
         packageSize: 2,
         packageUnit: "l",
+        packageType: "bottle",
         totalAmount: 4,
         confidence: "HIGH",
       }),
@@ -23,6 +24,7 @@ describe("voiceDraftToIntentInput", () => {
       packageCount: 2,
       packageSize: 2,
       packageUnit: "l",
+      packageType: "bottle",
       totalAmount: 4,
       brandPreference: "Coca-Cola",
     });

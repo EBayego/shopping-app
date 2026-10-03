@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "../services/supabase";
+import type { ShoppingPackageType } from "@shopping-app/voice-parser";
 import type {
   CreateGroupInput,
   CreateGroupResult,
@@ -135,6 +136,7 @@ export async function addShoppingIntent(
     packageCount?: number;
     packageSize?: number;
     packageUnit?: string;
+    packageType?: ShoppingPackageType;
     totalAmount?: number;
     brandPreference?: string;
     variant?: string;
@@ -166,6 +168,9 @@ export async function addShoppingIntent(
       ...(input.packageUnit === undefined
         ? {}
         : { package_unit: input.packageUnit }),
+      ...(input.packageType === undefined
+        ? {}
+        : { package_type: input.packageType }),
       ...(input.totalAmount === undefined
         ? {}
         : { total_amount: input.totalAmount }),
@@ -263,6 +268,7 @@ export async function editShoppingIntent(
       ...(input.packageUnit === null
         ? {}
         : { package_unit: input.packageUnit }),
+      ...(input.packageType == null ? {} : { package_type: input.packageType }),
       ...(input.totalAmount === null
         ? {}
         : { total_amount: input.totalAmount }),
@@ -334,6 +340,9 @@ export const shoppingSyncBackend: ShoppingSyncBackend = {
             ...(operation.localIntent.package_unit === null
               ? {}
               : { packageUnit: operation.localIntent.package_unit }),
+            ...(operation.localIntent.package_type == null
+              ? {}
+              : { packageType: operation.localIntent.package_type }),
             ...(operation.localIntent.total_amount === null
               ? {}
               : { totalAmount: operation.localIntent.total_amount }),

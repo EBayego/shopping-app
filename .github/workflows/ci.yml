@@ -49,6 +49,17 @@ jobs:
         env:
           RUN_LIVE_PROVIDER_TESTS: "false"
 
+      - name: Set up Deno for Edge Functions
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.6
+
+      - name: Check Edge Function types
+        run: deno check --config supabase/functions/deno.json supabase/functions/extract-shopping-intents/index.ts
+
+      - name: Lint Edge Functions
+        run: deno lint --config supabase/functions/deno.json supabase/functions
+
   database:
     runs-on: ubuntu-latest
     timeout-minutes: 15

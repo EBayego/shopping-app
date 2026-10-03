@@ -1,6 +1,11 @@
 import type {
   ShoppingIntentDraft,
   ShoppingIntentUnit,
+  ShoppingPackageType,
+} from "@shopping-app/voice-parser";
+import {
+  calculateIntentTotal,
+  PACKAGE_TYPES,
 } from "@shopping-app/voice-parser";
 import { StyleSheet, Text, View } from "react-native";
 
@@ -17,6 +22,7 @@ export interface ShoppingIntentFieldValues {
   packageCount: string;
   packageSize: string;
   packageUnit: string;
+  packageType: string;
 }
 
 interface ShoppingIntentFieldsProps {
@@ -60,7 +66,12 @@ export function ShoppingIntentFields({
   const styles = useThemedStyles(createStyles);
   const showPackaging =
     showEmptyOptionalFields ||
-    Boolean(values.packageCount || values.packageSize || values.packageUnit);
+    Boolean(
+      values.packageCount ||
+      values.packageSize ||
+      values.packageUnit ||
+      values.packageType,
+    );
 
   return (
     <View style={styles.fields}>
@@ -109,6 +120,12 @@ export function ShoppingIntentFields({
       {showPackaging ? (
         <View style={styles.packageBox}>
           <Text style={styles.label}>Formato del envase</Text>
+          <AppInput
+            label="Tipo de envase"
+            placeholder="Botella, lata, brik, bolsa…"
+            value={values.packageType}
+            onChangeText={(packageType) => onChange({ packageType })}
+          />
           <View style={styles.fieldRow}>
             <AppInput
               keyboardType="number-pad"
@@ -155,12 +172,17 @@ export function draftToFieldValues(
     packageCount: numberText(draft.packageCount),
     packageSize: numberText(draft.packageSize),
     packageUnit: unitText(draft.packageUnit),
+    packageType:
+      draft.packageType === undefined ? "" : PACKAGE_LABELS[draft.packageType],
   };
 }
 
 export function fieldValuesToDraft(
   values: ShoppingIntentFieldValues,
-  source: Pick<ShoppingIntentDraft, "confidence" | "rawText">,
+  source: Pick<
+    ShoppingIntentDraft,
+    "confidence" | "rawText" | "source" | "needsReview" | "reviewReason"
+  >,
 ): ShoppingIntentDraft {
   const product = values.product.trim();
   if (!product) {
@@ -170,7 +192,9 @@ export function fieldValuesToDraft(
     values.requestedQuantity,
     "cantidad",
   );
-  const requestedUnit = optionalUnit(values.requestedUnit, "unidad");
+  const requestedUnit =
+    optionalUnit(values.requestedUnit, "unidad") ??
+    (requestedQuantity === undefined ? undefined : "unit");
   if ((requestedQuantity === undefined) !== (requestedUnit === undefined)) {
     throw new TypeError("La cantidad y su unidad deben indicarse juntas.");
   }
@@ -182,23 +206,33 @@ export function fieldValuesToDraft(
     values.packageSize,
     "tamaño del envase",
   );
-  const packageUnit = optionalUnit(values.packageUnit, "unidad del envase");
+  const packageUnit =
+    optionalUnit(values.packageUnit, "unidad del envase") ??
+    (packageSize === undefined ? undefined : "unit");
   if ((packageSize === undefined) !== (packageUnit === undefined)) {
     throw new TypeError(
       "El tamaño y la unidad del envase deben indicarse juntos.",
     );
   }
-  const totalAmount =
-    packageSize !== undefined
-      ? (packageCount ?? requestedQuantity ?? 1) * packageSize
-      : requestedQuantity !== undefined &&
-          requestedUnit !== undefined &&
-          !isContainerUnit(requestedUnit)
-        ? requestedQuantity
-        : undefined;
+  const packageType = optionalPackageType(values.packageType);
+  const totalAmount = calculateIntentTotal({
+    ...(requestedQuantity === undefined ? {} : { requestedQuantity }),
+    ...(requestedUnit === undefined ? {} : { requestedUnit }),
+    ...(packageCount === undefined ? {} : { packageCount }),
+    ...(packageSize === undefined ? {} : { packageSize }),
+    ...(packageUnit === undefined ? {} : { packageUnit }),
+  });
 
   return {
-    ...source,
+    confidence: source.confidence,
+    rawText: source.rawText,
+    ...(source.source === undefined ? {} : { source: source.source }),
+    ...(source.needsReview === undefined
+      ? {}
+      : { needsReview: source.needsReview }),
+    ...(source.reviewReason === undefined
+      ? {}
+      : { reviewReason: source.reviewReason }),
     product,
     ...(values.variant.trim() ? { variant: values.variant.trim() } : {}),
     ...(values.brandPreference.trim()
@@ -209,6 +243,7 @@ export function fieldValuesToDraft(
     ...(packageCount === undefined ? {} : { packageCount }),
     ...(packageSize === undefined ? {} : { packageSize }),
     ...(packageUnit === undefined ? {} : { packageUnit }),
+    ...(packageType === undefined ? {} : { packageType }),
     ...(totalAmount === undefined ? {} : { totalAmount }),
   };
 }
@@ -267,10 +302,43 @@ function shouldShowUnit(value: string): boolean {
   return normalized.length > 0 && normalized !== "unit";
 }
 
-function isContainerUnit(unit: ShoppingIntentUnit): boolean {
-  return (
-    unit === "unit" || unit === "bottle" || unit === "can" || unit === "pack"
-  );
+export const PACKAGE_LABELS: Readonly<Record<ShoppingPackageType, string>> = {
+  bottle: "Botella",
+  can: "Lata",
+  carton: "Brik",
+  bag: "Bolsa",
+  tray: "Bandeja",
+  jar: "Bote",
+  box: "Caja",
+  pack: "Pack",
+  tub: "Tarrina",
+  tube: "Tubo",
+  jug: "Garrafa",
+};
+function optionalPackageType(value: string): ShoppingPackageType | undefined {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return undefined;
+  const aliases: Readonly<Record<string, ShoppingPackageType>> = {
+    tarro: "jar",
+    tarros: "jar",
+    carton: "carton",
+    cartón: "carton",
+    paquete: "pack",
+    paquetes: "pack",
+  };
+  const type =
+    aliases[normalized] ??
+    PACKAGE_TYPES.find(
+      (candidate) =>
+        candidate === normalized ||
+        PACKAGE_LABELS[candidate].toLowerCase() === normalized ||
+        `${PACKAGE_LABELS[candidate].toLowerCase()}s` === normalized,
+    );
+  if (!type)
+    throw new TypeError(
+      "El tipo de envase no es válido. Usa botella, lata, brik, bolsa, bandeja, bote, caja, pack, tarrina, tubo o garrafa.",
+    );
+  return type;
 }
 
 const createStyles = (colors: ThemeColors) =>

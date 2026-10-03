@@ -1,4 +1,5 @@
 import React from "react";
+import type { ShoppingIntentDraft } from "@shopping-app/voice-parser";
 import {
   act,
   create,
@@ -91,40 +92,48 @@ describe("VoiceShoppingPanel", () => {
     expect(screenText(renderer)).toContain("pan y seis huevos");
   });
 
-  it("explains and activates AI before starting the selected transcriber", async () => {
-    const nativeRecognize = vi
-      .fn()
-      .mockResolvedValue({ transcript: "transcripción nativa", segments: [] });
-    const aiRecognize = vi.fn().mockResolvedValue({
+  it("always transcribes natively and sends only the full text to AI", async () => {
+    const nativeRecognize = vi.fn().mockResolvedValue({
       transcript: "dos litros de leche",
-      segments: ["dos litros de leche"],
+      segments: ["dos litros", "de leche"],
     });
     const nativeService = serviceReturning(
-      "transcripción nativa",
+      "dos litros de leche",
       [],
       nativeRecognize,
     );
-    const aiService = serviceReturning(
-      "dos litros de leche",
-      ["dos litros de leche"],
-      aiRecognize,
-    );
-    const renderer = await renderPanel(nativeService, { aiService });
+    const aiParser = {
+      parse: vi.fn().mockResolvedValue([
+        {
+          rawText: "dos litros de leche",
+          product: "leche",
+          requestedQuantity: 2,
+          requestedUnit: "l",
+          source: "AI",
+          needsReview: false,
+          confidence: "MEDIUM",
+        },
+      ]),
+    };
+    const renderer = await renderPanel(nativeService, { aiParser });
 
     expect(nativeRecognize).not.toHaveBeenCalled();
-    expect(aiRecognize).not.toHaveBeenCalled();
+    expect(aiParser.parse).not.toHaveBeenCalled();
 
     await pressAndFlush(
       renderer.root.findByProps({
-        accessibilityLabel: "Información sobre la transcripción con AI",
+        accessibilityLabel: "Información sobre la interpretación con AI",
       }),
     );
     expect(normalizedScreenText(renderer)).toContain(
-      "mejorar en gran proporción la calidad de la transcripción",
+      "cantidades, formatos y marcas con modelos de OpenAI",
+    );
+    expect(normalizedScreenText(renderer)).toContain(
+      "solo envía el texto transcrito a OpenAI, nunca el audio",
     );
 
     const aiSwitch = renderer.root.findByProps({
-      accessibilityLabel: "Usar transcripción con AI",
+      accessibilityLabel: "Usar AI para interpretar la transcripción",
     });
     await act(() => {
       const onValueChange: unknown = aiSwitch.props.onValueChange;
@@ -139,10 +148,190 @@ describe("VoiceShoppingPanel", () => {
     });
 
     await pressAndFlush(buttonByText(renderer, "Empezar a escuchar"));
-    expect(aiRecognize).toHaveBeenCalledOnce();
-    expect(nativeRecognize).not.toHaveBeenCalled();
+    expect(nativeRecognize).toHaveBeenCalledOnce();
+    expect(aiParser.parse).toHaveBeenCalledWith(
+      "dos litros de leche",
+      expect.any(AbortSignal),
+    );
     expect(screenText(renderer)).toContain("dos litros de leche");
-    expect(screenText(renderer)).toContain("se elimina del dispositivo");
+    expect(screenText(renderer)).toContain("nunca el audio");
+  });
+
+  it("uses the native transcriber and local parser without calling GPT when AI is off", async () => {
+    const recognize = vi.fn().mockResolvedValue({
+      transcript: "un kilo de judías verdes una docena de patatas",
+      segments: ["un kilo de judías verdes", "una docena de patatas"],
+    });
+    const nativeService = serviceReturning(
+      "un kilo de judías verdes una docena de patatas",
+      ["un kilo de judías verdes", "una docena de patatas"],
+      recognize,
+    );
+    const aiParser = { parse: vi.fn().mockResolvedValue([]) };
+    const renderer = await renderPanel(nativeService, { aiParser });
+    expect(
+      renderer.root.findByProps({
+        accessibilityLabel: "Usar AI para interpretar la transcripción",
+      }).props.accessibilityState,
+    ).toEqual({ checked: false, disabled: false });
+    await pressAndFlush(buttonByText(renderer, "Empezar a escuchar"));
+    expect(recognize).toHaveBeenCalledOnce();
+    expect(aiParser.parse).not.toHaveBeenCalled();
+    expect(inputsByLabel(renderer, "Producto").map(inputValue)).toEqual([
+      "Judias verdes",
+      "Patatas",
+    ]);
+    expect(inputsByLabel(renderer, "Cantidad").map(inputValue)).toEqual([
+      "1",
+      "12",
+    ]);
+  });
+
+  it("still requires native voice permissions with AI enabled", async () => {
+    const openSettings = vi.fn().mockResolvedValue(undefined);
+    const nativeService = serviceRejecting(
+      new SpeechRecognitionError("PERMISSION_BLOCKED", "blocked"),
+      openSettings,
+    );
+    const aiParser = { parse: vi.fn().mockResolvedValue([]) };
+    const renderer = await renderPanel(nativeService, { aiParser });
+    await enableAi(renderer);
+    await pressAndFlush(buttonByText(renderer, "Empezar a escuchar"));
+    expect(aiParser.parse).not.toHaveBeenCalled();
+    await pressAndFlush(buttonByText(renderer, "Abrir Ajustes"));
+    expect(openSettings).toHaveBeenCalledOnce();
+  });
+
+  it("cancels native recognition with AI enabled before any GPT request", async () => {
+    let complete: ((result: SpeechRecognitionResult) => void) | undefined;
+    const cancel = vi.fn();
+    const nativeService: SpeechRecognitionService = {
+      ...serviceReturning(
+        "pan",
+        [],
+        vi.fn(
+          () =>
+            new Promise<SpeechRecognitionResult>((resolve) => {
+              complete = resolve;
+            }),
+        ),
+      ),
+      cancel,
+    };
+    const aiParser = { parse: vi.fn().mockResolvedValue([]) };
+    const renderer = await renderPanel(nativeService, { aiParser });
+    await enableAi(renderer);
+    await pressAndFlush(buttonByText(renderer, "Empezar a escuchar"));
+    await pressAndFlush(buttonByText(renderer, "Cancelar"));
+    expect(cancel).toHaveBeenCalledOnce();
+    await act(async () => {
+      complete?.({ transcript: "pan", segments: ["pan"] });
+      await Promise.resolve();
+    });
+    expect(aiParser.parse).not.toHaveBeenCalled();
+    expect(resultSelectors(renderer)).toHaveLength(0);
+  });
+
+  it("keeps text after an AI extraction failure and offers a local fallback", async () => {
+    const aiParser = {
+      parse: vi.fn().mockRejectedValue(new Error("AI ocupado")),
+    };
+    const onConfirm = vi.fn().mockResolvedValue(undefined);
+    const renderer = await renderPanel(
+      serviceReturning("dos litros de leche"),
+      {
+        aiParser,
+        onConfirm,
+      },
+    );
+    await enableAi(renderer);
+    await pressAndFlush(buttonByText(renderer, "Empezar a escuchar"));
+    expect(screenText(renderer)).toContain("dos litros de leche");
+    expect(screenText(renderer)).toContain("AI ocupado");
+    expect(resultSelectors(renderer)).toHaveLength(0);
+    await pressAndFlush(buttonByText(renderer, "Usar parser local"));
+    expect(screenText(renderer)).toContain("Se ha utilizado el parser local");
+    await pressAndFlush(buttonByText(renderer, "Añadir seleccionados"));
+    expect(onConfirm).toHaveBeenCalledWith([
+      expect.objectContaining({ product: "Leche", requestedQuantity: 2 }),
+    ]);
+  });
+
+  it("retries AI on the saved full text without recording again and leaves ambiguous items unselected", async () => {
+    const transcript = "leche de marca desconocida";
+    const recognize = vi.fn().mockResolvedValue({
+      transcript,
+      segments: ["leche de", "marca desconocida"],
+    });
+    const aiParser = {
+      parse: vi
+        .fn()
+        .mockRejectedValueOnce(new Error("timeout"))
+        .mockResolvedValueOnce([
+          {
+            rawText: transcript,
+            product: "leche",
+            confidence: "MEDIUM",
+            source: "AI",
+            needsReview: true,
+            reviewReason: "Marca poco clara",
+          },
+        ]),
+    };
+    const renderer = await renderPanel(
+      serviceReturning(transcript, [], recognize),
+      {
+        aiParser,
+      },
+    );
+    await enableAi(renderer);
+    await pressAndFlush(buttonByText(renderer, "Empezar a escuchar"));
+    await pressAndFlush(
+      buttonByText(renderer, "Reintentar interpretación con AI"),
+    );
+    expect(recognize).toHaveBeenCalledOnce();
+    expect(aiParser.parse).toHaveBeenCalledTimes(2);
+    expect(aiParser.parse).toHaveBeenLastCalledWith(
+      transcript,
+      expect.any(AbortSignal),
+    );
+    expect(screenText(renderer)).toContain("Marca poco clara");
+    expect(resultSelectors(renderer)[0]?.props.accessibilityState).toEqual({
+      checked: false,
+    });
+  });
+
+  it("cancels extraction and ignores a late result", async () => {
+    let complete: ((items: readonly ShoppingIntentDraft[]) => void) | undefined;
+    const aiParser = {
+      parse: vi.fn(
+        () =>
+          new Promise<readonly ShoppingIntentDraft[]>((resolve) => {
+            complete = resolve;
+          }),
+      ),
+    };
+    const renderer = await renderPanel(serviceReturning("pan"), {
+      aiParser,
+    });
+    await enableAi(renderer);
+    await pressAndFlush(buttonByText(renderer, "Empezar a escuchar"));
+    expect(screenText(renderer)).toContain("Interpretando productos con AI");
+    await pressAndFlush(buttonByText(renderer, "Cancelar"));
+    await act(async () => {
+      complete?.([
+        {
+          rawText: "pan",
+          product: "pan",
+          confidence: "MEDIUM",
+          source: "AI",
+          needsReview: false,
+        },
+      ]);
+      await Promise.resolve();
+    });
+    expect(resultSelectors(renderer)).toHaveLength(0);
+    expect(screenText(renderer)).toContain("Petición cancelada");
   });
 
   it("shows native errors without producing a preview", async () => {
@@ -344,6 +533,18 @@ async function pressAndFlush(node: ReactTestInstance): Promise<void> {
   await act(async () => {
     press(node);
     await Promise.resolve();
+  });
+}
+
+async function enableAi(renderer: ReactTestRenderer): Promise<void> {
+  await act(() => {
+    const node = renderer.root.findByProps({
+      accessibilityLabel: "Usar AI para interpretar la transcripción",
+    });
+    const handler: unknown = node.props.onValueChange;
+    if (typeof handler !== "function")
+      throw new TypeError("Missing switch handler");
+    (handler as (value: boolean) => void)(true);
   });
 }
 

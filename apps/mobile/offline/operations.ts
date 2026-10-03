@@ -19,6 +19,7 @@ export function applyOperationLocally(
         package_count: operation.input.packageCount,
         package_size: operation.input.packageSize,
         package_unit: operation.input.packageUnit,
+        package_type: operation.input.packageType ?? null,
         total_amount: operation.input.totalAmount,
         brand_preference: operation.input.brandPreference,
         variant: operation.input.variant,

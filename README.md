@@ -78,19 +78,21 @@ Hay ejemplos sin secretos en `.env.example`, `.env.development.example`,
 `.env.staging.example` y `.env.production.example`. Cada entorno necesita su
 propio Supabase y sus propias credenciales:
 
-| Variable                           | Dónde             | Sensibilidad              |
-| ---------------------------------- | ----------------- | ------------------------- |
-| `APP_ENV`                          | build Expo        | pública                   |
-| `EXPO_PUBLIC_APP_SCHEME`           | bundle móvil      | pública                   |
-| `EXPO_PUBLIC_SUPABASE_URL`         | bundle móvil      | pública                   |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY`    | bundle móvil      | pública, limitada por RLS |
-| `SUPABASE_URL`                     | ingest/admin      | servidor                  |
-| `SUPABASE_SECRET_KEY`              | ingest/scheduler  | secreta                   |
-| `SUPABASE_SERVICE_ROLE_KEY`        | admin             | secreta                   |
-| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | admin             | secretas                  |
-| `REFRESH_WORKER_ID`                | workers           | no secreta                |
-| `RUN_LIVE_PROVIDER_TESTS`          | tests manuales    | no secreta                |
-| `GROQ_API_KEY`                     | Supabase Function | secreta                   |
+| Variable                           | Dónde              | Sensibilidad              |
+| ---------------------------------- | ------------------ | ------------------------- |
+| `APP_ENV`                          | build Expo         | pública                   |
+| `EXPO_PUBLIC_APP_SCHEME`           | bundle móvil       | pública                   |
+| `EXPO_PUBLIC_SUPABASE_URL`         | bundle móvil       | pública                   |
+| `EXPO_PUBLIC_SUPABASE_ANON_KEY`    | bundle móvil       | pública, limitada por RLS |
+| `SUPABASE_URL`                     | ingest/admin       | servidor                  |
+| `SUPABASE_SECRET_KEY`              | ingest/scheduler   | secreta                   |
+| `SUPABASE_SERVICE_ROLE_KEY`        | admin              | secreta                   |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | admin              | secretas                  |
+| `REFRESH_WORKER_ID`                | workers            | no secreta                |
+| `RUN_LIVE_PROVIDER_TESTS`          | tests manuales     | no secreta                |
+| `OPENAI_API_KEY`                   | Supabase Functions | secreta                   |
+| `OPENAI_EXTRACTION_MODEL`          | Supabase Functions | no secreta                |
+| `OPENAI_EXTRACTION_REASONING`      | Supabase Functions | no secreta                |
 
 Nunca pongas secret/service-role bajo `EXPO_PUBLIC_*`. Los valores de staging y
 production deben vivir en el gestor de secretos del host, GitHub Environments y
@@ -131,20 +133,32 @@ pnpm exec supabase login
 pnpm exec supabase link --project-ref YOUR_PROJECT_REF
 pnpm exec supabase db push --dry-run
 pnpm exec supabase db push
-pnpm exec supabase secrets set GROQ_API_KEY=gsk_YOUR_KEY
-pnpm exec supabase functions deploy transcribe-audio
+pnpm exec supabase secrets set --env-file supabase/.env.local
+pnpm exec supabase functions deploy extract-shopping-intents
 ```
 
 Ejecuta primero contra staging, valida el checklist y repite el link/push con el
 project ref de production. Haz backup y revisa el plan SQL antes de production.
 Las credenciales del admin/worker se configuran en sus runtimes Node. La
-`GROQ_API_KEY` es distinta: debe configurarse como secreto de Supabase y nunca
-como `EXPO_PUBLIC_*`, porque solo la Edge Function `transcribe-audio` la lee.
-Para probarla en local, crea un archivo ignorado `supabase/.env.local` con la
-clave y ejecuta en otro terminal:
+`OPENAI_API_KEY` debe configurarse como secreto de Supabase y nunca como
+`EXPO_PUBLIC_*`. Crea un proyecto de OpenAI con facturación y acceso a los
+modelos elegidos; la suscripción de ChatGPT no configura esta API.
+Guarda en el archivo ignorado `supabase/.env.local` únicamente:
+
+```dotenv
+OPENAI_API_KEY=YOUR_SERVER_ONLY_KEY
+OPENAI_EXTRACTION_MODEL=gpt-6-luna
+OPENAI_EXTRACTION_REASONING=none
+```
+
+No añadas claves `SUPABASE_*` al archivo que se envía a `secrets set`: el
+runtime proporciona URL y service-role. Puedes cambiar la extracción a
+`gpt-5.6-luna` y el razonamiento a `low`, y comparar con el corpus opt-in.
+OpenAI solo interpreta texto; no se usa ninguna API de transcripción de audio.
+Para probar la función localmente, ejecuta en otro terminal:
 
 ```powershell
-pnpm exec supabase functions serve transcribe-audio --env-file supabase/.env.local
+pnpm exec supabase functions serve extract-shopping-intents --env-file supabase/.env.local
 ```
 
 ## Providers e ingestión
@@ -201,13 +215,67 @@ Los secretos de Google y Apple nunca forman parte del bundle móvil. La
 configuración local deja ambos proveedores desactivados hasta que existan
 credenciales válidas.
 
-Voz requiere development build y dispositivo con reconocimiento disponible.
+Voz requiere una build Android/iOS con el módulo nativo (no Expo Go) y un
+dispositivo con reconocimiento disponible.
 Solo solicita permisos al empezar, muestra transcript/preview y añade únicamente
-las líneas confirmadas. El switch `AI` usa
-`whisper-large-v3-turbo` a través de la función autenticada de Supabase. El
-audio AI se graba directamente con el micrófono en la caché del dispositivo, sin
-activar el transcriptor nativo; después se envía a Groq para transcribir y se
-elimina al terminar.
+las líneas confirmadas. La voz siempre se convierte a texto con el transcriptor
+nativo habitual, sin llamadas a OpenAI para el audio. Con `AI` desactivado,
+el parser local interpreta ese texto. Con `AI` activado, `gpt-6-luna` extrae
+productos, cantidades, tamaños, envases, variantes y marcas del texto completo
+con JSON Schema estricto, a través de una función autenticada de Supabase.
+Solo se envía el texto a OpenAI, nunca audio. El reconocedor nativo puede utilizar
+los servicios del sistema operativo; no se fuerza reconocimiento offline.
+Máximo 8000 caracteres y 40 productos. La función tiene timeout de 45 segundos
+y el cliente de 60 segundos.
+Si falla la interpretación, se conserva el texto para reintentar sin grabar o
+utilizar explícitamente el parser local. Los productos ambiguos requieren selección.
+
+La migración `20261003100000_voice_ai_and_package_type.sql` conserva el tipo de
+envase en un enum nullable (4 bytes cuando está presente, sin índice adicional).
+Las agrupaciones anidadas se aplanan a envases individuales con su tamaño; el
+texto original confirmado conserva la agrupación dicha. No se almacenan audio,
+respuestas completas de IA, prompts ni historiales de peticiones. Los contadores
+de cuota ocupan como máximo una fila por usuario y una global; se reutilizan
+y se eliminan con el usuario. La migración posterior
+`20261003110000_voice_ai_text_only.sql` elimina únicamente los contadores de audio
+obsoletos y rechaza ese ámbito de cuota, incluso si la primera migración ya se
+había aplicado. Límite de extracción: 6 peticiones/minuto/usuario,
+60/día/usuario y 500/día globales (UTC), contando también los intentos fallidos.
+Las sesiones anónimas autenticadas de la app están sujetas a esos mismos límites.
+
+La extracción usa Responses con `store: false`, sin herramientas y con prompt
+versionado en código. No significa retención cero por parte del proveedor:
+consulta [los controles de datos de OpenAI](https://developers.openai.com/api/docs/guides/your-data).
+Antes de producción, aplica las migraciones, despliega `extract-shopping-intents` y la
+actualización móvil, revoca las credenciales del proveedor anterior y prueba voz
+en dispositivos Android/iOS reales. Los tests normales no consumen API.
+
+Si llegaste a desplegar la antigua función de audio, elimínala del proyecto
+Supabase objetivo y retira su variable obsoleta del servidor (también del archivo
+local de secretos si la añadiste):
+
+```powershell
+pnpm exec supabase functions delete transcribe-audio
+pnpm exec supabase secrets unset OPENAI_TRANSCRIPTION_MODEL
+```
+
+No uses `functions deploy --prune`: podría eliminar otras funciones ajenas a voz.
+Genera otra APK después de actualizar el código y retirar las dependencias de
+audio; las instrucciones de build de abajo siguen siendo válidas.
+
+Comparación manual (consume API, clave solo en el entorno del terminal):
+
+```powershell
+$env:RUN_LIVE_VOICE_AI_TESTS='true'
+# OPENAI_API_KEY debe estar ya configurada de forma segura en este terminal.
+$env:OPENAI_EVAL_MODELS='gpt-6-luna,gpt-5.6-luna'
+pnpm exec vitest run packages/voice-parser/src/ai-contract.live.test.ts
+```
+
+Repite con `OPENAI_EXTRACTION_REASONING=low` para comparar precisión, latencia
+y tokens. El corpus es inicial: añade transcripciones reales anonimizadas antes
+de afirmar una mejora cuantificada. Estos tests validan texto, no micrófonos ni
+la precisión de reconocimiento del audio.
 
 ### Android
 

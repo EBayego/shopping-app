@@ -877,6 +877,7 @@ export type Database = {
           package_count: number | null
           package_size: number | null
           package_unit: string | null
+          package_type: Database["public"]["Enums"]["shopping_package_type"] | null
           product_concept_id: string | null
           raw_text: string
           requested_quantity: number | null
@@ -898,6 +899,7 @@ export type Database = {
           package_count?: number | null
           package_size?: number | null
           package_unit?: string | null
+          package_type?: Database["public"]["Enums"]["shopping_package_type"] | null
           product_concept_id?: string | null
           raw_text: string
           requested_quantity?: number | null
@@ -919,6 +921,7 @@ export type Database = {
           package_count?: number | null
           package_size?: number | null
           package_unit?: string | null
+          package_type?: Database["public"]["Enums"]["shopping_package_type"] | null
           product_concept_id?: string | null
           raw_text?: string
           requested_quantity?: number | null
@@ -1076,6 +1079,7 @@ export type Database = {
           package_count?: number
           package_size?: number
           package_unit?: string
+          package_type?: Database["public"]["Enums"]["shopping_package_type"]
           product_concept_id?: string
           raw_text: string
           requested_quantity?: number
@@ -1371,6 +1375,10 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      consume_voice_ai_quota: {
+        Args: { actor_id: string; operation: string }
+        Returns: boolean
+      }
       create_group_with_initial_list: {
         Args: { group_name: string; list_name: string; postal_code: string }
         Returns: {
@@ -1402,6 +1410,7 @@ export type Database = {
           package_count?: number
           package_size?: number
           package_unit?: string
+          package_type?: Database["public"]["Enums"]["shopping_package_type"]
           raw_text: string
           requested_quantity?: number
           requested_unit?: string
@@ -1515,6 +1524,7 @@ export type Database = {
       }
     }
     Enums: {
+      shopping_package_type: "bottle" | "can" | "carton" | "bag" | "tray" | "jar" | "box" | "pack" | "tub" | "tube" | "jug"
       group_member_role: "owner" | "member"
       provider_health_status: "healthy" | "degraded" | "unavailable"
       provider_operational_status: "ACTIVE" | "DEGRADED" | "DISABLED"
@@ -1648,6 +1658,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      shopping_package_type: ["bottle", "can", "carton", "bag", "tray", "jar", "box", "pack", "tub", "tube", "jug"],
       group_member_role: ["owner", "member"],
       provider_health_status: ["healthy", "degraded", "unavailable"],
       provider_operational_status: ["ACTIVE", "DEGRADED", "DISABLED"],
@@ -1657,4 +1668,3 @@ export const Constants = {
     },
   },
 } as const
-

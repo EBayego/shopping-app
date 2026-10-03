@@ -30,6 +30,7 @@ import { VoiceShoppingPanel } from "../../features/voice/voice-shopping-panel";
 import { VoiceDiscoveryModal } from "../../features/voice/voice-discovery-modal";
 import {
   fieldValuesToDraft,
+  PACKAGE_LABELS,
   ShoppingIntentFields,
   type ShoppingIntentFieldValues,
 } from "../../features/voice/shopping-intent-fields";
@@ -41,7 +42,7 @@ import { useThemedStyles, useTheme } from "../../features/theme/theme-context";
 import { spacing, type ThemeColors } from "../../lib/theme";
 import { useOfflineSync } from "../../offline/offline-sync-provider";
 import { speechRecognitionService } from "../../services/expo-speech-recognition-service";
-import { useGroqSpeechRecognitionService } from "../../services/groq-speech-recognition-service";
+import { openAiShoppingIntentParser } from "../../services/openai-shopping-intent-parser";
 
 function firstParameter(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -66,6 +67,8 @@ function intentToFieldValues(
     packageCount: numberText(intent.package_count),
     packageSize: numberText(intent.package_size),
     packageUnit: unitText(intent.package_unit),
+    packageType:
+      intent.package_type == null ? "" : PACKAGE_LABELS[intent.package_type],
   };
 }
 
@@ -86,7 +89,6 @@ function capitalizeFirst(value: string): string {
 export default function GroupDetailScreen() {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
-  const groqSpeechRecognitionService = useGroqSpeechRecognitionService();
   const params = useLocalSearchParams<{
     groupId: string | string[];
     joinOutcome?: string | string[];
@@ -222,6 +224,7 @@ export default function GroupDetailScreen() {
             packageCount: parsed.packageCount ?? null,
             packageSize: parsed.packageSize ?? null,
             packageUnit: parsed.packageUnit ?? null,
+            packageType: parsed.packageType ?? null,
             totalAmount: parsed.totalAmount ?? null,
             brandPreference: parsed.brandPreference ?? null,
             variant: parsed.variant ?? null,
@@ -368,7 +371,7 @@ export default function GroupDetailScreen() {
                 onClose={() => setVoiceOpen(false)}
                 onConfirm={addVoiceDrafts}
                 service={speechRecognitionService}
-                aiService={groqSpeechRecognitionService}
+                aiParser={openAiShoppingIntentParser}
               />
             ) : null}
             {inputError ? <Text style={styles.error}>{inputError}</Text> : null}

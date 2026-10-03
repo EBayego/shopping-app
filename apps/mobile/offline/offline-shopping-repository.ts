@@ -3,6 +3,7 @@ import type {
   GroupSummary,
   ShoppingIntent,
 } from "../features/groups/types";
+import type { ShoppingPackageType } from "@shopping-app/voice-parser";
 import {
   getGroupDetail,
   listGroups,
@@ -72,6 +73,7 @@ export function createLocalIntent(input: {
   packageCount?: number;
   packageSize?: number;
   packageUnit?: string;
+  packageType?: ShoppingPackageType;
   totalAmount?: number;
   brandPreference?: string;
   variant?: string;
@@ -87,6 +89,7 @@ export function createLocalIntent(input: {
     package_count: input.packageCount ?? null,
     package_size: input.packageSize ?? null,
     package_unit: input.packageUnit ?? null,
+    package_type: input.packageType ?? null,
     total_amount: input.totalAmount ?? null,
     brand_preference: input.brandPreference ?? null,
     variant: input.variant ?? null,

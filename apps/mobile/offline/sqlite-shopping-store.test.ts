@@ -129,6 +129,7 @@ function intentFixture(): ShoppingIntent {
     package_count: null,
     package_size: null,
     package_unit: null,
+    package_type: null,
     total_amount: 1,
     brand_preference: null,
     variant: null,
