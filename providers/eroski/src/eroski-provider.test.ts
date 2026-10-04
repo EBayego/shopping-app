@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  ProviderAccessBlockedError,
   MarketResolutionError,
   ProductNotFoundError,
   ProviderContractChangedError,
@@ -69,18 +70,24 @@ describe("EroskiProvider", () => {
     );
   });
 
-  it("keeps missing public-shop cookies and access denials as market failures", async () => {
-    for (const response of [
-      htmlResponse("no shop"),
-      htmlResponse("denied", 403),
-    ]) {
-      const provider = new EroskiProvider({
-        fetch: vi.fn<typeof fetch>().mockResolvedValue(response),
-      });
-      await expect(provider.resolveMarket("50009")).rejects.toBeInstanceOf(
-        MarketResolutionError,
-      );
-    }
+  it("keeps missing public-shop cookies as a market failure", async () => {
+    const provider = new EroskiProvider({
+      fetch: vi.fn<typeof fetch>().mockResolvedValue(htmlResponse("no shop")),
+    });
+    await expect(provider.resolveMarket("50009")).rejects.toBeInstanceOf(
+      MarketResolutionError,
+    );
+  });
+
+  it("reports denied bootstrap access distinctly from an invalid market", async () => {
+    const provider = new EroskiProvider({
+      fetch: vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(htmlResponse("denied", 403)),
+    });
+    await expect(provider.resolveMarket("50009")).rejects.toBeInstanceOf(
+      ProviderAccessBlockedError,
+    );
   });
 
   it("resuelve la tienda pública y refresca un producto por su id", async () => {

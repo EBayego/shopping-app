@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  ProviderAccessBlockedError,
   ProductNotFoundError,
   ProviderContractChangedError,
   RateLimitedError,
@@ -54,6 +55,19 @@ function productFixtureWithPrice(price: number): unknown {
 }
 
 describe("MercadonaProvider", () => {
+  it("reports HTTP 403 for a product as blocked access, preserving its identity", async () => {
+    const provider = new MercadonaProvider({
+      fetch: vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(marketResponse())
+        .mockResolvedValueOnce(new Response("denied", { status: 403 })),
+      maxRetries: 0,
+    });
+    const market = await provider.resolveMarket("50009");
+    await expect(
+      provider.refreshPrices(["33190"], market),
+    ).rejects.toBeInstanceOf(ProviderAccessBlockedError);
+  });
   it("resuelve un mercado inmutable y conserva el warehouse en el contexto", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

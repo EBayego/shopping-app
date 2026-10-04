@@ -21,6 +21,14 @@
         "EXPO_PUBLIC_APP_SCHEME": "shopping-app-staging"
       }
     },
+    "production-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "environment": "production",
+      "android": {
+        "buildType": "apk"
+      }
+    },
     "production": {
       "channel": "production",
       "autoIncrement": true,

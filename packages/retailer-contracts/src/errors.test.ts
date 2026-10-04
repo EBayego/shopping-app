@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ProviderAccessBlockedError,
   MarketResolutionError,
   ProductNotFoundError,
   ProviderCapabilityUnavailableError,
@@ -11,6 +12,14 @@ import {
 } from "./errors.js";
 
 describe("errores de provider", () => {
+  it("keeps access blocks as an unavailable provider with an explicit type", () => {
+    const cause = new Error("HTTP 403");
+    const error = new ProviderAccessBlockedError("DIA", { cause });
+    expect(error).toBeInstanceOf(ProviderUnavailableError);
+    expect(error.name).toBe("ProviderAccessBlockedError");
+    expect(error.provider).toBe("DIA");
+    expect(error.cause).toBe(cause);
+  });
   it("conserva provider, tipo, mensaje y causa", () => {
     const cause = new Error("network failure");
     const error = new ProviderUnavailableError("DIA", { cause });

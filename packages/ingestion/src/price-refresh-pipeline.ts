@@ -1,5 +1,8 @@
 import type { ProviderHealth } from "@shopping-app/domain";
-import { ProductNotFoundError } from "@shopping-app/retailer-contracts";
+import {
+  ProductNotFoundError,
+  ProviderUnavailableError,
+} from "@shopping-app/retailer-contracts";
 
 import { silentLogger } from "./logger.js";
 import { ObservedIngestionError } from "./observed-ingestion-error.js";
@@ -102,6 +105,11 @@ export class PriceRefreshPipeline {
     try {
       const candidates = await this.store.listPriceRefreshCandidates(session);
       const selected = selection.select(candidates, request.productIds);
+      await this.strategy.prepareRefresh(
+        selected.map((candidate) => candidate.retailerProductExternalId),
+        market,
+        this.executor,
+      );
       const outcomes = await Promise.all(
         selected.map(async (candidate) => {
           try {
@@ -139,7 +147,9 @@ export class PriceRefreshPipeline {
                 retailerProductExternalId: candidate.retailerProductExternalId,
                 error: safeError(error),
               } satisfies PriceRefreshFailure,
-              transient: isTransientProviderError(error),
+              unavailable:
+                error instanceof ProviderUnavailableError ||
+                isTransientProviderError(error),
             } as const;
           }
         }),
@@ -163,7 +173,9 @@ export class PriceRefreshPipeline {
       const health = await this.completionHealth(
         market.retailer,
         status,
-        outcomes.some((outcome) => "transient" in outcome && outcome.transient),
+        outcomes.some(
+          (outcome) => "unavailable" in outcome && outcome.unavailable,
+        ),
         failures.length,
       );
       const prepared = this.persistence.prepare(market, {
@@ -219,14 +231,14 @@ export class PriceRefreshPipeline {
   private async completionHealth(
     retailer: ProviderHealth["retailer"],
     status: PriceRefreshResult["status"],
-    hasTransientFailure: boolean,
+    hasAvailabilityFailure: boolean,
     failureCount: number,
   ): Promise<ProviderHealth> {
     if (status !== "succeeded") {
       return {
         retailer,
         status:
-          status === "failed" && hasTransientFailure
+          status === "failed" && hasAvailabilityFailure
             ? "unavailable"
             : "degraded",
         checkedAt: this.now(),

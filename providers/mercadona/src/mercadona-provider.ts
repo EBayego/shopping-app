@@ -6,6 +6,7 @@ import type {
   RetailerProduct,
 } from "@shopping-app/domain";
 import {
+  ProviderAccessBlockedError,
   MarketResolutionError,
   ProductNotFoundError,
   ProviderContractChangedError,
@@ -243,6 +244,12 @@ export class MercadonaProvider
         ...(error.retryAfterMs === undefined
           ? {}
           : { retryAfterMs: error.retryAfterMs }),
+        cause: error,
+      });
+    }
+    if (error.status === 401 || error.status === 403) {
+      return new ProviderAccessBlockedError("MERCADONA", {
+        message: `Mercadona denied access with HTTP ${error.status}`,
         cause: error,
       });
     }

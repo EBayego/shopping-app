@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import {
+  ProviderAccessBlockedError,
   ProviderContractChangedError,
   ProviderUnavailableError,
   RateLimitedError,
@@ -86,7 +87,11 @@ describe("AlcampoProvider", () => {
       ),
     });
     const market = await provider.resolveMarket("50009");
-    await expect(provider.getProduct("54180", market)).rejects.toThrow(
+    const error = await provider
+      .getProduct("54180", market)
+      .catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ProviderAccessBlockedError);
+    expect((error as ProviderAccessBlockedError).message).toContain(
       "AWS WAF challenge",
     );
   });

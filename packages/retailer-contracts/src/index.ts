@@ -1,4 +1,5 @@
 export {
+  ProviderAccessBlockedError,
   MarketResolutionError,
   ProductNotFoundError,
   ProviderCapabilityUnavailableError,

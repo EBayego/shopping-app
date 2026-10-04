@@ -243,3 +243,45 @@ individual. Los errores de transporte durante la resolución de mercado de
 Eroski conservan su carácter transitorio. Los logs de retry y preflight incluyen
 estado HTTP, tipo de transporte y código de red cuando existen, sin serializar
 las causas completas ni las credenciales de sesión.
+
+`ProviderAccessBlockedError` identifica denegaciones `401`/`403` y los challenges
+WAF de Alcampo. No se reintentan inmediatamente; siguen contando para el
+cortacircuitos. El scheduler conserva el código de salida 1 cuando uno o más
+trabajos terminan en `FAILED`. Una salida parcial puede haber persistido precios
+válidos aunque el tick termine con fallo.
+
+Para Mercadona, un refresh de 500 o más productos obtiene los precios actuales
+del catálogo y selecciona las ofertas solicitadas. Mantiene las consultas
+individuales para selecciones pequeñas y SKUs ausentes del listado. La ausencia
+en catálogo no retira productos: sigue siendo necesario confirmar un `404` por
+ficha. El refresh conserva las fechas de observación recibidas y no actualiza
+los metadatos de producto ni registra ausencias de un sync de catálogo.
+
+## Acceso desde el entorno de ejecución
+
+El scheduler del 4 de octubre de 2026 terminó con cinco trabajos fallidos por
+denegaciones de acceso desde el runner hospedado. DIA y Eroski recibieron `403`,
+Alcampo un challenge WAF y Mercadona tuvo errores `403` entre sus éxitos. La
+comprobación local posterior funcionó para los tres providers que recibieron
+`403`. Los detalles y las mediciones están en el apartado de seguimiento de la
+[auditoría de providers](ingestion-provider-audit.md).
+
+La siguiente validación se realiza con el workflow manual `Provider live tests`:
+selecciona `provider=all` y activa `compare_runners`. Ejecuta las pruebas en
+`ubuntu-latest`, `windows-latest` y `macos-latest` y conserva los resultados de
+todos aunque uno falle. La comparación usa únicamente runners hospedados de
+GitHub y no persiste datos en Supabase. Su opción está desactivada por defecto.
+Incluye una prueba del refresh de Mercadona con al menos 500 IDs reales que
+registra cuántas consultas de categoría y ficha necesita.
+
+Según la [referencia de runners de GitHub](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#ip-addresses),
+Ubuntu y Windows utilizan Azure y macOS utiliza la nube propia de GitHub.
+Compara los resultados antes de elegir otra etiqueta fija para el scheduler.
+Cambiar el sistema operativo no garantiza resolver el bloqueo. El scheduler
+continúa en `ubuntu-latest` hasta validar un destino alternativo; no se ha
+instalado un runner propio.
+
+Los trabajos que agotan intentos permanecen en `FAILED`. Después de solucionar
+el acceso, solicita nuevos trabajos desde el admin o espera a la siguiente
+cadencia. Volver a ejecutar el workflow no restablece los intentos ni fuerza
+los scopes que todavía no están vencidos.

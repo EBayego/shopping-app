@@ -14,6 +14,87 @@ No se ejecutó el scheduler contra Supabase ni se modificaron datos remotos.
 Los resultados describen el acceso observado desde este equipo, no garantizan
 que una IP de GitHub Actions reciba las mismas respuestas.
 
+## Seguimiento: scheduler del 4 de octubre, 19:19–19:28 en Madrid
+
+La [ejecución posterior a subir las correcciones](https://github.com/EBayego/shopping-app/actions/runs/37220056974)
+terminó de procesar los seis trabajos. No hubo OOM ni timeout del workflow:
+el código de salida 1 procede de `assertSuccessfulTick`, porque cinco trabajos
+agotaron sus intentos. El sexto quedó pendiente de reintento.
+
+| Provider/trabajo        | Resultado observado                                                                                                  |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| DIA, precios y catálogo | `HTTP 403` al resolver el mercado en ambos trabajos                                                                  |
+| Alcampo, precios        | 289 seleccionados: 6 actualizados, 5 challenges WAF y 278 rechazos del cortacircuitos                                |
+| Alcampo, catálogo       | Challenge WAF durante la resolución de mercado                                                                       |
+| Eroski, catálogo        | `HTTP 403` durante bootstrap                                                                                         |
+| Mercadona, precios      | 4.476 seleccionados: 4.016 actualizados, 140 retirados por `404`, 304 errores `403` y 16 rechazos del cortacircuitos |
+
+El runner estaba en Azure `eastus`. En la comprobación local posterior, DIA y
+Eroski resolvieron el mercado y los SKUs de Mercadona `33190` y `33357`, que
+fallaron con `403` en el runner, devolvieron ofertas válidas. Esto demuestra una
+diferencia de acceso entre entornos; no demuestra qué regla concreta del servidor
+denegó las peticiones. Cambiar endpoints o aumentar el heap no resuelve esa
+denegación. El `202` de Alcampo con `x-amzn-waf-action: challenge` coincide con
+el [comportamiento documentado de AWS WAF](https://docs.aws.amazon.com/waf/latest/developerguide/waf-captcha-and-challenge-actions.html).
+
+Correcciones de este seguimiento:
+
+- `ProviderAccessBlockedError` distingue `401`/`403` y el challenge de Alcampo
+  de un timeout o un `503`. El executor no hace reintentos inmediatos de esas
+  denegaciones, pero las cuenta para el cortacircuitos. Los errores `429`, de
+  red y `5xx` mantienen sus reintentos. El scheduler sigue devolviendo fallo
+  cuando hay trabajos fallidos.
+- Para Mercadona, desde **500 productos seleccionados**, el refresh recoge los
+  precios actuales del catálogo usando la estrategia incremental existente.
+  Conserva únicamente las ofertas de los productos seleccionados y su
+  `observedAt` original. En consultas pequeñas sigue usando la ficha.
+- Un SKU ausente del listado se consulta por ficha: solo un `404` confirmado
+  permite retirarlo. Un fallo de todo el catálogo no provoca una avalancha de
+  consultas individuales. Las observaciones se descartan antes de cada nuevo
+  refresh para evitar reutilizar precios viejos.
+
+Validación posterior: **473 tests** pasan, además de lint y typecheck. Las
+**8 pruebas live de DIA, Mercadona y Eroski**, incluida la nueva prueba del
+refresh grande, pasan desde este equipo. La nueva prueba refrescó **512 productos** con
+**153 llamadas** (árbol y 152 categorías), **ninguna consulta individual de
+ficha**, en **11,07 segundos** de refresh. Una comprobación previa de la misma
+estrategia recibió `200` en sus 153 llamadas y duró 9,46 segundos.
+Incluyó los dos SKUs de Mercadona
+que habían recibido `403`. Es una medición local de esa selección, no una
+garantía del tiempo ni del resultado de los 4.476 productos en GitHub.
+
+El usuario solo puede utilizar runners hospedados de GitHub. El workflow
+`Provider live tests` ahora permite elegir `provider=all` y
+`compare_runners=true`: compara los cuatro providers en destinos fijos
+`ubuntu-latest`, `windows-latest` y `macos-latest`, con `fail-fast=false` para
+obtener los resultados de los tres. La opción de comparación está desactivada
+por defecto. Estas pruebas consultan los providers y no ejecutan una ingesta
+en Supabase. Incluyen `mercadona-catalog-refresh.live.test.ts`, que obtiene una
+selección de al menos 500 IDs reales y comprueba el refresh por catálogo con
+métricas JSON de peticiones. También se ejecuta al elegir solo Mercadona.
+
+La [documentación de GitHub](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#ip-addresses)
+indica que Windows y Ubuntu utilizan Azure, mientras que macOS utiliza la nube
+propia de GitHub. Esto justifica comparar su acceso; no garantiza que macOS
+resuelva los bloqueos ni permite elegir España como región de un runner
+estándar. El scheduler sigue en `ubuntu-latest` hasta disponer de resultados.
+La propuesta anterior de runners dinámicos fue rechazada por la revisión
+automática; se sustituyó por esta comparación limitada a destinos hospedados
+conocidos. No se ha instalado un runner propio.
+
+Después de subir los cambios, ejecutar `Provider live tests` con las dos
+opciones anteriores es la siguiente comprobación. Si otro runner funciona,
+se puede trasladar el scheduler a esa etiqueta fija. Si todos reciben
+`403`/challenge, cambiar el sistema operativo no basta: el acceso desde los
+runners hospedados sigue siendo un problema externo pendiente. No se ha
+disparado el workflow ni cambiado el destino del scheduler en esta revisión.
+
+Después de resolver el acceso, los cinco trabajos en `FAILED` necesitan nuevas
+solicitudes desde el admin o esperar a la siguiente cadencia. Subir código y
+repetir el workflow no reinicia automáticamente los intentos de esas solicitudes.
+Esta ejecución no encoló trabajos nuevos (`enqueuedCount=0`); consumió la cola
+existente. Los éxitos parciales de precios ya se han conservado.
+
 ## Flujo de los scripts
 
 - `pnpm ingest:scheduler`: despacha trabajos vencidos en Supabase y consume la
@@ -24,7 +105,8 @@ que una IP de GitHub Actions reciba las mismas respuestas.
   operaciones de categoría concurrentes por defecto.
 - `PRICE_REFRESH`: resuelve mercado, lista candidatos de Supabase y aplica la
   política de frescura y uso en listas. Refresca un SKU por operación, con dos
-  operaciones concurrentes por defecto. Conserva los éxitos de una ejecución
+  operaciones concurrentes por defecto; Mercadona utiliza precios de catálogo
+  para selecciones de al menos 500 productos. Conserva los éxitos de una ejecución
   parcial; solo retira productos con un `404` tipado como producto inexistente.
 - El worker considera una ejecución parcial fallida a efectos de reprogramación;
   no la presenta como un refresh completo. Los fallos previos a abrir un run ahora
@@ -171,7 +253,8 @@ un endpoint para esa capability.
 **Corrección de reintentos:** timeouts, fallos de red, `408`, `425` y `5xx`
 durante bootstrap antes se envolvían como `MarketResolutionError`, que el
 executor no reintenta. Ahora conservan `ProviderUnavailableError`. Los errores
-permanentes o la ausencia de cookies de tienda siguen siendo fallos de mercado;
+de ausencia de cookies de tienda siguen siendo fallos de mercado. Tras el
+seguimiento, `401`/`403` se identifican como acceso bloqueado;
 `429` conserva el tratamiento de rate limit.
 
 ## Fallos del scheduler y cortacircuitos

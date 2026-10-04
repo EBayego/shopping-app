@@ -1,4 +1,5 @@
 import {
+  ProviderAccessBlockedError,
   ProviderContractChangedError,
   ProviderUnavailableError,
 } from "@shopping-app/retailer-contracts";
@@ -50,6 +51,34 @@ describe("ProviderExecutor", () => {
       ProviderContractChangedError,
     );
     expect(action).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not retry access blocks but still opens the circuit after blocked operations", async () => {
+    const sleep = vi.fn(() => Promise.resolve());
+    const subject = new ProviderExecutor(
+      "ALCAMPO",
+      1,
+      { maxAttempts: 3, initialDelayMs: 1, maxDelayMs: 10, jitterRatio: 0 },
+      { failureThreshold: 2, resetAfterMs: 30_000 },
+      silentLogger,
+      () => new Date("2026-10-04T19:00:00Z"),
+      sleep,
+      () => 0.5,
+    );
+    const action = vi.fn(() =>
+      Promise.reject(new ProviderAccessBlockedError("ALCAMPO")),
+    );
+    await expect(subject.run("refresh_price", action)).rejects.toBeInstanceOf(
+      ProviderAccessBlockedError,
+    );
+    await expect(subject.run("refresh_price", action)).rejects.toBeInstanceOf(
+      ProviderAccessBlockedError,
+    );
+    await expect(subject.run("refresh_price", action)).rejects.toBeInstanceOf(
+      CircuitOpenError,
+    );
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(sleep).not.toHaveBeenCalled();
   });
 
   it("allows all retries and counts one failure per exhausted operation", async () => {

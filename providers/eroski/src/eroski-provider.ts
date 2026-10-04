@@ -6,6 +6,7 @@ import type {
   RetailerProduct,
 } from "@shopping-app/domain";
 import {
+  ProviderAccessBlockedError,
   MarketResolutionError,
   ProductNotFoundError,
   ProviderContractChangedError,
@@ -104,7 +105,9 @@ export class EroskiProvider
           error.status === 408 ||
           error.status === 425 ||
           (error.status !== undefined && error.status >= 500));
-      throw mapped instanceof RateLimitedError || transient
+      throw mapped instanceof RateLimitedError ||
+        mapped instanceof ProviderAccessBlockedError ||
+        transient
         ? mapped
         : new MarketResolutionError("EROSKI", normalized, {
             message: "Eroski public default market could not be resolved",
@@ -346,6 +349,14 @@ export class EroskiProvider
         ...(error.retryAfterMs === undefined
           ? {}
           : { retryAfterMs: error.retryAfterMs }),
+        cause: error,
+      });
+    if (
+      error instanceof EroskiHttpError &&
+      (error.status === 401 || error.status === 403)
+    )
+      return new ProviderAccessBlockedError("EROSKI", {
+        message: `Eroski denied access to ${resource} with HTTP ${error.status}`,
         cause: error,
       });
     return new ProviderUnavailableError("EROSKI", {

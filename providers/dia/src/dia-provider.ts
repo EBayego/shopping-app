@@ -8,6 +8,7 @@ import type {
   RetailerProduct,
 } from "@shopping-app/domain";
 import {
+  ProviderAccessBlockedError,
   MarketResolutionError,
   ProductNotFoundError,
   ProviderContractChangedError,
@@ -448,6 +449,12 @@ export class DiaProvider
         ...(error.retryAfterMs === undefined
           ? {}
           : { retryAfterMs: error.retryAfterMs }),
+        cause: error,
+      });
+    }
+    if (error.status === 401 || error.status === 403) {
+      return new ProviderAccessBlockedError("DIA", {
+        message: `DIA denied access with HTTP ${error.status}`,
         cause: error,
       });
     }

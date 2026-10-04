@@ -6,6 +6,7 @@ import type {
   RetailerProduct,
 } from "@shopping-app/domain";
 import {
+  ProviderAccessBlockedError,
   MarketResolutionError,
   ProductNotFoundError,
   ProviderContractChangedError,
@@ -452,7 +453,9 @@ export class AlcampoProvider
         error.status === 408 ||
         error.status === 425 ||
         (error.status !== undefined && error.status >= 500));
-    return mapped instanceof RateLimitedError || transient
+    return mapped instanceof RateLimitedError ||
+      mapped instanceof ProviderAccessBlockedError ||
+      transient
       ? mapped
       : new MarketResolutionError("ALCAMPO", postalCode, {
           message:
@@ -481,6 +484,16 @@ export class AlcampoProvider
         ...(error.retryAfterMs === undefined
           ? {}
           : { retryAfterMs: error.retryAfterMs }),
+        cause: error,
+      });
+    if (
+      error instanceof AlcampoHttpError &&
+      (error.status === 401 ||
+        error.status === 403 ||
+        (error.status === 202 && error.kind === "http"))
+    )
+      return new ProviderAccessBlockedError("ALCAMPO", {
+        message: `Alcampo blocked access to ${resource}: ${error.message}`,
         cause: error,
       });
     return new ProviderUnavailableError("ALCAMPO", {

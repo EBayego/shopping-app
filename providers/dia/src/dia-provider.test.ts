@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  ProviderAccessBlockedError,
   ProductNotFoundError,
   ProviderContractChangedError,
   ProviderUnavailableError,
@@ -81,6 +82,17 @@ function productDetail(price: number): unknown {
 
 describe("DiaProvider", () => {
   beforeEach(() => vi.restoreAllMocks());
+
+  it("reports HTTP 403 during market resolution as blocked access", async () => {
+    const provider = createProvider(
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response("denied", { status: 403 })),
+    );
+    await expect(provider.resolveMarket("50009")).rejects.toBeInstanceOf(
+      ProviderAccessBlockedError,
+    );
+  });
 
   it("resuelve el mercado y usa el session_id definitivo en producto", async () => {
     const fetchMock = vi

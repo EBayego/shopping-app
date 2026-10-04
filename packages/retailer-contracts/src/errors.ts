@@ -31,6 +31,16 @@ export class ProviderUnavailableError extends ProviderError {
   }
 }
 
+export class ProviderAccessBlockedError extends ProviderUnavailableError {
+  constructor(provider: Retailer, options: ProviderErrorOptions = {}) {
+    super(provider, {
+      ...options,
+      message: options.message ?? `Access to provider ${provider} is blocked`,
+    });
+    this.name = "ProviderAccessBlockedError";
+  }
+}
+
 export interface RateLimitedErrorOptions extends ProviderErrorOptions {
   retryAfterMs?: number;
 }

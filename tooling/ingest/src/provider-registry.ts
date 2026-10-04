@@ -1,5 +1,6 @@
 import type { Retailer } from "@shopping-app/domain";
 import {
+  CatalogPriceRefreshIngestionStrategy,
   CatalogIngestionStrategy,
   PriceRefreshIngestionStrategy,
   SearchIngestionStrategy,
@@ -41,7 +42,7 @@ const REGISTRY: Partial<Record<Retailer, ProviderRegistration>> = {
     capabilities: ["CATALOG", "PRICE_REFRESH"],
     createCatalog: () => new CatalogIngestionStrategy(new MercadonaProvider()),
     createPriceRefresh: () =>
-      new PriceRefreshIngestionStrategy(new MercadonaProvider()),
+      new CatalogPriceRefreshIngestionStrategy(new MercadonaProvider()),
   },
   ALCAMPO: {
     capabilities: ["CATALOG", "PRICE_REFRESH"],

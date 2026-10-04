@@ -292,12 +292,25 @@ pnpm dlx eas-cli login
 Set-Location apps/mobile
 pnpm dlx eas-cli init
 pnpm dlx eas-cli build --platform android --profile staging
+pnpm dlx eas-cli build --platform android --profile production-apk
 pnpm dlx eas-cli build --platform android --profile production
 ```
 
 Antes configura en EAS las dos variables públicas Supabase del entorno. EAS
 solicitará o reutilizará el keystore; conserva su custodia. Verifica el enlace
 de invitación y voz sobre el AAB/APK resultante.
+
+`production-apk` genera una APK release instalable directamente con el nombre,
+identifier, scheme y canal de producción. Usa las variables del entorno EAS
+`production`: si comparte backend con staging, configura allí la misma URL y
+clave pública de Supabase. `production` genera un AAB para Google Play.
+
+`app.json` registra `expo-build-properties`, heredado por `app.config.ts`,
+para comprimir bibliotecas nativas en la APK y habilitar minificación R8 y
+eliminación de recursos no utilizados en builds release. El tamaño final debe
+medirse después de compilar y las funciones nativas deben probarse en un
+dispositivo. `supabase db push` solo es necesario si hay migraciones pendientes;
+se ejecuta desde la raíz del repositorio y no forma parte de la compilación.
 
 ### iOS
 

@@ -1,4 +1,5 @@
 import {
+  ProviderAccessBlockedError,
   ProviderUnavailableError,
   RateLimitedError,
 } from "@shopping-app/retailer-contracts";
@@ -88,6 +89,10 @@ export class ProviderExecutor {
         delete this.circuit.openedAt;
         return result;
       } catch (error) {
+        if (error instanceof ProviderAccessBlockedError) {
+          this.recordFailure();
+          throw error;
+        }
         if (!isTransientProviderError(error)) throw error;
         // Retries belong to one operation. A recovered attempt must not open
         // the circuit and prevent unrelated products from being refreshed.
@@ -156,7 +161,8 @@ export function createProviderExecutor(
 export function isTransientProviderError(error: unknown): boolean {
   return (
     error instanceof RateLimitedError ||
-    error instanceof ProviderUnavailableError
+    (error instanceof ProviderUnavailableError &&
+      !(error instanceof ProviderAccessBlockedError))
   );
 }
 

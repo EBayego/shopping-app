@@ -8,6 +8,17 @@ export class PriceRefreshIngestionStrategy {
 
   constructor(readonly provider: PriceRefreshRetailerProvider) {}
 
+  prepareRefresh(
+    productIds: readonly string[],
+    market: Market,
+    runner: ProviderOperationRunner,
+  ): Promise<void> {
+    void productIds;
+    void market;
+    void runner;
+    return Promise.resolve();
+  }
+
   refreshProduct(
     retailerProductExternalId: string,
     market: Market,

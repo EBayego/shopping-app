@@ -9,17 +9,28 @@ on:
         default: dia
         type: choice
         options:
+          - all
           - dia
           - mercadona
           - alcampo
           - eroski
+      compare_runners:
+        description: Compare access on Ubuntu, Windows and macOS hosted by GitHub
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
 
 jobs:
   live-test:
-    runs-on: ubuntu-latest
+    name: Live tests (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: ${{ inputs.compare_runners && fromJSON('["ubuntu-latest","windows-latest","macos-latest"]') || fromJSON('["ubuntu-latest"]') }}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 10
     environment: provider-live-tests
     env:
@@ -44,4 +55,13 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run selected provider live tests
+        if: inputs.provider != 'all'
         run: pnpm exec vitest run "providers/${{ inputs.provider }}/src/${{ inputs.provider }}-provider.live.test.ts"
+
+      - name: Run all provider live tests
+        if: inputs.provider == 'all'
+        run: pnpm test:live
+
+      - name: Run Mercadona catalog price refresh live test
+        if: inputs.provider == 'mercadona'
+        run: pnpm exec vitest run tooling/ingest/src/mercadona-catalog-refresh.live.test.ts

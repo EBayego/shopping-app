@@ -17,6 +17,7 @@ export type {
   SelectedPriceRefreshProduct,
 } from "./price-refresh-policy.js";
 export { PriceRefreshIngestionStrategy } from "./price-refresh-strategy.js";
+export { CatalogPriceRefreshIngestionStrategy } from "./catalog-price-refresh-strategy.js";
 export {
   CatalogIngestionStrategy,
   SearchIngestionStrategy,

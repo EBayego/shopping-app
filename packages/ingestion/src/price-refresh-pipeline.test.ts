@@ -5,6 +5,7 @@ import type {
   RetailerProduct,
 } from "@shopping-app/domain";
 import {
+  ProviderAccessBlockedError,
   ProductNotFoundError,
   RateLimitedError,
   type PriceRefreshRetailerProvider,
@@ -13,6 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { PriceRefreshPipeline } from "./price-refresh-pipeline.js";
 import { PriceRefreshIngestionStrategy } from "./price-refresh-strategy.js";
+import { CatalogPriceRefreshIngestionStrategy } from "./catalog-price-refresh-strategy.js";
 import type {
   FinishSyncRunInput,
   IngestionScope,
@@ -158,6 +160,113 @@ const staleCandidates: PriceRefreshCandidate[] = [
 ];
 
 describe("PriceRefreshPipeline", () => {
+  it("uses catalog prices for a large selection and confirms missing products by detail", async () => {
+    const sourceObservedAt = new Date(now.getTime() - 60_000);
+    const provider = Object.assign(
+      new FakeRefreshProvider((id) =>
+        Promise.reject(new ProductNotFoundError("DIA", id)),
+      ),
+      {
+        getCategories: vi.fn(() =>
+          Promise.resolve([{ externalId: "milk", name: "Milk", level: 1 }]),
+        ),
+        getProductsByCategory: vi.fn(() =>
+          Promise.resolve({
+            products: [],
+            offers: [offer("good", sourceObservedAt), offer("not-selected")],
+          }),
+        ),
+      },
+    );
+    const store = new FakeRefreshStore(staleCandidates);
+    const result = await new PriceRefreshPipeline(
+      new CatalogPriceRefreshIngestionStrategy(provider, 2),
+      store,
+      { now: () => now },
+    ).refresh({ postalCode: "50009" });
+    expect(result.status).toBe("succeeded");
+    expect(provider.calls).toEqual(["bad"]);
+    expect(provider.getProductsByCategory).toHaveBeenCalledTimes(1);
+    expect(store.persistedOffers).toEqual([offer("good", sourceObservedAt)]);
+    expect(store.deactivatedProductIds).toEqual(["bad"]);
+    expect(store.finished[0]?.offersSeen).toBe(1);
+  });
+
+  it("clears catalog observations before a later small manual refresh", async () => {
+    const oldObservedAt = new Date(now.getTime() - 60_000);
+    const provider = Object.assign(
+      new FakeRefreshProvider((id) =>
+        Promise.resolve([{ ...offer(id), normalPrice: 2.49 }]),
+      ),
+      {
+        getCategories: vi.fn(() =>
+          Promise.resolve([{ externalId: "milk", name: "Milk", level: 1 }]),
+        ),
+        getProductsByCategory: vi.fn(() =>
+          Promise.resolve({
+            products: [],
+            offers: [offer("good", oldObservedAt), offer("bad", oldObservedAt)],
+          }),
+        ),
+      },
+    );
+    const store = new FakeRefreshStore(staleCandidates);
+    const pipeline = new PriceRefreshPipeline(
+      new CatalogPriceRefreshIngestionStrategy(provider, 2),
+      store,
+      { now: () => now },
+    );
+    await pipeline.refresh({ postalCode: "50009" });
+    await pipeline.refresh({ postalCode: "50009", productIds: ["good"] });
+    expect(provider.getCategories).toHaveBeenCalledTimes(1);
+    expect(provider.calls).toEqual(["good"]);
+    expect(store.persistedOffers.at(-1)).toEqual({
+      ...offer("good"),
+      normalPrice: 2.49,
+    });
+  });
+
+  it("does not fall back to thousands of detail requests when the whole catalog is blocked", async () => {
+    const provider = Object.assign(new FakeRefreshProvider(), {
+      getCategories: () =>
+        Promise.resolve([{ externalId: "milk", name: "Milk", level: 1 }]),
+      getProductsByCategory: vi.fn(() =>
+        Promise.reject(new ProviderAccessBlockedError("DIA")),
+      ),
+    });
+    const store = new FakeRefreshStore(staleCandidates);
+    await expect(
+      new PriceRefreshPipeline(
+        new CatalogPriceRefreshIngestionStrategy(provider, 2),
+        store,
+        { now: () => now },
+      ).refresh({ postalCode: "50009" }),
+    ).rejects.toThrow();
+    expect(provider.getProductsByCategory).toHaveBeenCalledTimes(1);
+    expect(provider.calls).toEqual([]);
+    expect(store.persistedOffers).toEqual([]);
+    expect(store.deactivatedProductIds).toEqual([]);
+    expect(store.finished[0]?.status).toBe("failed");
+  });
+
+  it("marks blocked price access as unavailable without retrying or retiring products", async () => {
+    const provider = new FakeRefreshProvider(() =>
+      Promise.reject(new ProviderAccessBlockedError("DIA")),
+    );
+    const store = new FakeRefreshStore([staleCandidates[0]!]);
+    const sleep = vi.fn(() => Promise.resolve());
+    const result = await new PriceRefreshPipeline(
+      new PriceRefreshIngestionStrategy(provider),
+      store,
+      { now: () => now, sleep },
+    ).refresh({ postalCode: "50009" });
+    expect(result.status).toBe("failed");
+    expect(provider.calls).toEqual(["good"]);
+    expect(sleep).not.toHaveBeenCalled();
+    expect(store.deactivatedProductIds).toEqual([]);
+    expect(store.health[0]?.status).toBe("unavailable");
+  });
+
   it("persists successes and retires confirmed missing products", async () => {
     const provider = new FakeRefreshProvider((id) =>
       id === "bad"
