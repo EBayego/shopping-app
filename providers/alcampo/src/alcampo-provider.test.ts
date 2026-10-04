@@ -61,6 +61,36 @@ function requestBody(
 }
 
 describe("AlcampoProvider", () => {
+  it("preserves transient market failures so the pipeline can retry them", async () => {
+    const provider = new AlcampoProvider({
+      environment: {},
+      maxRetries: 0,
+      fetch: vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response("failure", { status: 503 })),
+    });
+    await expect(provider.resolveMarket("50009")).rejects.toBeInstanceOf(
+      ProviderUnavailableError,
+    );
+  });
+
+  it("reports WAF challenges explicitly instead of a generic product failure", async () => {
+    const provider = new AlcampoProvider({
+      sessionContext: context(),
+      maxRetries: 0,
+      fetch: vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(null, {
+          status: 202,
+          headers: { "x-amzn-waf-action": "challenge" },
+        }),
+      ),
+    });
+    const market = await provider.resolveMarket("50009");
+    await expect(provider.getProduct("54180", market)).rejects.toThrow(
+      "AWS WAF challenge",
+    );
+  });
+
   it("resuelve 50009 mediante el flujo confirmado y mantiene regionId como identidad inmutable", async () => {
     const responses = [
       html(
@@ -165,70 +195,101 @@ describe("AlcampoProvider", () => {
     expect(observations.products[0]?.productUrl).toContain("/54180");
   });
 
-  it("materializa los 50 productos del ItemList aunque excedan un lote de viewport", async () => {
-    const ids = Array.from({ length: 50 }, (_, index) =>
-      String(54_000 + index),
-    );
-    const itemListElement = ids.map((id, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      item: { url: `/products/producto-${index + 1}/${id}` },
-    }));
-    const internalByRetailer = new Map(
-      ids.map((id, index) => [
-        id,
-        `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
-      ]),
-    );
-    const productEntities = Object.fromEntries(
-      [...internalByRetailer].map(([retailerProductId, productId]) => [
-        productId,
-        { productId, retailerProductId },
-      ]),
-    );
-    const initialState = `<script data-test="initial-state-script">window.__INITIAL_STATE__=${JSON.stringify({ session: { csrf: { token: "csrf" }, metadata: { visitorId: "visitor" } }, data: { products: { productEntities } } })}</script>`;
-    const categoryHtml = `${initialState}<script data-test="product-listing-structured-data" type="application/ld+json">${JSON.stringify({ "@type": "ItemList", itemListElement })}</script>`;
-    let batchRequests = 0;
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockImplementation((input, init) => {
-        const url = requestUrl(input);
-        if (url.includes("categories?"))
-          return Promise.resolve(json(fixture("categories.json")));
-        if (url.includes("/categories/"))
-          return Promise.resolve(html(categoryHtml));
-        if (!url.includes("/v6/products") || typeof init?.body !== "string")
-          throw new Error(`Unexpected ${url}`);
-        batchRequests += 1;
-        const requested = JSON.parse(init.body) as string[];
-        const products = requested.map((productId) => {
-          const retailerProductId = [...internalByRetailer].find(
-            ([, internalId]) => internalId === productId,
-          )?.[0];
-          if (retailerProductId === undefined)
-            throw new Error("Unknown internal product id");
-          return {
-            ...(fixture("product-54180.json") as Record<string, unknown>),
+  it.each([50, 243])(
+    "materializa los %i productos del estado completo aunque ItemList solo tenga 50",
+    async (count) => {
+      const ids = Array.from({ length: count }, (_, index) =>
+        String(54_000 + index),
+      );
+      const itemListElement = ids.slice(0, 50).map((id, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        item: { url: `/products/producto-${index + 1}/${id}` },
+      }));
+      const internalByRetailer = new Map(
+        ids.map((id, index) => [
+          id,
+          `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
+        ]),
+      );
+      const productEntities = Object.fromEntries(
+        [...internalByRetailer]
+          .slice(0, 50)
+          .map(([retailerProductId, productId]) => [
             productId,
-            retailerProductId,
-          };
+            { productId, retailerProductId },
+          ]),
+      );
+      const initialState = `<script data-test="initial-state-script">window.__INITIAL_STATE__=${JSON.stringify(
+        {
+          data: {
+            products: {
+              productEntities,
+              catalogue: {
+                data: {
+                  productGroups: [
+                    {
+                      type: "on_offer",
+                      products: [...internalByRetailer.values()].slice(0, 54),
+                    },
+                    {
+                      type: "ungrouped",
+                      products: [...internalByRetailer.values()].slice(54),
+                    },
+                  ],
+                  totalProducts: count,
+                },
+              },
+            },
+          },
+        },
+      )}</script>`;
+      const categoryHtml = `${initialState}<script data-test="product-listing-structured-data" type="application/ld+json">${JSON.stringify({ "@type": "ItemList", itemListElement })}</script>`;
+      let batchRequests = 0;
+      const fetchMock = vi
+        .fn<typeof fetch>()
+        .mockImplementation((input, init) => {
+          const url = requestUrl(input);
+          if (url.includes("categories?"))
+            return Promise.resolve(json(fixture("categories.json")));
+          if (url.includes("/categories/"))
+            return Promise.resolve(html(categoryHtml));
+          if (!url.includes("/v6/products") || typeof init?.body !== "string")
+            throw new Error(`Unexpected ${url}`);
+          batchRequests += 1;
+          const requested = JSON.parse(init.body) as string[];
+          const products = requested.map((productId) => {
+            const retailerProductId = [...internalByRetailer].find(
+              ([, internalId]) => internalId === productId,
+            )?.[0];
+            if (retailerProductId === undefined)
+              throw new Error("Unknown internal product id");
+            return {
+              ...(fixture("product-54180.json") as Record<string, unknown>),
+              productId,
+              retailerProductId,
+            };
+          });
+          return Promise.resolve(
+            json({ products, missedPromotions: [], restrictedGroups: [] }),
+          );
         });
-        return Promise.resolve(
-          json({ products, missedPromotions: [], restrictedGroups: [] }),
-        );
+      const provider = new AlcampoProvider({
+        fetch: fetchMock,
+        sessionContext: context(),
+        maxRetries: 0,
+        concurrency: 6,
       });
-    const provider = new AlcampoProvider({
-      fetch: fetchMock,
-      sessionContext: context(),
-      maxRetries: 0,
-      concurrency: 6,
-    });
-    const market = await provider.resolveMarket("50009");
-    const observations = await provider.getProductsByCategory("OC1603", market);
-    expect(observations.products).toHaveLength(50);
-    expect(observations.offers).toHaveLength(50);
-    expect(batchRequests).toBe(3);
-  });
+      const market = await provider.resolveMarket("50009");
+      const observations = await provider.getProductsByCategory(
+        "OC1603",
+        market,
+      );
+      expect(observations.products.map((p) => p.externalId)).toEqual(ids);
+      expect(observations.offers).toHaveLength(count);
+      expect(batchRequests).toBe(Math.ceil(count / 24));
+    },
+  );
 
   it("getProduct admite IDs numéricos y alfanuméricos y refreshPrices conserva éxitos parciales", async () => {
     const fetchMock = vi.fn<typeof fetch>().mockImplementation((input) => {

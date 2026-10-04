@@ -1,0 +1,10 @@
+{
+  "product": {
+    "sku_id": "261354",
+    "primary_info": {
+      "title": "solomillos de pollo seleccion de dia 550 g aprox"
+    },
+    "prices": { "currency": "EUR", "price": 3.82 },
+    "units_in_stock": 30
+  }
+}

@@ -65,7 +65,7 @@ export class AlcampoProvider
       options.sessionContext ??
       AlcampoSessionContext.fromEnvironment(options.environment ?? process.env);
     this.now = options.now ?? (() => new Date());
-    this.concurrency = options.concurrency ?? 6;
+    this.concurrency = options.concurrency ?? 2;
     if (!Number.isInteger(this.concurrency) || this.concurrency < 1)
       throw new RangeError("Alcampo concurrency must be a positive integer");
   }
@@ -262,10 +262,12 @@ export class AlcampoProvider
     listing: {
       retailerProductIds: readonly string[];
       internalProductIds: ReadonlyMap<string, string>;
+      productIds?: readonly string[];
     },
     market: Market,
   ): Promise<AlcampoProductDto[]> {
     if (
+      listing.productIds === undefined &&
       !listing.retailerProductIds.every((id) =>
         listing.internalProductIds.has(id),
       )
@@ -273,19 +275,19 @@ export class AlcampoProvider
       return this.loadMany(listing.retailerProductIds, market);
     }
     const context = this.contextFor(market);
-    const requested = listing.retailerProductIds.map((retailerProductId) => ({
-      retailerProductId,
-      productId: listing.internalProductIds.get(retailerProductId) as string,
-    }));
-    const batches: Array<typeof requested> = [];
+    // ItemList and productEntities only cover the first SSR viewport (50).
+    // catalogue.data.productGroups contains the complete category identities.
+    const requested =
+      listing.productIds ??
+      listing.retailerProductIds.map(
+        (id) => listing.internalProductIds.get(id) as string,
+      );
+    const batches: Array<readonly string[]> = [];
     for (let index = 0; index < requested.length; index += 24) {
       batches.push(requested.slice(index, index + 24));
     }
     const payloads = await this.settledMap(batches, (batch) =>
-      this.client.getProducts(
-        batch.map((item) => item.productId),
-        context,
-      ),
+      this.client.getProducts(batch, context),
     );
     const failed = payloads.find((outcome) => outcome.status === "rejected");
     if (failed !== undefined) throw failed.reason;
@@ -299,11 +301,28 @@ export class AlcampoProvider
     const byRetailerId = new Map(
       products.map((product) => [product.retailerProductId, product]),
     );
-    return requested.map(({ retailerProductId, productId }) => {
+    for (const retailerProductId of listing.retailerProductIds) {
       const product = byRetailerId.get(retailerProductId);
-      if (product === undefined || product.productId !== productId) {
+      const productId = listing.internalProductIds.get(retailerProductId);
+      if (
+        product === undefined ||
+        (productId !== undefined && product.productId !== productId)
+      ) {
         throw this.contract("products batch identity");
       }
+    }
+    const byProductId = new Map(
+      products.map((product) => [product.productId, product]),
+    );
+    if (
+      byRetailerId.size !== products.length ||
+      byProductId.size !== products.length ||
+      products.length !== requested.length
+    )
+      throw this.contract("products batch identities");
+    return requested.map((productId) => {
+      const product = byProductId.get(productId);
+      if (product === undefined) throw this.contract("products batch identity");
       return product;
     });
   }
@@ -426,14 +445,21 @@ export class AlcampoProvider
     )
       return error;
     const mapped = this.providerError(error, "market");
-    return mapped instanceof RateLimitedError
+    const transient =
+      error instanceof AlcampoHttpError &&
+      (error.kind === "network" ||
+        error.kind === "aborted" ||
+        error.status === 408 ||
+        error.status === 425 ||
+        (error.status !== undefined && error.status >= 500));
+    return mapped instanceof RateLimitedError || transient
       ? mapped
       : new MarketResolutionError("ALCAMPO", postalCode, {
           message:
-            error instanceof AlcampoHttpError && error.status === 403
-              ? "Alcampo area lookup returned HTTP 403 because a reproducible CSRF/WAF context was not available"
+            error instanceof AlcampoHttpError && error.kind === "http"
+              ? `Alcampo market resolution failed: ${error.message}`
               : "Alcampo market resolution failed",
-          cause: error,
+          cause: mapped,
         });
   }
   private providerError(error: unknown, resource: string): Error {
@@ -459,8 +485,8 @@ export class AlcampoProvider
       });
     return new ProviderUnavailableError("ALCAMPO", {
       message:
-        error instanceof AlcampoHttpError && error.status === 403
-          ? `Alcampo rejected ${resource} with HTTP 403`
+        error instanceof AlcampoHttpError && error.kind === "http"
+          ? `Alcampo rejected ${resource}: ${error.message}`
           : `Alcampo ${resource} is unavailable`,
       cause: error,
     });

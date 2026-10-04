@@ -6,6 +6,7 @@ import {
   MarketResolutionError,
   ProductNotFoundError,
   ProviderContractChangedError,
+  ProviderUnavailableError,
   RateLimitedError,
   supportsCatalog,
   supportsSearch,
@@ -43,6 +44,45 @@ function htmlResponse(
 }
 
 describe("EroskiProvider", () => {
+  it.each([408, 425, 503])(
+    "preserves a retryable HTTP %i during market bootstrap",
+    async (status) => {
+      const provider = new EroskiProvider({
+        fetch: vi
+          .fn<typeof fetch>()
+          .mockResolvedValue(htmlResponse("unavailable", status)),
+      });
+      await expect(provider.resolveMarket("50009")).rejects.toBeInstanceOf(
+        ProviderUnavailableError,
+      );
+    },
+  );
+
+  it("preserves network errors during market bootstrap", async () => {
+    const provider = new EroskiProvider({
+      fetch: vi
+        .fn<typeof fetch>()
+        .mockRejectedValue(new TypeError("fetch failed")),
+    });
+    await expect(provider.resolveMarket("50009")).rejects.toBeInstanceOf(
+      ProviderUnavailableError,
+    );
+  });
+
+  it("keeps missing public-shop cookies and access denials as market failures", async () => {
+    for (const response of [
+      htmlResponse("no shop"),
+      htmlResponse("denied", 403),
+    ]) {
+      const provider = new EroskiProvider({
+        fetch: vi.fn<typeof fetch>().mockResolvedValue(response),
+      });
+      await expect(provider.resolveMarket("50009")).rejects.toBeInstanceOf(
+        MarketResolutionError,
+      );
+    }
+  });
+
   it("resuelve la tienda pública y refresca un producto por su id", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

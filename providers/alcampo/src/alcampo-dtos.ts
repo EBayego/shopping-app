@@ -39,6 +39,7 @@ export interface AlcampoCategoryListingDto {
   retailerProductIds: string[];
   productUrls: ReadonlyMap<string, string>;
   internalProductIds: ReadonlyMap<string, string>;
+  productIds?: readonly string[];
 }
 export interface AlcampoMoneyDto {
   amount: number;

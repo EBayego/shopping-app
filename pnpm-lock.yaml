@@ -239,6 +239,9 @@ importers:
       '@shopping-app/provider-dia':
         specifier: workspace:*
         version: link:../../providers/dia
+      '@shopping-app/provider-eroski':
+        specifier: workspace:*
+        version: link:../../providers/eroski
       '@shopping-app/provider-mercadona':
         specifier: workspace:*
         version: link:../../providers/mercadona

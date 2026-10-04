@@ -2,6 +2,7 @@ import { isRetailer, type Retailer } from "@shopping-app/domain";
 import {
   ObservedIngestionError,
   silentLogger,
+  safeError,
   PriceRefreshPipeline,
   RetailerIngestionPipeline,
   type PriceRefreshStore,
@@ -89,6 +90,13 @@ export class PipelineRefreshExecutor implements RefreshExecutor {
     } catch (error) {
       if (!(error instanceof ObservedIngestionError)) {
         const message = sanitizeError(error);
+        this.logger.error("ingestion.preflight_failed", {
+          retailer,
+          strategy: request.request_type,
+          postalCode: request.postal_code,
+          requestId: request.id,
+          error: { ...safeError(error), message },
+        });
         try {
           await this.store.recordPreflightFailure?.({
             retailer,
@@ -241,7 +249,13 @@ function parseRetailer(value: string): Retailer {
 
 export function sanitizeError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
-  return message
+  const { httpStatus, transportKind, networkCode } = safeError(error);
+  const diagnostics = [
+    typeof httpStatus === "number" ? `HTTP ${httpStatus}` : undefined,
+    typeof transportKind === "string" ? transportKind : undefined,
+    typeof networkCode === "string" ? networkCode : undefined,
+  ].filter((value): value is string => value !== undefined);
+  return `${message}${diagnostics.length === 0 ? "" : ` (${diagnostics.join(", ")})`}`
     .replaceAll(
       /(authorization|api[_-]?key|service[_-]?role|password|secret|token)\s*[:=]\s*[^\s,;]+/gi,
       "$1=[REDACTED]",

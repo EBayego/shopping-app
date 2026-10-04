@@ -34,6 +34,11 @@ export interface DiaSearchItemDto {
   prices?: DiaSearchPricesDto;
 }
 
+export interface DiaProductDetailDto extends DiaSearchItemDto {
+  unitsInStock: number;
+  prices: DiaSearchPricesDto;
+}
+
 export interface DiaSearchPageDto {
   postalCode?: string;
   pageNumber: number;
@@ -166,6 +171,38 @@ function parseDiaSearchItem(value: unknown): DiaSearchItemDto | undefined {
     ...(url === undefined ? {} : { url }),
     ...(prices === undefined ? {} : { prices }),
   };
+}
+
+export function parseDiaProductDetail(
+  payload: unknown,
+): DiaProductDetailDto | undefined {
+  if (!isRecord(payload) || !isRecord(payload.product)) return undefined;
+  const product = payload.product;
+  if (!isRecord(product.primary_info)) return undefined;
+  const images: readonly unknown[] = Array.isArray(product.images)
+    ? product.images
+    : [];
+  const breadcrumb: readonly unknown[] = Array.isArray(product.breadcrumb)
+    ? product.breadcrumb
+    : [];
+  const root = breadcrumb[0];
+  const leaf = breadcrumb[1];
+  const dto = parseDiaSearchItem({
+    ...product,
+    display_name: product.primary_info.title,
+    image: images[0],
+    l1_category_description: isRecord(root) ? root.title : undefined,
+    l2_category_description: isRecord(leaf) ? leaf.title : undefined,
+  });
+  if (
+    dto === undefined ||
+    dto.prices === undefined ||
+    dto.unitsInStock === undefined ||
+    dto.unitsInStock < 0
+  ) {
+    return undefined;
+  }
+  return { ...dto, prices: dto.prices, unitsInStock: dto.unitsInStock };
 }
 
 export function parseDiaSearchPage(

@@ -35,13 +35,19 @@ export class AlcampoInitialStateParser {
   }
 
   parseInternalProductIds(html: string): ReadonlyMap<string, string> {
+    return this.parseProductListing(html).internalProductIds;
+  }
+
+  parseProductListing(html: string): {
+    internalProductIds: ReadonlyMap<string, string>;
+    productIds?: readonly string[];
+  } {
     const state = this.parse(html);
     const data = this.record(state.data);
     const products = this.record(data?.products);
     const entities = this.record(products?.productEntities);
-    if (entities === undefined) return new Map();
     const result = new Map<string, string>();
-    for (const [key, value] of Object.entries(entities)) {
+    for (const [key, value] of Object.entries(entities ?? {})) {
       const entity = this.record(value);
       const productId = this.nonEmptyString(entity?.productId) ?? key;
       const retailerProductId = this.nonEmptyString(entity?.retailerProductId);
@@ -52,7 +58,44 @@ export class AlcampoInitialStateParser {
         result.set(retailerProductId, productId);
       }
     }
-    return result;
+    const catalogue = this.record(products?.catalogue);
+    const catalogueData = this.record(catalogue?.data);
+    const groups = catalogueData?.productGroups;
+    if (groups === undefined) return { internalProductIds: result };
+    if (!Array.isArray(groups)) {
+      throw new AlcampoInitialStateError(
+        "Alcampo catalogue productGroups is incompatible",
+      );
+    }
+    const productIds = new Set<string>();
+    for (const group of groups) {
+      const ids = this.record(group)?.products;
+      if (
+        !Array.isArray(ids) ||
+        ids.some(
+          (id) =>
+            typeof id !== "string" ||
+            !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+              id,
+            ),
+        )
+      ) {
+        throw new AlcampoInitialStateError(
+          "Alcampo catalogue contains invalid product identities",
+        );
+      }
+      for (const id of ids) productIds.add(id as string);
+    }
+    const total = catalogueData?.totalProducts;
+    if (
+      total !== undefined &&
+      (!Number.isInteger(total) || total !== productIds.size)
+    ) {
+      throw new AlcampoInitialStateError(
+        "Alcampo catalogue product count differs from totalProducts",
+      );
+    }
+    return { internalProductIds: result, productIds: [...productIds] };
   }
 
   private parse(html: string): Record<string, unknown> {
@@ -73,7 +116,8 @@ export class AlcampoInitialStateParser {
     try {
       const payload: unknown = JSON.parse(source.slice(prefix.length));
       const parsed = this.record(payload);
-      if (parsed === undefined) throw new Error("Initial state is not an object");
+      if (parsed === undefined)
+        throw new Error("Initial state is not an object");
       return parsed;
     } catch (cause) {
       throw new AlcampoInitialStateError(

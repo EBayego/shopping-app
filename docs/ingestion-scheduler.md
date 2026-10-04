@@ -157,6 +157,15 @@ Tapestry de las categorías. También ofrece búsqueda y refresh directo mediant
 `/productdetail/{id}-x/`. Como esa tienda no se resuelve desde el código postal,
 sus precios son orientativos y el retailer permanece `DEGRADED`.
 
+DIA consulta la ficha `pdp-back/{sku}` para refrescar precios conservando las
+condiciones Club y las promociones. Alcampo obtiene todos los IDs de una
+categoría desde `catalogue.data.productGroups` y consulta sus datos en lotes;
+el `ItemList` visible solo contiene el primer bloque de productos.
+
+La [auditoría de providers del 4 de octubre de 2026](ingestion-provider-audit.md)
+documenta los endpoints comprobados, la limitación de mercado de Eroski y los
+bloqueos intermitentes de Alcampo por AWS WAF.
+
 ## Variables y secretos
 
 La CLI necesita:
@@ -228,3 +237,9 @@ Cada pipeline persiste su run en `provider_sync_runs`, actualiza
 `provider_health` y emite logs JSON. La cola conserva `PENDING`, `RUNNING`,
 `SUCCEEDED` y `FAILED`, número de intentos, error saneado y worker. El workflow
 conserva los logs estructurados de scheduler, retries y pipelines.
+
+El cortacircuitos cuenta operaciones que agotan sus reintentos, no cada intento
+individual. Los errores de transporte durante la resolución de mercado de
+Eroski conservan su carácter transitorio. Los logs de retry y preflight incluyen
+estado HTTP, tipo de transporte y código de red cuando existen, sin serializar
+las causas completas ni las credenciales de sesión.

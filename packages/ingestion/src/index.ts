@@ -27,6 +27,7 @@ export {
   CircuitOpenError,
   ProviderExecutor,
   isTransientProviderError,
+  safeError,
 } from "./resilience.js";
 export type {
   CircuitBreakerOptions,

@@ -30,12 +30,136 @@ describe("SupabaseIngestionStore preflight observability", () => {
     });
 
     expect(candidates).toHaveLength(1_001);
-    expect(new Headers(fetch.mock.calls[0]?.[1]?.headers).get("Range")).toBe(
-      "0-999",
+    expect(fetch.mock.calls[0]?.[0]).toBe(
+      "https://project.supabase.co/rest/v1/rpc/list_price_refresh_candidates?limit=1000&offset=0",
     );
-    expect(new Headers(fetch.mock.calls[1]?.[1]?.headers).get("Range")).toBe(
-      "1000-1999",
+    expect(fetch.mock.calls[1]?.[0]).toBe(
+      "https://project.supabase.co/rest/v1/rpc/list_price_refresh_candidates?limit=1000&offset=1000",
     );
+    expect(fetch).toHaveBeenCalledTimes(2);
+    for (const [, init] of fetch.mock.calls) {
+      expect(init?.method).toBe("POST");
+      expect(new Headers(init?.headers).has("Range")).toBe(false);
+      if (typeof init?.body !== "string") {
+        throw new TypeError("Expected a JSON request body");
+      }
+      expect(JSON.parse(init.body)).toEqual({
+        target_retailer_id: "retailer-1",
+        target_market_id: "market-1",
+      });
+    }
+  });
+
+  it.each([0, 1_000, 2_000, 4_476])(
+    "reads %i candidates using query-parameter pagination and terminates",
+    async (count) => {
+      const rows = Array.from({ length: count }, (_, index) => ({
+        retailer_product_external_id: String(index),
+        offer_observed_at: "2026-10-04T09:00:00Z",
+        in_active_list: index === 0,
+        last_used_at: index === 0 ? "2026-10-03T09:00:00Z" : null,
+      }));
+      const fetch = vi.fn<typeof globalThis.fetch>((input) => {
+        if (typeof input !== "string") {
+          throw new TypeError("Expected a request URL string");
+        }
+        const url = new URL(input);
+        expect(url.searchParams.get("limit")).toBe("1000");
+        const offset = Number(url.searchParams.get("offset"));
+        expect(url.searchParams.has("offset")).toBe(true);
+        expect(offset).toBe((fetch.mock.calls.length - 1) * 1_000);
+        return Promise.resolve(
+          jsonResponse(rows.slice(offset, offset + 1_000)),
+        );
+      });
+      const store = new SupabaseIngestionStore({
+        url: "https://project.supabase.co",
+        secretKey: "sb_secret_test-key",
+        fetch,
+      });
+
+      const candidates = await store.listPriceRefreshCandidates({
+        retailerId: "retailer-1",
+        marketId: "market-1",
+      });
+
+      expect(candidates).toHaveLength(count);
+      expect(
+        new Set(candidates.map((row) => row.retailerProductExternalId)).size,
+      ).toBe(count);
+      expect(fetch).toHaveBeenCalledTimes(Math.floor(count / 1_000) + 1);
+      if (count > 0) {
+        expect(candidates[0]).toEqual({
+          retailerProductExternalId: "0",
+          offerObservedAt: new Date("2026-10-04T09:00:00Z"),
+          inActiveList: true,
+          lastUsedAt: new Date("2026-10-03T09:00:00Z"),
+        });
+      }
+    },
+  );
+
+  it.each(["repeated", "overlapping"])(
+    "rejects a %s page instead of accumulating candidates indefinitely",
+    async (mode) => {
+      const firstPage = Array.from({ length: 1_000 }, (_, index) => ({
+        retailer_product_external_id: String(index),
+        offer_observed_at: null,
+        in_active_list: false,
+        last_used_at: null,
+      }));
+      // Even changed metadata must not disguise a repeated product identity.
+      const secondPage = (
+        mode === "repeated" ? firstPage : firstPage.slice(-1)
+      ).map((row) => ({ ...row, in_active_list: true }));
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(jsonResponse(firstPage))
+        .mockResolvedValueOnce(jsonResponse(secondPage))
+        .mockRejectedValue(new Error("Unexpected additional page request"));
+      const store = new SupabaseIngestionStore({
+        url: "https://project.supabase.co",
+        secretKey: "sb_secret_test-key",
+        fetch,
+      });
+
+      await expect(
+        store.listPriceRefreshCandidates({
+          retailerId: "retailer-1",
+          marketId: "market-1",
+        }),
+      ).rejects.toThrow("duplicate product at offset 1000");
+      expect(fetch).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("propagates a failed page request without returning incomplete candidates", async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse(
+          Array.from({ length: 1_000 }, (_, index) => ({
+            retailer_product_external_id: String(index),
+            offer_observed_at: null,
+            in_active_list: false,
+            last_used_at: null,
+          })),
+        ),
+      )
+      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }));
+    const store = new SupabaseIngestionStore({
+      url: "https://project.supabase.co",
+      secretKey: "sb_secret_test-key",
+      fetch,
+    });
+
+    await expect(
+      store.listPriceRefreshCandidates({
+        retailerId: "retailer-1",
+        marketId: "market-1",
+      }),
+    ).rejects.toThrow("Supabase request failed (503)");
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it("deactivates unique products confirmed missing", async () => {

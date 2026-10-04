@@ -10,6 +10,7 @@
     "@shopping-app/domain": "workspace:*",
     "@shopping-app/provider-alcampo": "workspace:*",
     "@shopping-app/provider-dia": "workspace:*",
+    "@shopping-app/provider-eroski": "workspace:*",
     "@shopping-app/provider-mercadona": "workspace:*",
     "@shopping-app/retailer-contracts": "workspace:*"
   }

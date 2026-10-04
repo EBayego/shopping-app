@@ -89,8 +89,12 @@ export class ProviderExecutor {
         return result;
       } catch (error) {
         if (!isTransientProviderError(error)) throw error;
-        this.recordFailure();
-        if (attempt >= this.retry.maxAttempts) throw error;
+        // Retries belong to one operation. A recovered attempt must not open
+        // the circuit and prevent unrelated products from being refreshed.
+        if (attempt >= this.retry.maxAttempts) {
+          this.recordFailure();
+          throw error;
+        }
         const delayMs = retryDelay(error, attempt, this.retry, this.random);
         this.logger.warn("provider.retry", {
           provider: this.provider,
@@ -175,5 +179,45 @@ function retryDelay(
 
 export function safeError(error: unknown): Readonly<Record<string, unknown>> {
   if (!(error instanceof Error)) return { name: "UnknownError" };
-  return { name: error.name, message: error.message };
+  const result: Record<string, unknown> = {
+    name: error.name,
+    message: error.message,
+  };
+  const pending: unknown[] = [error];
+  const seen = new Set<unknown>();
+  // Inspect only typed transport fields. Cause messages, URLs, response
+  // bodies and session/header values can contain credentials.
+  while (pending.length > 0 && seen.size < 8) {
+    const cause = pending.shift();
+    if (typeof cause !== "object" || cause === null || seen.has(cause))
+      continue;
+    seen.add(cause);
+    const details = cause as Record<string, unknown>;
+    if (
+      result.httpStatus === undefined &&
+      typeof details.status === "number" &&
+      Number.isInteger(details.status) &&
+      details.status >= 100 &&
+      details.status <= 599
+    )
+      result.httpStatus = details.status;
+    if (
+      result.transportKind === undefined &&
+      typeof details.kind === "string" &&
+      ["aborted", "http", "invalid-response", "network"].includes(details.kind)
+    )
+      result.transportKind = details.kind;
+    if (
+      result.networkCode === undefined &&
+      typeof details.code === "string" &&
+      /^(?:E[A-Z_]+|UND_ERR_[A-Z_]+)$/.test(details.code)
+    )
+      result.networkCode = details.code;
+    pending.push(details.cause);
+    if (cause instanceof AggregateError) {
+      const errors: readonly unknown[] = cause.errors;
+      pending.push(...errors.slice(0, 4));
+    }
+  }
+  return result;
 }

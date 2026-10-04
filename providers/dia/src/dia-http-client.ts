@@ -99,6 +99,21 @@ export class DiaHttpClient {
     return this.readJson(response, "product");
   }
 
+  async getProductDetail(
+    externalId: string,
+    context: DiaSessionContext,
+  ): Promise<unknown> {
+    const url = new URL(
+      `/api/v1/pdp-back/${encodeURIComponent(externalId)}`,
+      this.baseUrl,
+    );
+    const response = await this.request(url, {
+      method: "GET",
+      headers: this.contextHeaders(context.cartId, context.sessionId, true),
+    });
+    return this.readJson(response, "product detail");
+  }
+
   async searchProducts(
     query: string,
     page: number,

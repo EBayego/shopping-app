@@ -102,20 +102,27 @@ export class SupabaseIngestionStore implements PriceRefreshStore {
       last_used_at: string | null;
     };
     const rows: CandidateRow[] = [];
+    const seenExternalIds = new Set<string>();
     for (let offset = 0; ; offset += PRICE_REFRESH_CANDIDATE_PAGE_SIZE) {
+      // POST RPCs ignore Range headers; paginate with URL parameters instead.
       const page = await this.request<CandidateRow[]>(
-        "/rest/v1/rpc/list_price_refresh_candidates",
+        `/rest/v1/rpc/list_price_refresh_candidates?limit=${PRICE_REFRESH_CANDIDATE_PAGE_SIZE}&offset=${offset}`,
         {
           method: "POST",
-          headers: {
-            Range: `${offset}-${offset + PRICE_REFRESH_CANDIDATE_PAGE_SIZE - 1}`,
-          },
           body: JSON.stringify({
             target_retailer_id: scope.retailerId,
             target_market_id: scope.marketId,
           }),
         },
       );
+      for (const row of page) {
+        if (seenExternalIds.has(row.retailer_product_external_id)) {
+          throw new Error(
+            `Price refresh candidate pagination returned a duplicate product at offset ${offset}; stopping to avoid an unbounded loop`,
+          );
+        }
+        seenExternalIds.add(row.retailer_product_external_id);
+      }
       rows.push(...page);
       if (page.length < PRICE_REFRESH_CANDIDATE_PAGE_SIZE) break;
     }

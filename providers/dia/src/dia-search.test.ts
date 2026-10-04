@@ -24,7 +24,7 @@ const INVALID_FIXTURE: unknown = JSON.parse(
 );
 const PRODUCT_FIXTURE: unknown = JSON.parse(
   readFileSync(
-    new URL("./fixtures/product-261354.json", import.meta.url),
+    new URL("./fixtures/product-detail-261354.json", import.meta.url),
     "utf8",
   ),
 );

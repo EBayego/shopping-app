@@ -97,7 +97,14 @@ export class EroskiProvider
     } catch (error) {
       if (error instanceof MarketResolutionError) throw error;
       const mapped = this.providerError(error, "public market bootstrap");
-      throw mapped instanceof RateLimitedError
+      const transient =
+        error instanceof EroskiHttpError &&
+        (error.kind === "network" ||
+          error.kind === "aborted" ||
+          error.status === 408 ||
+          error.status === 425 ||
+          (error.status !== undefined && error.status >= 500));
+      throw mapped instanceof RateLimitedError || transient
         ? mapped
         : new MarketResolutionError("EROSKI", normalized, {
             message: "Eroski public default market could not be resolved",

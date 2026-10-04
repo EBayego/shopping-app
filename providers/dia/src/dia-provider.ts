@@ -22,7 +22,7 @@ import {
 import {
   parseDiaCatalogPage,
   parseDiaMenu,
-  parseDiaProductAnalytics,
+  parseDiaProductDetail,
   parseDiaSearchPage,
   type DiaSearchItemDto,
 } from "./dia-dtos.js";
@@ -286,7 +286,7 @@ export class DiaProvider
     market: Market,
   ): Promise<RetailerProduct> {
     const dto = await this.loadProduct(externalId, market);
-    return this.mapper.toProduct(dto, market, this.now());
+    return this.mapper.searchItemToProduct(dto, market, this.now());
   }
 
   async refreshPrices(
@@ -296,7 +296,13 @@ export class DiaProvider
     return Promise.all(
       productIds.map(async (productId) => {
         const dto = await this.loadProduct(productId, market);
-        return this.mapper.toOffer(dto, market, this.now());
+        const offer = this.mapper.searchItemToOffer(dto, market, this.now());
+        if (offer === undefined) {
+          throw new ProviderContractChangedError("DIA", {
+            message: "DIA product detail did not contain a complete offer",
+          });
+        }
+        return offer;
       }),
     );
   }
@@ -304,9 +310,10 @@ export class DiaProvider
   healthCheck(): Promise<ProviderHealth> {
     return Promise.resolve({
       retailer: "DIA",
-      status: "degraded",
+      status: "healthy",
       checkedAt: this.now(),
-      message: "getProduct uses DIA's provisional analytics endpoint",
+      message:
+        "DIA supports session-bound catalog, search and PDP price refresh",
     });
   }
 
@@ -314,22 +321,14 @@ export class DiaProvider
     const context = this.contextFor(market);
 
     try {
-      const payload = await this.client.getProductAnalytics(
-        externalId,
-        context,
-      );
-      const dto = parseDiaProductAnalytics(payload, externalId);
-      if (
-        dto === undefined ||
-        dto.externalId !== externalId ||
-        (context.shopId !== undefined && dto.shopId !== context.shopId)
-      ) {
+      const payload = await this.client.getProductDetail(externalId, context);
+      const dto = parseDiaProductDetail(payload);
+      if (dto === undefined || dto.skuId !== externalId) {
         throw new ProviderContractChangedError("DIA", {
           message:
-            "DIA product analytics response is incompatible with the expected contract",
+            "DIA product detail response is incompatible with the expected contract",
         });
       }
-      context.resolveShopId(dto.shopId);
       return dto;
     } catch (error) {
       throw this.productError(externalId, error);

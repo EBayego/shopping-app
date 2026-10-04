@@ -94,6 +94,15 @@ describe("RefreshRequestWorker", () => {
 });
 
 describe("sanitizeError", () => {
+  it("persists transport diagnostics without serializing the cause", () => {
+    const cause = Object.assign(new Error("token=secret"), {
+      kind: "http",
+      status: 403,
+    });
+    expect(sanitizeError(new Error("market failed", { cause }))).toBe(
+      "market failed (HTTP 403, http)",
+    );
+  });
   it("redacts secret-shaped values", () => {
     expect(sanitizeError("Authorization: Bearer123 password=hunter2")).toBe(
       "Authorization=[REDACTED] password=[REDACTED]",
@@ -163,9 +172,15 @@ describe("PipelineRefreshExecutor observability", () => {
       getOfferFreshnessConfig: vi.fn(),
       recordPreflightFailure,
     };
+    const logger = {
+      debug: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
 
     await expect(
-      new PipelineRefreshExecutor(store).execute({
+      new PipelineRefreshExecutor(store, logger).execute({
         ...request,
         retailer_code: "EROSKI",
         request_type: "CATALOG_SYNC",
@@ -185,5 +200,15 @@ describe("PipelineRefreshExecutor observability", () => {
     );
     expect(recorded?.startedAt).toBeInstanceOf(Date);
     expect(recorded?.finishedAt).toBeInstanceOf(Date);
+    expect(logger.error).toHaveBeenCalledOnce();
+    expect(logger.error.mock.calls[0]).toMatchObject([
+      "ingestion.preflight_failed",
+      {
+        retailer: "EROSKI",
+        strategy: "CATALOG_SYNC",
+        requestId: request.id,
+        error: { name: "MarketResolutionError" },
+      },
+    ]);
   });
 });

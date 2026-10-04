@@ -79,13 +79,22 @@ export class AlcampoCategoryParser {
       if (!productUrls.has(retailerProductId)) ids.push(retailerProductId);
       productUrls.set(retailerProductId, url.href);
     }
-    let internalProductIds: ReadonlyMap<string, string> = new Map();
-    try {
-      internalProductIds = this.initialState.parseInternalProductIds(html);
-    } catch (error) {
-      if (!(error instanceof AlcampoInitialStateError)) throw error;
+    let initialListing: {
+      internalProductIds: ReadonlyMap<string, string>;
+      productIds?: readonly string[];
+    } = { internalProductIds: new Map() };
+    if ($('script[data-test="initial-state-script"]').length > 0) {
+      try {
+        initialListing = this.initialState.parseProductListing(html);
+      } catch (error) {
+        if (!(error instanceof AlcampoInitialStateError)) throw error;
+        throw new AlcampoCategoryHtmlError(
+          "Alcampo category initial product listing is incompatible",
+          { cause: error },
+        );
+      }
     }
-    return { retailerProductIds: ids, productUrls, internalProductIds };
+    return { retailerProductIds: ids, productUrls, ...initialListing };
   }
 
   private itemUrl(value: unknown): string | undefined {

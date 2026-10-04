@@ -13,13 +13,19 @@ import { DiaProvider } from "./dia-provider.js";
 
 const PRODUCT_FIXTURE: unknown = JSON.parse(
   readFileSync(
-    new URL("./fixtures/product-261354.json", import.meta.url),
+    new URL("./fixtures/product-detail-261354.json", import.meta.url),
     "utf8",
   ),
 );
 const INCOMPATIBLE_FIXTURE: unknown = JSON.parse(
   readFileSync(
     new URL("./fixtures/product-incompatible.json", import.meta.url),
+    "utf8",
+  ),
+);
+const CLUB_FIXTURE: unknown = JSON.parse(
+  readFileSync(
+    new URL("./fixtures/product-detail-club.json", import.meta.url),
     "utf8",
   ),
 );
@@ -60,16 +66,15 @@ function createProvider(
   });
 }
 
-function productAnalytics(price: number): unknown {
+function productDetail(price: number): unknown {
   return {
-    initial_datalayer: { shop_id: "3423" },
-    page_product_analytics: {
-      "261354": {
-        item_id: "261354",
-        item_name: "solomillos de pollo seleccion de dia 550 g aprox",
-        price,
-        stock_availability: true,
+    product: {
+      sku_id: "261354",
+      primary_info: {
+        title: "solomillos de pollo seleccion de dia 550 g aprox",
       },
+      prices: { currency: "EUR", price },
+      units_in_stock: 30,
     },
   };
 }
@@ -119,7 +124,7 @@ describe("DiaProvider", () => {
     const productCall = fetchMock.mock.calls[1];
     expect(productCall?.[0]).toBeInstanceOf(URL);
     expect((productCall?.[0] as URL).href).toBe(
-      "https://www.dia.es/api/v1/pdp-insight/initial_analytics/261354",
+      "https://www.dia.es/api/v1/pdp-back/261354",
     );
     expect(new Headers(productCall?.[1]?.headers).get("session_id")).toBe(
       DEFINITIVE_SESSION_ID,
@@ -133,8 +138,8 @@ describe("DiaProvider", () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(marketResponse())
-      .mockResolvedValueOnce(jsonResponse(productAnalytics(3.82)))
-      .mockResolvedValueOnce(jsonResponse(productAnalytics(4.15)));
+      .mockResolvedValueOnce(jsonResponse(productDetail(3.82)))
+      .mockResolvedValueOnce(jsonResponse(productDetail(4.15)));
     const firstObservedAt = new Date("2026-08-08T10:00:00.000Z");
     const refreshedAt = new Date("2026-08-08T18:00:00.000Z");
     const observationTimes = [firstObservedAt, refreshedAt];
@@ -159,6 +164,78 @@ describe("DiaProvider", () => {
     expect(product.observedAt).toEqual(firstObservedAt);
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
+
+  it("conserva el precio anterior, la promoción Club y el precio por litro del PDP", async () => {
+    const provider = createProvider(
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValueOnce(marketResponse())
+        .mockResolvedValueOnce(jsonResponse(CLUB_FIXTURE))
+        .mockResolvedValueOnce(jsonResponse(CLUB_FIXTURE)),
+    );
+    const market = await provider.resolveMarket("50009");
+    const product = await provider.getProduct("130063P6", market);
+    expect(product).toMatchObject({
+      externalId: "130063P6",
+      packageSize: 1,
+      packageUnit: "l",
+      packageCount: 6,
+      totalAmount: 6,
+      category: "Huevos, leche y mantequilla",
+      subcategory: "Leche sin lactosa y enriquecidas",
+      imageUrl:
+        "https://www.dia.es/product_images/130063P6/130063P6_ISO_0_ES.jpg",
+    });
+    await expect(provider.refreshPrices(["130063P6"], market)).resolves.toEqual(
+      [
+        {
+          retailerProductId: "130063P6",
+          marketId: "postal-code:50009",
+          normalPrice: 5.64,
+          promoPrice: 5.34,
+          pricePerUnit: 0.89,
+          referenceUnit: "l",
+          promotionType: "fixed-price",
+          requiresMembership: true,
+          available: true,
+          observedAt: OBSERVED_AT,
+        },
+      ],
+    );
+  });
+
+  it.each([
+    {
+      sku_id: "different",
+      prices: { currency: "EUR", price: 4 },
+      units_in_stock: 3,
+    },
+    { sku_id: "261354", units_in_stock: 3 },
+    { sku_id: "261354", prices: { currency: "EUR", price: 4 } },
+    {
+      sku_id: "261354",
+      prices: { currency: "EUR", price: 4 },
+      units_in_stock: -1,
+    },
+  ])(
+    "rechaza un PDP con identidad, precio o stock incompatibles: %j",
+    async (product) => {
+      const provider = createProvider(
+        vi
+          .fn<typeof fetch>()
+          .mockResolvedValueOnce(marketResponse())
+          .mockResolvedValueOnce(
+            jsonResponse({
+              product: { ...product, primary_info: { title: "Producto" } },
+            }),
+          ),
+      );
+      const market = await provider.resolveMarket("50009");
+      await expect(
+        provider.refreshPrices(["261354"], market),
+      ).rejects.toBeInstanceOf(ProviderContractChangedError);
+    },
+  );
 
   it("acepta como autoritativa una sesión devuelta sin rotación", async () => {
     const fetchMock = vi
