@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "../services/supabase";
+import { normalizeInviteCode } from "../features/groups/invites";
 import type { ShoppingPackageType } from "@shopping-app/voice-parser";
 import type {
   CreateGroupInput,
@@ -103,7 +104,7 @@ export async function joinGroup(inviteCode: string): Promise<JoinGroupResult> {
   const knownGroupIds = new Set(groupsBefore.data.map((group) => group.id));
 
   const { data, error } = await supabase.rpc("join_group_by_invite", {
-    invite_code: inviteCode.trim(),
+    invite_code: normalizeInviteCode(inviteCode),
   });
   if (error) throw error;
   return {

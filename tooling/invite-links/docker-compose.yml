@@ -1,0 +1,40 @@
+services:
+  invites:
+    image: nginx@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94
+    container_name: shoppingapp_invites
+    restart: unless-stopped
+    user: "101:101"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    entrypoint: [nginx, -g, "daemon off;"]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m,mode=1777
+    volumes:
+      - ./public:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks: [proxy]
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://127.0.0.1:8080/]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: privnetproxy
+      traefik.http.routers.shoppingapp-invites.rule: Host(`shoppingapp.ebia.cloud`)
+      traefik.http.routers.shoppingapp-invites.entrypoints: websecure
+      traefik.http.routers.shoppingapp-invites.tls.certresolver: le
+      traefik.http.routers.shoppingapp-invites.service: shoppingapp-invites
+      traefik.http.services.shoppingapp-invites.loadbalancer.server.port: "8080"
+      traefik.http.routers.shoppingapp-invites-http.rule: Host(`shoppingapp.ebia.cloud`)
+      traefik.http.routers.shoppingapp-invites-http.entrypoints: web
+      traefik.http.routers.shoppingapp-invites-http.middlewares: shoppingapp-invites-https
+      traefik.http.routers.shoppingapp-invites-http.service: shoppingapp-invites
+      traefik.http.middlewares.shoppingapp-invites-https.redirectscheme.scheme: https
+      traefik.http.middlewares.shoppingapp-invites-https.redirectscheme.permanent: "true"
+
+networks:
+  proxy:
+    external: true
+    name: privnetproxy

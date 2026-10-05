@@ -1,4 +1,5 @@
 import { useLocalSearchParams } from "expo-router";
+import * as Linking from "expo-linking";
 import { useEffect, useState } from "react";
 import { Modal, Pressable, Share, StyleSheet, Text, View } from "react-native";
 
@@ -7,7 +8,10 @@ import { AppInput } from "../../../components/app-input";
 import { Screen } from "../../../components/screen";
 import { ScreenState } from "../../../components/screen-state";
 import { useSession } from "../../../features/auth/session-provider";
-import { createInviteLink } from "../../../features/groups/invites";
+import {
+  createInviteDeepLink,
+  createInviteLink,
+} from "../../../features/groups/invites";
 import {
   useGenerateInviteMutation,
   useGroupDetailQuery,
@@ -121,6 +125,16 @@ export default function GroupSettingsScreen() {
     setShareError(null);
     try {
       await Share.share({ message: code });
+    } catch (error) {
+      setShareError(getErrorMessage(error));
+    }
+  };
+
+  const openInvite = async (): Promise<void> => {
+    if (!generateInvite.data) return;
+    setShareError(null);
+    try {
+      await Linking.openURL(createInviteDeepLink(generateInvite.data));
     } catch (error) {
       setShareError(getErrorMessage(error));
     }
@@ -273,8 +287,8 @@ export default function GroupSettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Invitaciones</Text>
           <Text style={styles.muted}>
-            Cada enlace caduca en 7 días y permite que se unan hasta 100
-            personas. Puedes enviarlo directamente a un grupo de WhatsApp.
+            Cada código tiene 6 cifras, caduca en 7 días y permite que se unan
+            hasta 100 personas. Puedes compartir su enlace por WhatsApp.
           </Text>
           <AppButton
             loading={generateInvite.isPending}
@@ -290,7 +304,12 @@ export default function GroupSettingsScreen() {
                 {generateInvite.data}
               </Text>
               <Text style={styles.label}>Enlace</Text>
-              <Text selectable style={styles.link}>
+              <Text
+                accessibilityRole="link"
+                onPress={() => void openInvite()}
+                selectable
+                style={styles.link}
+              >
                 {createInviteLink(generateInvite.data)}
               </Text>
               <AppButton onPress={() => void shareInvite()}>

@@ -1,0 +1,10 @@
+{
+  "name": "@shopping-app/invite-links",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsx src/cli.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit"
+  }
+}

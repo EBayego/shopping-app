@@ -133,8 +133,8 @@ select
   );
 
 select extensions.ok(
-  (select value from rls_test_values where key = 'invite_code') ~ '^[0-9A-F]{4}(-[0-9A-F]{4}){5}$',
-  'owner receives a human-readable 96-bit invite code'
+  (select value from rls_test_values where key = 'invite_code') ~ '^[0-9]{6}$',
+  'owner receives a six-digit invite code'
 );
 
 reset role;

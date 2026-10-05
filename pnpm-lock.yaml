@@ -231,6 +231,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/retailer-contracts
 
+  tooling/invite-links: {}
+
   tooling/provider-poc:
     dependencies:
       '@shopping-app/domain':

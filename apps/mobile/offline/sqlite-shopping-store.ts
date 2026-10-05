@@ -29,6 +29,21 @@ export class SQLiteShoppingStore implements LocalShoppingStore {
     await this.database();
   }
 
+  async clearSyncedCache(): Promise<void> {
+    await this.withExclusiveTransaction(async (transaction) => {
+      const pending = await transaction.getFirstAsync<{ count: number }>(
+        "select count(*) as count from pending_operations",
+      );
+      if ((pending?.count ?? 0) > 0) {
+        throw new Error(
+          "Hay cambios locales pendientes. Sincronízalos antes de cerrar sesión para conservarlos.",
+        );
+      }
+      await transaction.runAsync("delete from cached_groups");
+      await transaction.runAsync("delete from sync_metadata");
+    });
+  }
+
   async getGroupDetail(groupId: string): Promise<GroupDetail | null> {
     return readGroupDetail(await this.database(), groupId);
   }

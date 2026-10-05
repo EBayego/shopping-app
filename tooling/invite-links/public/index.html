@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Invitación · shopping-app</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: system-ui, sans-serif;
+        background: #101711;
+        color: #f4f6f4;
+      }
+      body {
+        min-height: 100dvh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+      }
+      main {
+        box-sizing: border-box;
+        width: min(100% - 32px, 440px);
+        padding: 28px;
+        border: 1px solid #35433b;
+        border-radius: 24px;
+        background: #1a2720;
+      }
+      h1 {
+        font-size: 28px;
+        line-height: 1.2;
+        margin: 0 0 16px;
+      }
+      p {
+        color: #b7c0b9;
+        line-height: 1.5;
+      }
+      .code {
+        overflow-wrap: anywhere;
+        color: #f4f6f4;
+        text-align: center;
+        font:
+          600 32px ui-monospace,
+          monospace;
+        letter-spacing: 0.1em;
+        background: #153d2a;
+        border-radius: 12px;
+        padding: 20px 8px;
+        user-select: all;
+      }
+      a,
+      button {
+        box-sizing: border-box;
+        display: block;
+        width: 100%;
+        min-height: 48px;
+        border-radius: 12px;
+        padding: 14px;
+        margin-top: 12px;
+        font:
+          700 16px system-ui,
+          sans-serif;
+        text-align: center;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      a {
+        color: #101711;
+        background: #55c38a;
+        border: 0;
+      }
+      button {
+        color: #f4f6f4;
+        background: transparent;
+        border: 1px solid #53635a;
+      }
+      a:focus-visible,
+      button:focus-visible {
+        outline: 3px solid #f4f6f4;
+        outline-offset: 4px;
+      }
+      [hidden] {
+        display: none;
+      }
+      #status {
+        min-height: 24px;
+        font-size: 14px;
+        margin-bottom: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 id="title">Invitación a shopping-app</h1>
+      <p id="description">
+        Abre la app para comprobar la invitación y unirte al grupo. Los códigos
+        caducan a los 7 días.
+      </p>
+      <div id="invitation" hidden>
+        <p class="code" id="code"></p>
+        <a id="open-app">Abrir en shopping-app</a>
+        <button id="copy-code" type="button">Copiar código</button>
+        <p>
+          Si todavía no tienes la app, instálala y pega este código en «Unirse
+          con invitación».
+        </p>
+      </div>
+      <p id="status" role="status" aria-live="polite"></p>
+      <noscript
+        >Activa JavaScript o copia el código de la dirección y pégalo en la
+        app.</noscript
+      >
+    </main>
+    <script>
+      const url = new URL(window.location.href);
+      const match = /^\/(?:preview\/)?join\/([^/]+)\/?$/.exec(url.pathname);
+      let code = "";
+      try {
+        code = match ? decodeURIComponent(match[1]).trim() : "";
+      } catch {
+        /* Invalid encoding. */
+      }
+      const valid =
+        /^(?:[0-9]{6}|[0-9A-F]{4}(?:-[0-9A-F]{4}){5}|[0-9a-f]{48})$/.test(code);
+      if (valid) {
+        const requestedScheme =
+          url.searchParams.get("scheme") || "shopping-app";
+        const scheme = [
+          "shopping-app",
+          "shopping-app-dev",
+          "shopping-app-staging",
+        ].includes(requestedScheme)
+          ? requestedScheme
+          : "shopping-app";
+        const deepLink = `${scheme}://join/${encodeURIComponent(code)}`;
+        document.getElementById("code").textContent = code;
+        document.getElementById("open-app").href = deepLink;
+        document.getElementById("invitation").hidden = false;
+        document
+          .getElementById("copy-code")
+          .addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(code);
+              document.getElementById("status").textContent = "Código copiado.";
+            } catch {
+              document.getElementById("status").textContent =
+                "Mantén pulsado el código para copiarlo.";
+            }
+          });
+      } else {
+        document.getElementById("description").textContent =
+          "Abre el enlace completo que te han enviado o introduce el código de invitación en la app.";
+      }
+    </script>
+  </body>
+</html>

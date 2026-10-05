@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.shoppingapp.mobile",
+      "sha256_cert_fingerprints": [
+        "5F:79:DB:E6:96:A2:C8:75:DF:F3:4A:22:0C:59:68:B0:E2:D9:FE:90:A6:A0:09:DD:9C:0F:69:21:8A:0E:CE:7A"
+      ]
+    }
+  }
+]

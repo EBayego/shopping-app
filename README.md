@@ -194,12 +194,20 @@ pausas: `docs/ingestion-scheduler.md`.
 ## Mobile, deep links y voz
 
 `apps/mobile/app.config.ts` valida la variante, configura identifiers, scheme,
-icon/splash placeholder y permisos iOS/Android. Un enlace tiene forma
-`shopping-app-dev://join/CODE` (o scheme de staging/production). Anonymous Auth
+icon/splash placeholder y permisos iOS/Android. Las invitaciones nuevas usan seis
+cifras y enlaces `https://shoppingapp.ebia.cloud/join/CODE`, con siete días de
+validez y hasta 100 usos. Los códigos caducados pueden asignarse de nuevo y las
+invitaciones antiguas se conservan. Configuración del subdominio del VPS y de los
+App Links / Universal Links: [docs/invitation-links.md](docs/invitation-links.md).
+Los schemes por variante siguen disponibles como respaldo. Anonymous Auth
 se restaura desde SecureStore; desinstalar la app puede perder esa identidad
 hasta que se vincule una cuenta.
 
-En Ajustes se puede vincular o iniciar sesión con Google y Apple mediante OAuth
+En Ajustes, una identidad anónima sin grupos solo ofrece iniciar sesión. Con
+grupos también puede proteger sus datos vinculando una cuenta. Una sesión iniciada
+muestra únicamente sus proveedores vinculados y el botón de cerrar sesión; este
+espera a que no haya cambios locales pendientes y limpia la caché sincronizada
+antes de cambiar de identidad. Se usa Google y Apple mediante OAuth
 PKCE. La vinculación conserva la identidad anónima y sus datos; iniciar sesión
 con una cuenta existente sustituye la sesión local después de mostrar una
 advertencia. Para habilitarlo en cada proyecto Supabase remoto:

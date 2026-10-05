@@ -4,6 +4,7 @@ import { Screen } from "../../components/screen";
 import { ScreenState } from "../../components/screen-state";
 import { useSession } from "../../features/auth/session-provider";
 import { useJoinGroupMutation } from "../../features/groups/queries";
+import { normalizeInviteCode } from "../../features/groups/invites";
 import { getErrorMessage } from "../../lib/errors";
 import { useUiStore } from "../../stores/ui-store";
 
@@ -13,7 +14,7 @@ function firstParameter(value: string | string[] | undefined): string {
 
 export default function JoinGroupScreen() {
   const params = useLocalSearchParams<{ inviteCode: string | string[] }>();
-  const inviteCode = firstParameter(params.inviteCode).trim();
+  const inviteCode = normalizeInviteCode(firstParameter(params.inviteCode));
   const join = useJoinGroupMutation();
   const session = useSession();
   const setPendingInviteCode = useUiStore(

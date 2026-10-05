@@ -403,10 +403,14 @@ describe("VoiceShoppingPanel", () => {
     expect(inputsByLabel(renderer, "Envases").map(inputValue)).toEqual([
       "3",
       "2",
+      "",
+      "",
     ]);
     expect(inputsByLabel(renderer, "Tamaño").map(inputValue)).toEqual([
       "8",
       "1",
+      "",
+      "",
     ]);
     expect(inputsByLabel(renderer, "Cantidad").map(inputValue)).toEqual([
       "",
@@ -416,13 +420,14 @@ describe("VoiceShoppingPanel", () => {
     ]);
   });
 
-  it("capitalizes display values and omits empty optional fields and unit", async () => {
+  it("capitalizes display values and keeps empty optional fields editable", async () => {
     const renderer = await renderPanel(serviceReturning("dos leches"));
 
     expect(inputByLabel(renderer, "Producto").props.value).toBe("Leche");
-    expect(inputsByLabel(renderer, "Variante")).toHaveLength(0);
-    expect(inputsByLabel(renderer, "Marca")).toHaveLength(0);
-    expect(inputsByLabel(renderer, "Unidad")).toHaveLength(0);
+    expect(inputByLabel(renderer, "Variante").props.value).toBe("");
+    expect(inputByLabel(renderer, "Marca").props.value).toBe("");
+    expect(inputByLabel(renderer, "Unidad").props.value).toBe("");
+    expect(inputByLabel(renderer, "Tipo de envase").props.value).toBe("");
     expect(screenText(renderer)).not.toContain("Producto 1");
     expect(screenText(renderer)).not.toContain("Cantidad 1");
   });
@@ -436,8 +441,64 @@ describe("VoiceShoppingPanel", () => {
     expect(inputByLabel(renderer, "Variante").props.value).toBe(
       "semidesnatada",
     );
-    expect(inputsByLabel(renderer, "Marca")).toHaveLength(0);
+    expect(inputByLabel(renderer, "Marca").props.value).toBe("");
   });
+
+  it.each([false, true])(
+    "confirms details added to a product-only transcript with AI=%s",
+    async (useAi) => {
+      const onConfirm = vi.fn().mockResolvedValue(undefined);
+      const aiParser = {
+        parse: vi.fn().mockResolvedValue([
+          {
+            rawText: "leche",
+            product: "leche",
+            confidence: "MEDIUM",
+            source: "AI",
+            needsReview: false,
+          },
+        ]),
+      };
+      const renderer = await renderPanel(serviceReturning("leche"), {
+        onConfirm,
+        aiParser,
+      });
+      if (useAi) await enableAi(renderer);
+      await pressAndFlush(buttonByText(renderer, "Empezar a escuchar"));
+      for (const [label, value] of [
+        ["Cantidad", "2"],
+        ["Unidad", "l"],
+        ["Marca", "Pascual"],
+        ["Variante", "semidesnatada"],
+      ]) {
+        await act(() => {
+          const input = inputByLabel(renderer, label!);
+          const handler: unknown = input.props.onChangeText;
+          if (typeof handler !== "function")
+            throw new TypeError("Missing onChangeText");
+          (handler as (text: string) => void)(value!);
+        });
+      }
+      const selector = resultSelectors(renderer)[0]!;
+      if (
+        !(selector.props as { accessibilityState: { checked: boolean } })
+          .accessibilityState.checked
+      ) {
+        await pressAndFlush(selector);
+      }
+      await pressAndFlush(buttonByText(renderer, "Añadir seleccionados"));
+      expect(onConfirm).toHaveBeenCalledWith([
+        expect.objectContaining({
+          product: "Leche",
+          requestedQuantity: 2,
+          requestedUnit: "l",
+          totalAmount: 2,
+          brandPreference: "Pascual",
+          variant: "semidesnatada",
+        }),
+      ]);
+    },
+  );
 
   it("makes LOW confidence explicit and requires selection", async () => {
     const onConfirm = vi.fn().mockResolvedValue(undefined);

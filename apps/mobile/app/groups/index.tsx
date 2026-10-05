@@ -7,6 +7,7 @@ import { AppInput } from "../../components/app-input";
 import { Screen } from "../../components/screen";
 import { ScreenState } from "../../components/screen-state";
 import { useGroupsQuery } from "../../features/groups/queries";
+import { normalizeInviteCode } from "../../features/groups/invites";
 import { getErrorMessage } from "../../lib/errors";
 import { useThemedStyles } from "../../features/theme/theme-context";
 import { spacing, type ThemeColors } from "../../lib/theme";
@@ -103,7 +104,7 @@ export default function GroupsScreen() {
           autoCorrect={false}
           label="Código"
           onChangeText={setInviteCode}
-          placeholder="Pega el código recibido"
+          placeholder="Código de 6 cifras o enlace recibido"
           value={inviteCode}
         />
         <AppButton
@@ -112,7 +113,7 @@ export default function GroupsScreen() {
           onPress={() =>
             router.push({
               pathname: "/join/[inviteCode]",
-              params: { inviteCode: inviteCode.trim() },
+              params: { inviteCode: normalizeInviteCode(inviteCode) },
             })
           }
         >

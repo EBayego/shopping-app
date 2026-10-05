@@ -1,5 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -8,6 +8,7 @@ import { AppInput } from "../components/app-input";
 import { Screen } from "../components/screen";
 import { ScreenState } from "../components/screen-state";
 import { useSession } from "../features/auth/session-provider";
+import { useGroupsQuery } from "../features/groups/queries";
 import {
   useProfileQuery,
   useUpdateProfileMutation,
@@ -15,9 +16,11 @@ import {
 import { useThemedStyles, useTheme } from "../features/theme/theme-context";
 import { getErrorMessage } from "../lib/errors";
 import { spacing, type ThemeColors, type ThemeMode } from "../lib/theme";
+import { useOfflineSync } from "../offline/offline-sync-provider";
 import {
   beginSocialIdentityLink,
   beginSocialSignIn,
+  signOutCurrentDevice,
   type SocialIdentityProvider,
 } from "../repositories/auth-repository";
 
@@ -32,10 +35,12 @@ export default function SettingsScreen() {
     oauthProvider?: SocialIdentityProvider;
   }>();
   const session = useSession();
+  const sync = useOfflineSync();
   const { mode, setMode } = useTheme();
   const styles = useThemedStyles(createStyles);
   const userId = session.status === "ready" ? session.session.user.id : "";
   const profile = useProfileQuery(userId);
+  const groups = useGroupsQuery();
   const updateProfile = useUpdateProfileMutation(userId);
   const [displayName, setDisplayName] = useState("");
   const [linkingProvider, setLinkingProvider] =
@@ -43,6 +48,7 @@ export default function SettingsScreen() {
   const [signingInProvider, setSigningInProvider] =
     useState<SocialIdentityProvider | null>(null);
   const [identityError, setIdentityError] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
 
   const connectedProviders = useMemo(
     () =>
@@ -55,9 +61,14 @@ export default function SettingsScreen() {
       ),
     [session],
   );
+  const isSignedIn =
+    session.status === "ready" && !session.session.user.is_anonymous;
+  const hasShoppingData = (groups.data?.length ?? 0) > 0;
+  const identityBusy =
+    linkingProvider !== null || signingInProvider !== null || signingOut;
 
   useEffect(() => {
-    if (profile.data) setDisplayName(profile.data.display_name ?? "");
+    setDisplayName(profile.data?.display_name ?? "");
   }, [profile.data]);
 
   async function linkIdentity(provider: SocialIdentityProvider) {
@@ -73,6 +84,10 @@ export default function SettingsScreen() {
   }
 
   function confirmSignIn(provider: SocialIdentityProvider) {
+    if (!hasShoppingData) {
+      void signIn(provider);
+      return;
+    }
     Alert.alert(
       `Iniciar sesión con ${providerLabels[provider]}`,
       "La identidad local actual será sustituida. Si quieres conservar sus listas y grupos, cancela y vincúlala primero.",
@@ -98,7 +113,20 @@ export default function SettingsScreen() {
     }
   }
 
-  if (profile.isLoading)
+  async function signOut() {
+    setIdentityError(null);
+    setSigningOut(true);
+    try {
+      await signOutCurrentDevice();
+      router.replace("/settings");
+    } catch (error) {
+      setIdentityError(getErrorMessage(error));
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
+  if (profile.isLoading || (!isSignedIn && groups.isLoading))
     return (
       <Screen scroll={false}>
         <ScreenState loading title="Cargando ajustes" />
@@ -111,6 +139,17 @@ export default function SettingsScreen() {
           title="No se pudo cargar el perfil"
           message={getErrorMessage(profile.error)}
           retry={() => void profile.refetch()}
+        />
+      </Screen>
+    );
+  }
+  if (!isSignedIn && groups.isError) {
+    return (
+      <Screen scroll={false}>
+        <ScreenState
+          title="No se pudieron comprobar tus grupos"
+          message={getErrorMessage(groups.error)}
+          retry={() => void groups.refetch()}
         />
       </Screen>
     );
@@ -166,12 +205,23 @@ export default function SettingsScreen() {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Protege tu cuenta</Text>
-        <Text style={styles.muted}>
-          Vincula una cuenta para recuperar el acceso sin perder tus listas ni
-          grupos. Google y Apple son las opciones sociales disponibles.
+        <Text style={styles.sectionTitle}>
+          {isSignedIn
+            ? "Tu cuenta"
+            : hasShoppingData
+              ? "Protege tu cuenta"
+              : "Iniciar sesión"}
         </Text>
-        {oauthProvider && providerLabels[oauthProvider] ? (
+        <Text style={styles.muted}>
+          {isSignedIn
+            ? "Tu cuenta está vinculada. Puedes recuperar tus listas y grupos iniciando sesión en otro dispositivo."
+            : hasShoppingData
+              ? "Vincula una cuenta para recuperar el acceso sin perder tus listas ni grupos. Google y Apple son las opciones sociales disponibles."
+              : "Inicia sesión con Google o Apple para acceder a tus listas y grupos."}
+        </Text>
+        {isSignedIn &&
+        oauthProvider &&
+        connectedProviders.has(oauthProvider) ? (
           <Text accessibilityLiveRegion="polite" style={styles.success}>
             {oauthIntent === "sign-in"
               ? `Sesión iniciada con ${providerLabels[oauthProvider]} correctamente.`
@@ -181,46 +231,59 @@ export default function SettingsScreen() {
         {identityError ? (
           <Text style={styles.error}>{identityError}</Text>
         ) : null}
-        {(Object.keys(providerLabels) as SocialIdentityProvider[]).map(
-          (provider) => {
-            const connected = connectedProviders.has(provider);
-            return (
-              <AppButton
-                disabled={
-                  connected ||
-                  linkingProvider !== null ||
-                  signingInProvider !== null
-                }
-                key={provider}
-                icon={<SocialProviderIcon provider={provider} />}
-                loading={linkingProvider === provider}
-                onPress={() => void linkIdentity(provider)}
-                tone="secondary"
-              >
-                {connected
-                  ? `${providerLabels[provider]} vinculado`
-                  : `Vincular con ${providerLabels[provider]}`}
-              </AppButton>
-            );
-          },
-        )}
-        <Text style={styles.accountHint}>
-          ¿Ya protegiste tu cuenta en otro dispositivo? Inicia sesión para
-          recuperarla. La identidad local actual será sustituida.
-        </Text>
-        {(Object.keys(providerLabels) as SocialIdentityProvider[]).map(
-          (provider) => (
-            <AppButton
-              disabled={linkingProvider !== null || signingInProvider !== null}
-              key={`sign-in-${provider}`}
-              icon={<SocialProviderIcon provider={provider} />}
-              loading={signingInProvider === provider}
-              onPress={() => confirmSignIn(provider)}
-              tone="secondary"
-            >
-              Iniciar sesión con {providerLabels[provider]}
-            </AppButton>
-          ),
+        {(isSignedIn || hasShoppingData) &&
+          (Object.keys(providerLabels) as SocialIdentityProvider[]).map(
+            (provider) => {
+              const connected = connectedProviders.has(provider);
+              if (isSignedIn && !connected) return null;
+              return (
+                <AppButton
+                  disabled={connected || identityBusy}
+                  key={provider}
+                  icon={<SocialProviderIcon provider={provider} />}
+                  loading={linkingProvider === provider}
+                  onPress={() => void linkIdentity(provider)}
+                  tone="secondary"
+                >
+                  {connected
+                    ? `${providerLabels[provider]} vinculado`
+                    : `Vincular con ${providerLabels[provider]}`}
+                </AppButton>
+              );
+            },
+          )}
+        {isSignedIn ? (
+          <AppButton
+            disabled={identityBusy || sync.isSyncing}
+            loading={signingOut}
+            onPress={() => void signOut()}
+            tone="secondary"
+          >
+            Cerrar sesión
+          </AppButton>
+        ) : (
+          <>
+            {hasShoppingData ? (
+              <Text style={styles.accountHint}>
+                ¿Ya protegiste tu cuenta en otro dispositivo? Inicia sesión para
+                recuperarla. La identidad local actual será sustituida.
+              </Text>
+            ) : null}
+            {(Object.keys(providerLabels) as SocialIdentityProvider[]).map(
+              (provider) => (
+                <AppButton
+                  disabled={identityBusy}
+                  key={`sign-in-${provider}`}
+                  icon={<SocialProviderIcon provider={provider} />}
+                  loading={signingInProvider === provider}
+                  onPress={() => confirmSignIn(provider)}
+                  tone="secondary"
+                >
+                  Iniciar sesión con {providerLabels[provider]}
+                </AppButton>
+              ),
+            )}
+          </>
         )}
       </View>
     </Screen>

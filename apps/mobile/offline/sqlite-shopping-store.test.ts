@@ -7,6 +7,7 @@ const { database, intentIds, transactionState } = vi.hoisted(() => {
   const state = { active: 0, maximumActive: 0 };
   const fakeDatabase = {
     execAsync: vi.fn(() => Promise.resolve()),
+    getFirstAsync: vi.fn(() => Promise.resolve({ count: 0 })),
     getAllAsync: vi.fn(() => Promise.resolve([])),
     runAsync: vi.fn((sql: string, ...parameters: unknown[]) => {
       if (sql.startsWith("delete from cached_shopping_intents")) {
@@ -55,6 +56,7 @@ describe("SQLiteShoppingStore", () => {
     transactionState.active = 0;
     transactionState.maximumActive = 0;
     vi.clearAllMocks();
+    database.getFirstAsync.mockResolvedValue({ count: 0 });
   });
 
   it("can rewrite a cached group when an existing intent changes", async () => {
@@ -88,6 +90,24 @@ describe("SQLiteShoppingStore", () => {
     ).resolves.toEqual([undefined, undefined]);
 
     expect(transactionState.maximumActive).toBe(1);
+  });
+
+  it("clears synchronized account data before switching to an anonymous session", async () => {
+    const store = new SQLiteShoppingStore();
+    await store.clearSyncedCache();
+    expect(database.runAsync).toHaveBeenCalledWith("delete from cached_groups");
+    expect(database.runAsync).not.toHaveBeenCalledWith(
+      "delete from pending_operations",
+    );
+  });
+
+  it("preserves unsynchronized changes when logout is attempted", async () => {
+    database.getFirstAsync.mockResolvedValue({ count: 1 });
+    const store = new SQLiteShoppingStore();
+    await expect(store.clearSyncedCache()).rejects.toThrow(
+      "cambios locales pendientes",
+    );
+    expect(database.runAsync).not.toHaveBeenCalled();
   });
 });
 

@@ -32,7 +32,9 @@
     "ios": {
       "supportsTablet": true
     },
-    "android": {},
+    "android": {
+      "versionCode": 4
+    },
     "extra": {
       "appEnvironment": "development",
       "router": {},

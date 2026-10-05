@@ -5,6 +5,8 @@ import {
   type EnsuredSession,
 } from "../features/auth/anonymous-session";
 import type { OAuthCallbackResult } from "../features/auth/oauth-callback";
+import { queryClient } from "../lib/query-client";
+import { sqliteShoppingStore } from "../offline/sqlite-shopping-store";
 import { secureStoreAdapter } from "../services/secure-store-adapter";
 import { getSupabaseClient } from "../services/supabase";
 
@@ -32,6 +34,17 @@ export async function beginSocialSignIn(
   provider: SocialIdentityProvider,
 ): Promise<void> {
   return beginSocialOAuth(provider, "sign-in");
+}
+
+export async function signOutCurrentDevice(): Promise<void> {
+  await queryClient.cancelQueries();
+  await sqliteShoppingStore.clearSyncedCache();
+  const { error } = await getSupabaseClient().auth.signOut({ scope: "local" });
+  if (error) {
+    await queryClient.invalidateQueries();
+    throw error;
+  }
+  await secureStoreAdapter.removeItem(PENDING_IDENTITY_LINK_KEY);
 }
 
 async function beginSocialOAuth(

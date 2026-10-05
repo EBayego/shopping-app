@@ -432,7 +432,11 @@ function VoiceDraftEditor({
           <Text style={styles.hint}>{confidenceMessage}</Text>
         </View>
       </Pressable>
-      <ShoppingIntentFields onChange={onChange} values={draft} />
+      <ShoppingIntentFields
+        onChange={onChange}
+        showEmptyOptionalFields
+        values={draft}
+      />
     </View>
   );
 }
