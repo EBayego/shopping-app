@@ -68,6 +68,10 @@ export function OfflineSyncProvider({ children }: PropsWithChildren) {
       .then(async () => {
         await refreshStatus();
         await queryClient.invalidateQueries({ queryKey: groupKeys.root });
+        await queryClient.invalidateQueries({
+          queryKey: ["basket-comparison"],
+        });
+        await queryClient.invalidateQueries({ queryKey: ["product-search"] });
       })
       .catch(async (error: unknown) => {
         const message = getErrorMessage(error);

@@ -94,6 +94,8 @@ export function createLocalIntent(input: {
     brand_preference: input.brandPreference ?? null,
     variant: input.variant ?? null,
     product_concept_id: input.productConceptId ?? null,
+    linked_offer_id: null,
+    product_link: null,
     concept_resolution_method: null,
     concept_resolution_score: null,
     checked: false,

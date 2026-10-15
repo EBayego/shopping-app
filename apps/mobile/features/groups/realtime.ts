@@ -18,6 +18,9 @@ export function subscribeToGroupBroadcast(
     void queryClient.invalidateQueries({
       queryKey: groupKeys.detailScope(groupId),
     });
+    void queryClient.invalidateQueries({ queryKey: ["basket-comparison"] });
+    void queryClient.invalidateQueries({ queryKey: ["product-search"] });
+    void queryClient.invalidateQueries({ queryKey: ["supermarkets"] });
   });
 
   void supabase.realtime.setAuth().then(() => {

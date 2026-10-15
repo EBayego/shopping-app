@@ -137,6 +137,29 @@ describe("ProductSearchPanel interactions", () => {
     expect(onSelectProduct).toHaveBeenCalledWith(result);
   });
 
+  it("links a concrete offer and market without exposing the free-add action", async () => {
+    mocks.state.data = [result];
+    const onSelectOffer = vi.fn();
+    const onSelectProduct = vi.fn();
+    const renderer = await renderPanel({
+      mode: "link",
+      initialQuery: "leche",
+      onSelectOffer,
+      onSelectProduct,
+    });
+    expect(screenText(renderer)).toContain("Enlazar producto");
+    expect(screenText(renderer)).not.toContain("como item libre");
+    await act(() =>
+      press(
+        renderer.root.findByProps({
+          accessibilityLabel: "Enlazar Leche semidesnatada Hacendado de DIA",
+        }),
+      ),
+    );
+    expect(onSelectOffer).toHaveBeenCalledWith(result, result.offers[0]);
+    expect(onSelectProduct).not.toHaveBeenCalled();
+  });
+
   it("adds unmatched text as a free item", async () => {
     mocks.state.data = [];
     const onAddFreeItem = vi.fn();

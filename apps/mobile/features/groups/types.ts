@@ -4,8 +4,14 @@ import type { ShoppingPackageType } from "@shopping-app/voice-parser";
 export type Group = Database["public"]["Tables"]["groups"]["Row"];
 export type ShoppingList =
   Database["public"]["Tables"]["shopping_lists"]["Row"];
-export type ShoppingIntent =
+type ShoppingIntentRow =
   Database["public"]["Tables"]["shopping_intents"]["Row"];
+// SQLite snapshots created by earlier versions do not contain the new fields.
+export type ShoppingIntent = Omit<
+  ShoppingIntentRow,
+  "linked_offer_id" | "product_link"
+> &
+  Partial<Pick<ShoppingIntentRow, "linked_offer_id" | "product_link">>;
 export type GroupMember = Database["public"]["Tables"]["group_members"]["Row"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 

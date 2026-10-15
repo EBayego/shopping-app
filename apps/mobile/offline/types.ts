@@ -1,3 +1,4 @@
+import type { Json } from "@shopping-app/database";
 import type {
   EditShoppingIntentInput,
   GroupDetail,
@@ -13,6 +14,14 @@ type OperationBase = {
 };
 
 export type ShoppingOperation =
+  | (OperationBase & {
+      kind: "link_product";
+      intentId: string;
+      expectedInput: Json;
+      productId: string | null;
+      marketId: string | null;
+      snapshot: Json | null;
+    })
   | (OperationBase & {
       kind: "add_intent";
       shoppingListId: string;

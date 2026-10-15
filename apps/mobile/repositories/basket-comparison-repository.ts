@@ -11,7 +11,7 @@ import {
 import { getSupabaseClient } from "../services/supabase";
 import { listSupermarketsForShoppingList } from "./supermarket-preferences-repository";
 
-interface ComparisonInputs {
+export interface ComparisonInputs {
   retailers: readonly string[];
   intents: readonly BasketIntent[];
   candidates: readonly BasketOfferCandidate[];
@@ -45,7 +45,7 @@ export async function getBasketComparisons(
   );
 }
 
-function decodeInputs(value: Json): ComparisonInputs {
+export function decodeInputs(value: Json): ComparisonInputs {
   if (!isRecord(value)) throw invalidResponse();
   const retailers = value.retailers;
   const intents = value.intents;
@@ -72,6 +72,12 @@ function decodeIntent(value: Json): BasketIntent {
   return {
     id: value.id,
     name: value.name,
+    ...(isString(value.normalizedName)
+      ? { normalizedName: value.normalizedName }
+      : {}),
+    ...(isString(value.conceptName) ? { conceptName: value.conceptName } : {}),
+    ...(isString(value.updatedAt) ? { updatedAt: value.updatedAt } : {}),
+    ...(isString(value.linkSource) ? { linkSource: value.linkSource } : {}),
     ...(isString(value.productConceptId)
       ? { productConceptId: value.productConceptId }
       : {}),
@@ -117,6 +123,12 @@ function decodeCandidate(value: Json): BasketOfferCandidate {
     retailer: value.retailer,
     productId: value.productId,
     productName: value.productName,
+    ...(isString(value.offerId) ? { offerId: value.offerId } : {}),
+    ...(isString(value.marketId) ? { marketId: value.marketId } : {}),
+    ...(isString(value.observedAt) ? { observedAt: value.observedAt } : {}),
+    ...(typeof value.locationApproximate === "boolean"
+      ? { locationApproximate: value.locationApproximate }
+      : {}),
     ...(isString(value.brand) ? { brand: value.brand } : {}),
     classificationConfidence: value.classificationConfidence,
     classificationAccepted: value.classificationAccepted,
@@ -135,6 +147,9 @@ function decodeCandidate(value: Json): BasketOfferCandidate {
     ...optionalUnit(value, "referenceUnit"),
     ...(isString(value.promotionText)
       ? { promotionText: value.promotionText }
+      : {}),
+    ...(isString(value.promotionType)
+      ? { promotionType: value.promotionType }
       : {}),
   };
 }

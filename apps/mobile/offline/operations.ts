@@ -1,11 +1,35 @@
 import type { GroupDetail, ShoppingIntent } from "../features/groups/types";
 import type { ShoppingOperation } from "./types";
+import { productLinkInput } from "../features/groups/product-links";
 
 export function applyOperationLocally(
   detail: GroupDetail,
   operation: ShoppingOperation,
 ): GroupDetail {
   switch (operation.kind) {
+    case "link_product": {
+      const intent = detail.intents.find(
+        (item) => item.id === operation.intentId,
+      );
+      if (
+        !intent ||
+        JSON.stringify(productLinkInput(intent)) !==
+          JSON.stringify(operation.expectedInput)
+      )
+        return detail;
+      const offerId =
+        operation.snapshot &&
+        typeof operation.snapshot === "object" &&
+        !Array.isArray(operation.snapshot) &&
+        typeof operation.snapshot.offerId === "string"
+          ? operation.snapshot.offerId
+          : null;
+      return patchIntent(detail, operation.intentId, {
+        linked_offer_id: offerId,
+        product_link: operation.snapshot,
+        updated_at: operation.createdAt,
+      });
+    }
     case "add_intent":
       return detail.intents.some((item) => item.id === operation.localIntent.id)
         ? detail
@@ -63,6 +87,11 @@ export function applyOperationLocally(
     case "update_postal_code":
       return {
         ...detail,
+        intents: detail.intents.map((intent) =>
+          intent.shopping_list_id === operation.shoppingListId
+            ? { ...intent, linked_offer_id: null, product_link: null }
+            : intent,
+        ),
         lists: detail.lists.map((list) =>
           list.id === operation.shoppingListId
             ? {
@@ -83,9 +112,14 @@ function patchIntent(
 ): GroupDetail {
   return {
     ...detail,
-    intents: detail.intents.map((item) =>
-      item.id === intentId ? { ...item, ...patch } : item,
-    ),
+    intents: detail.intents.map((item) => {
+      if (item.id !== intentId) return item;
+      const updated = { ...item, ...patch };
+      return JSON.stringify(productLinkInput(item)) ===
+        JSON.stringify(productLinkInput(updated))
+        ? updated
+        : { ...updated, linked_offer_id: null, product_link: null };
+    }),
   };
 }
 

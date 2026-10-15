@@ -315,8 +315,25 @@ export async function updateShoppingListPostalCode(
 }
 
 export const shoppingSyncBackend: ShoppingSyncBackend = {
-  apply(operation: ShoppingOperation) {
+  async apply(operation: ShoppingOperation) {
     switch (operation.kind) {
+      case "link_product":
+        return getSupabaseClient()
+          .rpc("link_shopping_product_operation", {
+            operation_id: operation.operationId,
+            intent_id: operation.intentId,
+            expected_input: operation.expectedInput,
+            ...(operation.productId === null
+              ? {}
+              : { product_id: operation.productId }),
+            ...(operation.marketId === null
+              ? {}
+              : { market_id: operation.marketId }),
+          })
+          .then(({ data, error }) => {
+            if (error) throw error;
+            return data as unknown as ShoppingIntent;
+          });
       case "add_intent":
         return addShoppingIntent(
           operation.shoppingListId,

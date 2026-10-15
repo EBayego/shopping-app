@@ -26,6 +26,11 @@ import { useProductSearchQuery } from "./queries";
 import type { ProductSearchOffer, ProductSearchResult } from "./types";
 
 interface ProductSearchPanelProps {
+  mode?: "add" | "link";
+  initialQuery?: string;
+  onSelectOffer?:
+    | ((result: ProductSearchResult, offer: ProductSearchOffer) => void)
+    | undefined;
   shoppingListId: string;
   adding: boolean;
   onAddFreeItem: (text: string) => void;
@@ -36,6 +41,9 @@ interface ProductSearchPanelProps {
 }
 
 export function ProductSearchPanel({
+  mode = "add",
+  initialQuery = "",
+  onSelectOffer,
   shoppingListId,
   adding,
   onAddFreeItem,
@@ -46,7 +54,7 @@ export function ProductSearchPanel({
 }: ProductSearchPanelProps) {
   const { colors } = useTheme();
   const styles = useThemedStyles(createStyles);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const debouncedQuery = useDebouncedValue(query.trim(), 350);
   const search = useProductSearchQuery(shoppingListId, debouncedQuery);
 
@@ -54,7 +62,9 @@ export function ProductSearchPanel({
     <View style={styles.panel}>
       {onClose ? (
         <View style={styles.panelHeading}>
-          <Text style={styles.title}>Añadir producto</Text>
+          <Text style={styles.title}>
+            {mode === "link" ? "Enlazar producto" : "Añadir producto"}
+          </Text>
           <Pressable accessibilityRole="button" onPress={onClose}>
             <Text style={styles.action}>Cerrar</Text>
           </Pressable>
@@ -80,7 +90,7 @@ export function ProductSearchPanel({
         value={query}
       />
 
-      {query.trim().length > 0 ? (
+      {mode === "add" && query.trim().length > 0 ? (
         <AppButton
           disabled={adding}
           tone="secondary"
@@ -112,7 +122,9 @@ export function ProductSearchPanel({
         <View style={styles.stateBox}>
           <Text style={styles.title}>Sin resultados de catálogo</Text>
           <Text style={styles.hint}>
-            Puedes añadir el texto como item libre y completarlo después.
+            {mode === "link"
+              ? "Prueba otro nombre o conserva el artículo sin enlazar."
+              : "Puedes añadir el texto como item libre y completarlo después."}
           </Text>
         </View>
       ) : (
@@ -120,11 +132,11 @@ export function ProductSearchPanel({
           {search.data?.map((result, index) => (
             <ProductResultCard
               key={
-                result.concept?.id ??
-                result.retailerProducts[0]?.id ??
-                index
+                result.concept?.id ?? result.retailerProducts[0]?.id ?? index
               }
               adding={adding}
+              mode={mode}
+              onSelectOffer={onSelectOffer}
               onRefreshOffers={onRefreshOffers}
               onSelect={(selected) => {
                 onSelectProduct(selected);
@@ -140,11 +152,17 @@ export function ProductSearchPanel({
 }
 
 function ProductResultCard({
+  mode,
+  onSelectOffer,
   result,
   adding,
   onRefreshOffers,
   onSelect,
 }: {
+  mode: "add" | "link";
+  onSelectOffer?:
+    | ((result: ProductSearchResult, offer: ProductSearchOffer) => void)
+    | undefined;
   result: ProductSearchResult;
   adding: boolean;
   onRefreshOffers?: ((result: ProductSearchResult) => void) | undefined;
@@ -163,9 +181,11 @@ function ProductResultCard({
   return (
     <View style={styles.card}>
       <Pressable
-        accessibilityLabel={`Añadir ${resultName(result)}`}
+        accessibilityLabel={
+          mode === "link" ? resultName(result) : `Añadir ${resultName(result)}`
+        }
         accessibilityRole="button"
-        disabled={adding}
+        disabled={adding || mode === "link"}
         onPress={() => onSelect(result)}
         style={styles.productHeader}
       >
@@ -180,7 +200,9 @@ function ProductResultCard({
           <Text style={styles.productName}>{resultName(result)}</Text>
           {brand ? <Text style={styles.meta}>{brand}</Text> : null}
           {format ? <Text style={styles.meta}>{format}</Text> : null}
-          <Text style={styles.selectText}>Seleccionar producto</Text>
+          {mode === "add" ? (
+            <Text style={styles.selectText}>Seleccionar producto</Text>
+          ) : null}
         </View>
       </Pressable>
 
@@ -191,10 +213,34 @@ function ProductResultCard({
       ) : (
         <View style={styles.offers}>
           {result.offers.map((offer) => (
-            <OfferRow
-              key={`${offer.market.id}:${offer.retailerProduct.id}`}
-              offer={offer}
-            />
+            <View key={`${offer.market.id}:${offer.retailerProduct.id}`}>
+              {mode === "link" ? (
+                <>
+                  <Text style={styles.productName}>
+                    {offer.retailerProduct.name}
+                  </Text>
+                  <Text style={styles.meta}>
+                    {resultFormat({
+                      ...result,
+                      retailerProducts: result.retailerProducts.filter(
+                        (product) => product.id === offer.retailerProduct.id,
+                      ),
+                    })}
+                  </Text>
+                </>
+              ) : null}
+              <OfferRow offer={offer} />
+              {mode === "link" ? (
+                <AppButton
+                  disabled={adding || !offer.availability}
+                  accessibilityLabel={`Enlazar ${offer.retailerProduct.name} de ${offer.retailer.name}`}
+                  onPress={() => onSelectOffer?.(result, offer)}
+                  tone="secondary"
+                >
+                  Enlazar este producto
+                </AppButton>
+              ) : null}
+            </View>
           ))}
         </View>
       )}

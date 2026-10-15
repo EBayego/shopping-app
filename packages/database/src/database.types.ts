@@ -873,12 +873,16 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          linked_offer_id: string | null
           normalized_name: string
           package_count: number | null
           package_size: number | null
+          package_type:
+            | Database["public"]["Enums"]["shopping_package_type"]
+            | null
           package_unit: string | null
-          package_type: Database["public"]["Enums"]["shopping_package_type"] | null
           product_concept_id: string | null
+          product_link: Json | null
           raw_text: string
           requested_quantity: number | null
           requested_unit: string | null
@@ -895,12 +899,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          linked_offer_id?: string | null
           normalized_name: string
           package_count?: number | null
           package_size?: number | null
+          package_type?:
+            | Database["public"]["Enums"]["shopping_package_type"]
+            | null
           package_unit?: string | null
-          package_type?: Database["public"]["Enums"]["shopping_package_type"] | null
           product_concept_id?: string | null
+          product_link?: Json | null
           raw_text: string
           requested_quantity?: number | null
           requested_unit?: string | null
@@ -917,12 +925,16 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          linked_offer_id?: string | null
           normalized_name?: string
           package_count?: number | null
           package_size?: number | null
+          package_type?:
+            | Database["public"]["Enums"]["shopping_package_type"]
+            | null
           package_unit?: string | null
-          package_type?: Database["public"]["Enums"]["shopping_package_type"] | null
           product_concept_id?: string | null
+          product_link?: Json | null
           raw_text?: string
           requested_quantity?: number | null
           requested_unit?: string | null
@@ -937,6 +949,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopping_intents_linked_offer_id_fkey"
+            columns: ["linked_offer_id"]
+            isOneToOne: false
+            referencedRelation: "product_offers"
             referencedColumns: ["id"]
           },
           {
@@ -1078,8 +1097,8 @@ export type Database = {
           operation_id: string
           package_count?: number
           package_size?: number
-          package_unit?: string
           package_type?: Database["public"]["Enums"]["shopping_package_type"]
+          package_unit?: string
           product_concept_id?: string
           raw_text: string
           requested_quantity?: number
@@ -1284,6 +1303,10 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_shopping_product_links: {
+        Args: { choices: Json; operation_id: string; shopping_list_id: string }
+        Returns: Json
+      }
       change_retailer_product_concept: {
         Args: {
           target_confidence: string
@@ -1409,8 +1432,8 @@ export type Database = {
           operation_id: string
           package_count?: number
           package_size?: number
-          package_unit?: string
           package_type?: Database["public"]["Enums"]["shopping_package_type"]
+          package_unit?: string
           raw_text: string
           requested_quantity?: number
           requested_unit?: string
@@ -1438,6 +1461,10 @@ export type Database = {
           very_stale_after_ms: number
         }[]
       }
+      get_product_link_inputs: {
+        Args: { shopping_list_id: string }
+        Returns: Json
+      }
       ingest_product_offers_batch: {
         Args: {
           payload: Json
@@ -1455,6 +1482,16 @@ export type Database = {
         Returns: undefined
       }
       join_group_by_invite: { Args: { invite_code: string }; Returns: string }
+      link_shopping_product_operation: {
+        Args: {
+          expected_input: Json
+          intent_id: string
+          market_id?: string
+          operation_id: string
+          product_id?: string
+        }
+        Returns: Json
+      }
       list_price_refresh_candidates: {
         Args: { target_market_id: string; target_retailer_id: string }
         Returns: {
@@ -1522,15 +1559,30 @@ export type Database = {
         }
         Returns: undefined
       }
+      undo_shopping_product_links: {
+        Args: { batch_id: string; operation_id: string }
+        Returns: number
+      }
     }
     Enums: {
-      shopping_package_type: "bottle" | "can" | "carton" | "bag" | "tray" | "jar" | "box" | "pack" | "tub" | "tube" | "jug"
       group_member_role: "owner" | "member"
       provider_health_status: "healthy" | "degraded" | "unavailable"
       provider_operational_status: "ACTIVE" | "DEGRADED" | "DISABLED"
       provider_sync_status: "running" | "succeeded" | "partial" | "failed"
       refresh_request_status: "PENDING" | "RUNNING" | "SUCCEEDED" | "FAILED"
       refresh_request_type: "PRICE_REFRESH" | "CATALOG_SYNC"
+      shopping_package_type:
+        | "bottle"
+        | "can"
+        | "carton"
+        | "bag"
+        | "tray"
+        | "jar"
+        | "box"
+        | "pack"
+        | "tub"
+        | "tube"
+        | "jug"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1658,13 +1710,25 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      shopping_package_type: ["bottle", "can", "carton", "bag", "tray", "jar", "box", "pack", "tub", "tube", "jug"],
       group_member_role: ["owner", "member"],
       provider_health_status: ["healthy", "degraded", "unavailable"],
       provider_operational_status: ["ACTIVE", "DEGRADED", "DISABLED"],
       provider_sync_status: ["running", "succeeded", "partial", "failed"],
       refresh_request_status: ["PENDING", "RUNNING", "SUCCEEDED", "FAILED"],
       refresh_request_type: ["PRICE_REFRESH", "CATALOG_SYNC"],
+      shopping_package_type: [
+        "bottle",
+        "can",
+        "carton",
+        "bag",
+        "tray",
+        "jar",
+        "box",
+        "pack",
+        "tub",
+        "tube",
+        "jug",
+      ],
     },
   },
 } as const

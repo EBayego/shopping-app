@@ -1,7 +1,4 @@
-import type {
-  ProductClassificationConfidence,
-  ProductUnit,
-} from "./models.ts";
+import type { ProductClassificationConfidence, ProductUnit } from "./models.ts";
 import type { Retailer } from "./retailer.ts";
 
 export type OfferFreshness = "FRESH" | "STALE" | "VERY_STALE";
@@ -11,6 +8,10 @@ export type BasketLineStatus =
 export interface BasketIntent {
   id: string;
   name: string;
+  normalizedName?: string;
+  conceptName?: string;
+  updatedAt?: string;
+  linkSource?: string;
   productConceptId?: string;
   requestedQuantity?: number;
   requestedUnit?: ProductUnit;
@@ -30,6 +31,10 @@ export interface BasketOfferCandidate {
   retailer: Retailer;
   productId: string;
   productName: string;
+  offerId?: string;
+  marketId?: string;
+  observedAt?: string;
+  locationApproximate?: boolean;
   brand?: string;
   classificationConfidence: ProductClassificationConfidence;
   classificationAccepted: boolean;
@@ -47,6 +52,7 @@ export interface BasketOfferCandidate {
   pricePerUnit?: number;
   referenceUnit?: ProductUnit;
   promotionText?: string;
+  promotionType?: string;
 }
 
 export interface BasketUnavailableItem {
@@ -60,6 +66,8 @@ export interface BasketComparisonLine {
   requestedName: string;
   status: BasketLineStatus;
   productId?: string;
+  offerId?: string;
+  marketId?: string;
   productName?: string;
   commercialUnits?: number;
   suppliedAmount?: number;
@@ -269,6 +277,12 @@ function evaluateCandidate(
       requestedName: intent.name,
       status: "MATCHED",
       productId: candidate.productId,
+      ...(candidate.offerId === undefined
+        ? {}
+        : { offerId: candidate.offerId }),
+      ...(candidate.marketId === undefined
+        ? {}
+        : { marketId: candidate.marketId }),
       productName: candidate.productName,
       commercialUnits,
       suppliedAmount: roundQuantity(supply.amount * commercialUnits),
@@ -472,7 +486,9 @@ function matchesPreference(
 ): boolean {
   if (preference === undefined) return true;
   if (candidate === undefined) return false;
-  return normalizeComparable(candidate).includes(normalizeComparable(preference));
+  return normalizeComparable(candidate).includes(
+    normalizeComparable(preference),
+  );
 }
 
 function normalizeComparable(value: string): string {

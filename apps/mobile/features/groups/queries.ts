@@ -15,6 +15,11 @@ import {
 import { useOfflineSync } from "../../offline/offline-sync-provider";
 import { groupKeys } from "./query-keys";
 import type { AddShoppingIntentInput, EditShoppingIntentInput } from "./types";
+import type { ShoppingOperation } from "../../offline/types";
+import {
+  automaticallyLinkProducts,
+  undoAutomaticProductLinks,
+} from "../../repositories/product-link-repository";
 
 export function useGroupsQuery() {
   const session = useSession();
@@ -124,6 +129,71 @@ export function useToggleIntentMutation(groupId: string) {
   });
 }
 
+export function useLinkProductMutation(groupId: string) {
+  const queryClient = useQueryClient();
+  const sync = useOfflineSync();
+  return useMutation({
+    mutationFn: (
+      input: Omit<
+        Extract<ShoppingOperation, { kind: "link_product" }>,
+        "kind" | "groupId" | "createdAt"
+      >,
+    ) =>
+      enqueueShoppingOperation({
+        ...input,
+        kind: "link_product",
+        groupId,
+        createdAt: new Date().toISOString(),
+      }),
+    onSuccess: (detail) =>
+      completeLocalMutation(queryClient, groupId, detail, sync),
+  });
+}
+
+export function useAutomaticProductLinksMutation(groupId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      shoppingListId,
+      operationId,
+    }: {
+      shoppingListId: string;
+      operationId: string;
+    }) => automaticallyLinkProducts(shoppingListId, operationId),
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: groupKeys.detailScope(groupId),
+        }),
+        queryClient.invalidateQueries({ queryKey: ["basket-comparison"] }),
+        queryClient.invalidateQueries({ queryKey: ["product-search"] }),
+      ]);
+    },
+  });
+}
+
+export function useUndoProductLinksMutation(groupId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      batchId,
+      operationId,
+    }: {
+      batchId: string;
+      operationId: string;
+    }) => undoAutomaticProductLinks(batchId, operationId),
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: groupKeys.detailScope(groupId),
+        }),
+        queryClient.invalidateQueries({ queryKey: ["basket-comparison"] }),
+        queryClient.invalidateQueries({ queryKey: ["product-search"] }),
+      ]);
+    },
+  });
+}
+
 export function useEditIntentMutation(groupId: string) {
   const queryClient = useQueryClient();
   const sync = useOfflineSync();
@@ -217,5 +287,7 @@ function completeLocalMutation(
     detail,
   );
   void sync.refreshStatus();
+  void queryClient.invalidateQueries({ queryKey: ["basket-comparison"] });
+  void queryClient.invalidateQueries({ queryKey: ["product-search"] });
   sync.syncNow();
 }

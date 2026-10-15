@@ -33,7 +33,11 @@ cross join (values
 where retailer.code = 'DIA';
 
 select extensions.is(
-  (select count(*) from public.product_concepts), 5::bigint,
+  (select count(*) from public.product_concepts where id in (
+    '10000000-0000-4000-8000-000000000001', '10000000-0000-4000-8000-000000000002',
+    '10000000-0000-4000-8000-000000000003', '10000000-0000-4000-8000-000000000004',
+    '10000000-0000-4000-8000-000000000005'
+  )), 5::bigint,
   'the first five broad shopping concepts are seeded'
 );
 select extensions.is(
