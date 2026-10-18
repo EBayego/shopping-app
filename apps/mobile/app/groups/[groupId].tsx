@@ -10,9 +10,9 @@ import type { ShoppingIntentDraft } from "@shopping-app/voice-parser";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import {
+  FlatList,
   Modal,
   Pressable,
-  SectionList,
   StyleSheet,
   Text,
   View,
@@ -29,7 +29,6 @@ import {
   useDeleteIntentMutation,
   useEditIntentMutation,
   useGroupDetailQuery,
-  useToggleIntentMutation,
   useAutomaticProductLinksMutation,
   useUndoProductLinksMutation,
 } from "../../features/groups/queries";
@@ -115,7 +114,6 @@ export default function GroupDetailScreen() {
   const sync = useOfflineSync();
   const detail = useGroupDetailQuery(groupId);
   const addIntent = useAddIntentMutation(groupId);
-  const toggleIntent = useToggleIntentMutation(groupId);
   const editIntent = useEditIntentMutation(groupId);
   const changeQuantity = useChangeIntentQuantityMutation(groupId);
   const deleteIntent = useDeleteIntentMutation(groupId);
@@ -126,7 +124,6 @@ export default function GroupDetailScreen() {
     result: AutomaticLinkResult;
   } | null>(null);
   const [linkingIntentId, setLinkingIntentId] = useState<string | null>(null);
-  const [checkedOpen, setCheckedOpen] = useState(false);
   const dimensions = useWindowDimensions();
   const columns = dimensions.width < 360 || dimensions.fontScale > 1.25 ? 1 : 2;
   const [voiceOpen, setVoiceOpen] = useState(false);
@@ -156,30 +153,12 @@ export default function GroupDetailScreen() {
   );
 
   const supermarkets = useSupermarketsQuery(activeListId);
-  const sections = useMemo(() => {
-    const rows = (items: readonly ShoppingIntent[]) => {
-      const result: ShoppingIntent[][] = [];
-      for (let index = 0; index < items.length; index += columns)
-        result.push(items.slice(index, index + columns));
-      return result;
-    };
-    const pending = activeIntents.filter((intent) => !intent.checked);
-    const checked = activeIntents.filter((intent) => intent.checked);
-    return [
-      {
-        key: "pending",
-        title: "Por comprar",
-        count: pending.length,
-        data: rows(pending),
-      },
-      {
-        key: "checked",
-        title: "Comprados",
-        count: checked.length,
-        data: checkedOpen ? rows(checked) : [],
-      },
-    ];
-  }, [activeIntents, checkedOpen, columns]);
+  const rows = useMemo(() => {
+    const result: ShoppingIntent[][] = [];
+    for (let index = 0; index < activeIntents.length; index += columns)
+      result.push(activeIntents.slice(index, index + columns));
+    return result;
+  }, [activeIntents, columns]);
   if (detail.isLoading) {
     return (
       <Screen scroll={false}>
@@ -271,10 +250,7 @@ export default function GroupDetailScreen() {
   };
 
   const mutationError =
-    toggleIntent.error ??
-    editIntent.error ??
-    changeQuantity.error ??
-    deleteIntent.error;
+    editIntent.error ?? changeQuantity.error ?? deleteIntent.error;
 
   const report =
     automaticReport?.listId === activeListId ? automaticReport.result : null;
@@ -297,9 +273,8 @@ export default function GroupDetailScreen() {
         </Text>
       ) : null}
       {!sync.isOnline ||
-      sync.isSyncing ||
-      sync.pendingCount > 0 ||
-      sync.conflictCount > 0 ? (
+      sync.conflictCount > 0 ||
+      (sync.lastError && sync.pendingCount > 0) ? (
         <View
           style={[
             styles.syncBanner,
@@ -309,16 +284,17 @@ export default function GroupDetailScreen() {
           <Text style={styles.syncText}>
             {!sync.isOnline
               ? `Sin conexión · ${sync.pendingCount} cambio(s) pendiente(s)`
-              : sync.isSyncing
-                ? "Sincronizando cambios…"
-                : sync.conflictCount > 0
-                  ? `${sync.conflictCount} cambio(s) necesitan revisión`
-                  : sync.lastError
-                    ? `No se pudo sincronizar · ${sync.pendingCount} cambio(s) guardados`
-                    : `${sync.pendingCount} cambio(s) pendiente(s)`}
+              : sync.conflictCount > 0
+                ? `${sync.conflictCount} cambio(s) necesitan revisión`
+                : `No se pudo sincronizar · ${sync.pendingCount} cambio(s) guardados`}
           </Text>
-          {sync.isOnline && !sync.isSyncing && sync.pendingCount > 0 ? (
-            <Pressable accessibilityRole="button" onPress={sync.syncNow}>
+          {sync.isOnline && sync.pendingCount > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ disabled: sync.isSyncing }}
+              disabled={sync.isSyncing}
+              onPress={sync.syncNow}
+            >
               <Text style={styles.actionText}>Reintentar</Text>
             </Pressable>
           ) : null}
@@ -371,11 +347,12 @@ export default function GroupDetailScreen() {
           </Text>
         ) : null}
       </View>
-      {activeListId && activeIntents.some((intent) => !intent.checked) ? (
+      {activeListId && activeIntents.length > 0 ? (
         <View style={styles.toolbar}>
           <AppButton
             loading={automaticLinks.isPending}
             disabled={!canAutoLink || undoLinks.isPending}
+            accessibilityHint="Disponible con conexión y después de sincronizar los cambios."
             icon={<Ionicons name="link-outline" size={20} color="#FFFFFF" />}
             onPress={() =>
               automaticLinks.mutate(
@@ -393,9 +370,8 @@ export default function GroupDetailScreen() {
             Enlazar automáticamente
           </AppButton>
           <Text style={styles.caption}>
-            {canAutoLink
-              ? "Busca el equivalente más barato por artículo entre tus supermercados. Conserva los enlaces manuales."
-              : "Disponible con conexión y después de sincronizar los cambios."}
+            Busca el equivalente más barato por artículo entre tus
+            supermercados. Conserva los enlaces manuales.
           </Text>
           <AppButton
             tone="secondary"
@@ -483,40 +459,13 @@ export default function GroupDetailScreen() {
         }}
       />
       <VoiceDiscoveryModal />
-      <SectionList
-        sections={sections}
+      <FlatList
+        data={rows}
         style={styles.list}
         keyboardShouldPersistTaps="handled"
-        stickySectionHeadersEnabled={false}
         ListHeaderComponent={header}
         keyExtractor={(row) => row.map((intent) => intent.id).join(":")}
         contentContainerStyle={styles.listContent}
-        renderSectionHeader={({ section }) =>
-          section.count > 0 ? (
-            <Pressable
-              accessibilityRole={
-                section.key === "checked" ? "button" : "header"
-              }
-              accessibilityState={
-                section.key === "checked" ? { expanded: checkedOpen } : {}
-              }
-              disabled={section.key !== "checked"}
-              onPress={() => setCheckedOpen((open) => !open)}
-              style={styles.sectionHeading}
-            >
-              <Text style={styles.sectionTitle}>
-                {section.title} · {section.count}
-              </Text>
-              {section.key === "checked" ? (
-                <Ionicons
-                  color={colors.muted}
-                  name={checkedOpen ? "chevron-up" : "chevron-down"}
-                  size={20}
-                />
-              ) : null}
-            </Pressable>
-          ) : null
-        }
         renderItem={({ item: row }) => (
           <View style={styles.cardRow}>
             {row.map((intent) => {
@@ -531,13 +480,6 @@ export default function GroupDetailScreen() {
                   key={intent.id}
                   intent={intent}
                   retailerEnabled={enabled}
-                  onToggle={() =>
-                    toggleIntent.mutate({
-                      intentId: intent.id,
-                      checked: !intent.checked,
-                      operationId: createOperationId(),
-                    })
-                  }
                   onQuantity={(direction) =>
                     changeQuantity.mutate({
                       intentId: intent.id,
@@ -668,12 +610,6 @@ const createStyles = (colors: ThemeColors) =>
     syncErrorBanner: { borderColor: colors.danger },
     syncText: { color: colors.muted, flex: 1 },
     sectionTitle: { color: colors.text, fontSize: 18, fontWeight: "700" },
-    sectionHeading: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingVertical: spacing.md,
-    },
     muted: { color: colors.muted, lineHeight: 21 },
     bodyText: { color: colors.text, lineHeight: 22 },
     caption: { color: colors.muted, lineHeight: 19, fontSize: 12 },

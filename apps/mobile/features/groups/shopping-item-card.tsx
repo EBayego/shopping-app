@@ -1,13 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useEffect, useRef, useState } from "react";
-import {
-  AccessibilityInfo,
-  Animated,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useThemedStyles, useTheme } from "../theme/theme-context";
 import type { ThemeColors } from "../../lib/theme";
 import {
@@ -22,7 +14,6 @@ import type { ShoppingIntent } from "./types";
 
 export function ShoppingItemCard({
   intent,
-  onToggle,
   onEdit,
   onDelete,
   onLink,
@@ -30,7 +21,6 @@ export function ShoppingItemCard({
   retailerEnabled = true,
 }: {
   intent: ShoppingIntent;
-  onToggle: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onLink: () => void;
@@ -41,31 +31,6 @@ export function ShoppingItemCard({
   const { colors } = useTheme();
   const display = formatShoppingIntent(intent);
   const link = readProductLink(intent.product_link);
-  const scale = useRef(new Animated.Value(1)).current;
-  const [reduceMotion, setReduceMotion] = useState(true);
-  useEffect(() => {
-    let active = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((value) => {
-      if (active) setReduceMotion(value);
-    });
-    const subscription = AccessibilityInfo.addEventListener(
-      "reduceMotionChanged",
-      setReduceMotion,
-    );
-    return () => {
-      active = false;
-      subscription.remove();
-    };
-  }, []);
-  const animate = (value: number) => {
-    if (reduceMotion) return;
-    Animated.spring(scale, {
-      toValue: value,
-      useNativeDriver: true,
-      speed: 35,
-      bounciness: 3,
-    }).start();
-  };
   const ageHours = link
     ? (Date.now() - new Date(link.observedAt).getTime()) / 3_600_000
     : 0;
@@ -73,38 +38,16 @@ export function ShoppingItemCard({
     ageHours >= 24 ? "VERY_STALE" : ageHours >= 6 ? "STALE" : "FRESH",
   );
   return (
-    <Animated.View
-      style={[
-        styles.card,
-        intent.checked && styles.checked,
-        { transform: [{ scale }] },
-      ]}
-    >
-      <Pressable
-        accessibilityRole="checkbox"
-        aria-checked={intent.checked}
-        accessibilityState={{ checked: intent.checked }}
-        accessibilityLabel={`${intent.checked ? "Desmarcar" : "Marcar"} ${display.title}`}
-        onPress={onToggle}
-        onPressIn={() => animate(0.97)}
-        onPressOut={() => animate(1)}
-        style={styles.main}
-      >
+    <View style={styles.card}>
+      <View style={styles.main}>
         <View style={styles.top}>
           <Text style={styles.kind}>{link ? "ENLAZADO" : "TU LISTA"}</Text>
-          <Ionicons
-            name={intent.checked ? "checkmark-circle" : "ellipse-outline"}
-            color={colors.primary}
-            size={24}
-          />
         </View>
         <Text accessible={false} style={styles.illustration}>
           {productIcon(intent.normalized_name)}
         </Text>
-        <Text style={[styles.title, intent.checked && styles.checkedTitle]}>
-          {display.title}
-        </Text>
-      </Pressable>
+        <Text style={styles.title}>{display.title}</Text>
+      </View>
       <View style={styles.quantityRow}>
         <Pressable
           accessibilityRole="button"
@@ -193,7 +136,7 @@ export function ShoppingItemCard({
           <Ionicons color={colors.danger} name="trash-outline" size={20} />
         </Pressable>
       </View>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -209,7 +152,6 @@ const createStyles = (colors: ThemeColors) =>
       borderColor: colors.border,
       gap: 8,
     },
-    checked: { backgroundColor: colors.successBackground, opacity: 0.8 },
     main: { gap: 10, alignItems: "center" },
     top: {
       flexDirection: "row",
@@ -231,7 +173,6 @@ const createStyles = (colors: ThemeColors) =>
       textAlign: "center",
       lineHeight: 23,
     },
-    checkedTitle: { color: colors.muted, textDecorationLine: "line-through" },
     quantityRow: { flexDirection: "row", alignItems: "center", gap: 2 },
     quantityButton: {
       minWidth: 44,
