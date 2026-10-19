@@ -5,6 +5,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { SessionGate } from "../features/auth/session-gate";
 import { SessionProvider } from "../features/auth/session-provider";
+import { NavigationPersistence } from "../features/navigation/navigation-persistence";
 import { useTheme } from "../features/theme/theme-context";
 import { ThemeProvider } from "../features/theme/theme-provider";
 import { queryClient } from "../lib/query-client";
@@ -18,6 +19,7 @@ export default function RootLayout() {
           <SessionProvider>
             <OfflineSyncProvider>
               <SessionGate>
+                <NavigationPersistence />
                 <ThemedStack />
               </SessionGate>
             </OfflineSyncProvider>
