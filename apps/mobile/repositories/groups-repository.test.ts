@@ -7,6 +7,7 @@ import {
   editShoppingIntent,
   generateGroupInvite,
   joinGroup,
+  shoppingSyncBackend,
 } from "./groups-repository";
 
 vi.mock("../services/supabase", () => ({ getSupabaseClient: vi.fn() }));
@@ -92,6 +93,31 @@ describe("groups repository RPCs", () => {
       expires_in: "7 days",
       allowed_uses: 100,
     });
+  });
+
+  it("sincroniza el borrado de una lista solo dentro de su grupo", async () => {
+    const listFilter = vi.fn().mockResolvedValue({ error: null });
+    const groupFilter = vi.fn().mockReturnValue({ eq: listFilter });
+    const remove = vi.fn().mockReturnValue({ eq: groupFilter });
+    const from = vi.fn().mockReturnValue({ delete: remove });
+    useClient({ from });
+    const operation = {
+      kind: "delete_list",
+      groupId: "group-1",
+      shoppingListId: "list-1",
+      operationId: "delete-list-1",
+      createdAt: "2026-11-07T12:00:00Z",
+    } as const;
+
+    await expect(shoppingSyncBackend.apply(operation)).resolves.toBeUndefined();
+    expect(from).toHaveBeenCalledWith("shopping_lists");
+    expect(remove).toHaveBeenCalledOnce();
+    expect(groupFilter).toHaveBeenCalledWith("group_id", "group-1");
+    expect(listFilter).toHaveBeenCalledWith("id", "list-1");
+
+    const error = new Error("Network request failed");
+    listFilter.mockResolvedValueOnce({ error });
+    await expect(shoppingSyncBackend.apply(operation)).rejects.toBe(error);
   });
 
   it("asocia un resultado seleccionado con el producto canónico", async () => {

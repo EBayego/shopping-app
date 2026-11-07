@@ -90,6 +90,63 @@ describe("ShoppingSyncEngine", () => {
     expect((await store.getSyncStatus()).pendingCount).toBe(0);
   });
 
+  it("keeps a deleted list hidden while a pending delete is retried", async () => {
+    const fixture = detailFixture();
+    const otherList = { ...fixture.lists[0]!, id: "list-2" };
+    const otherIntent = {
+      ...intentFixture("intent-2"),
+      shopping_list_id: otherList.id,
+    };
+    const detail = {
+      ...fixture,
+      lists: [...fixture.lists, otherList],
+      intents: [...fixture.intents, otherIntent],
+    };
+    const store = new MemoryStore(detail);
+    const backend = new Backend("delete-list");
+    backend.snapshot = detail;
+    const engine = new ShoppingSyncEngine(store, backend);
+    await store.enqueue({
+      kind: "delete_list",
+      operationId: "delete-list",
+      groupId: "group-1",
+      shoppingListId: "list-1",
+      createdAt: NOW,
+    });
+
+    expect(store.detail.lists).toEqual([otherList]);
+    expect(store.detail.intents).toEqual([otherIntent]);
+
+    expect((await engine.sync()).interrupted).toBe(true);
+    expect(store.detail.lists).toEqual([otherList]);
+    expect(store.detail.intents).toEqual([otherIntent]);
+
+    expect((await engine.sync()).applied).toBe(1);
+    expect(store.operations).toHaveLength(0);
+    expect(backend.snapshot).toEqual(store.detail);
+  });
+
+  it("does not restore a pending new item if another member deleted its list", async () => {
+    const store = new MemoryStore(detailFixture());
+    await store.enqueue({
+      kind: "add_intent",
+      operationId: "add-before-delete",
+      groupId: "group-1",
+      shoppingListId: "list-1",
+      localIntent: intentFixture("local:add-before-delete"),
+      createdAt: NOW,
+    });
+
+    await store.replaceWithServerSnapshot({
+      ...detailFixture(),
+      lists: [],
+      intents: [],
+    });
+
+    expect(store.detail.intents).toHaveLength(0);
+    expect(await store.nextPending()).not.toBeNull();
+  });
+
   it("continues a partial replay from the failed operation", async () => {
     const store = new MemoryStore(detailFixture());
     await store.enqueue(toggle("one", true));

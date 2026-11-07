@@ -21,11 +21,13 @@ export const shoppingSyncEngine = new ShoppingSyncEngine(
 
 export async function getOfflineGroupDetail(
   groupId: string,
+  signal?: AbortSignal,
 ): Promise<GroupDetail> {
   await sqliteShoppingStore.initialize();
   if (isNetworkOnline()) {
     try {
       const remote = await getGroupDetail(groupId);
+      if (signal?.aborted) return remote;
       await sqliteShoppingStore.replaceWithServerSnapshot(remote);
       return (await sqliteShoppingStore.getGroupDetail(groupId)) ?? remote;
     } catch (error) {

@@ -18,6 +18,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppButton } from "../../components/app-button";
 import { Screen } from "../../components/screen";
@@ -27,6 +28,7 @@ import {
   useAddIntentMutation,
   useChangeIntentQuantityMutation,
   useDeleteIntentMutation,
+  useDeleteListMutation,
   useEditIntentMutation,
   useGroupDetailQuery,
   useAutomaticProductLinksMutation,
@@ -56,6 +58,8 @@ import { spacing, type ThemeColors } from "../../lib/theme";
 import { useOfflineSync } from "../../offline/offline-sync-provider";
 import { speechRecognitionService } from "../../services/expo-speech-recognition-service";
 import { openAiShoppingIntentParser } from "../../services/openai-shopping-intent-parser";
+
+const MIN_CARD_WIDTH = 104; // Fits two 44-point controls, their gap and the card edges.
 
 function firstParameter(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? "") : (value ?? "");
@@ -117,6 +121,7 @@ export default function GroupDetailScreen() {
   const editIntent = useEditIntentMutation(groupId);
   const changeQuantity = useChangeIntentQuantityMutation(groupId);
   const deleteIntent = useDeleteIntentMutation(groupId);
+  const deleteList = useDeleteListMutation(groupId);
   const automaticLinks = useAutomaticProductLinksMutation(groupId);
   const undoLinks = useUndoProductLinksMutation(groupId);
   const [automaticReport, setAutomaticReport] = useState<{
@@ -124,10 +129,17 @@ export default function GroupDetailScreen() {
     result: AutomaticLinkResult;
   } | null>(null);
   const [linkingIntentId, setLinkingIntentId] = useState<string | null>(null);
-  const dimensions = useWindowDimensions();
-  const columns = dimensions.width < 360 || dimensions.fontScale > 1.25 ? 1 : 2;
-  const [voiceOpen, setVoiceOpen] = useState(false);
+  const { width, fontScale } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const gridWidth = width - insets.left - insets.right - 2 * spacing.md;
+  const columnsThatFit = Math.floor(
+    (gridWidth + spacing.sm) / (MIN_CARD_WIDTH + spacing.sm),
+  );
+  const columns =
+    fontScale > 1.25 ? 1 : Math.max(1, Math.min(5, columnsThatFit));
+  const [voiceListId, setVoiceListId] = useState<string | null>(null);
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [listIdToDelete, setListIdToDelete] = useState<string | null>(null);
   const [inputError, setInputError] = useState<string | null>(null);
   const [editingIntentId, setEditingIntentId] = useState<string | null>(null);
   const [editingValues, setEditingValues] =
@@ -140,7 +152,11 @@ export default function GroupDetailScreen() {
     queryClient,
   );
 
-  const activeListId = selectedListId ?? detail.data?.lists[0]?.id ?? null;
+  const activeList =
+    detail.data?.lists.find((list) => list.id === selectedListId) ??
+    detail.data?.lists[0];
+  const activeListId = activeList?.id ?? null;
+  const voiceOpen = activeListId !== null && activeListId === voiceListId;
   const activeIntents = useMemo(
     () =>
       detail.data?.intents.filter(
@@ -148,10 +164,9 @@ export default function GroupDetailScreen() {
       ) ?? [],
     [activeListId, detail.data?.intents],
   );
-  const activeList = detail.data?.lists.find(
-    (list) => list.id === activeListId,
-  );
-
+  const canDeleteList = activeIntents.length >= 2;
+  const listToDelete =
+    activeList?.id === listIdToDelete ? activeList : undefined;
   const supermarkets = useSupermarketsQuery(activeListId);
   const rows = useMemo(() => {
     const result: ShoppingIntent[][] = [];
@@ -178,6 +193,10 @@ export default function GroupDetailScreen() {
     );
   }
   if (!detail.data) return null;
+
+  const closeDeleteConfirmation = () => {
+    if (!deleteList.isPending) setListIdToDelete(null);
+  };
 
   const addFreeItem = async (text: string): Promise<void> => {
     if (!activeListId) return;
@@ -207,7 +226,7 @@ export default function GroupDetailScreen() {
         ...voiceDraftToIntentInput(draft),
       });
     }
-    setVoiceOpen(false);
+    setVoiceListId(null);
   };
 
   const submitIntentEdit = (intentId: string) => {
@@ -264,7 +283,6 @@ export default function GroupDetailScreen() {
     sync.conflictCount === 0;
   const header = (
     <View style={styles.header}>
-      <Text style={styles.muted}>{detail.data.members.length} miembro(s)</Text>
       {joinOutcome ? (
         <Text style={styles.successBanner}>
           {joinOutcome === "already-member"
@@ -323,30 +341,34 @@ export default function GroupDetailScreen() {
           ))}
         </View>
       ) : null}
-      <Text style={styles.listTitle}>{activeList?.name ?? "Tu lista"}</Text>
-      <Text style={styles.muted}>Lo que necesitas, a tu manera.</Text>
-      <View style={styles.addBox}>
-        {!voiceOpen && activeListId ? (
-          <QuickAddPanel
-            adding={addIntent.isPending}
-            onAdd={addFreeItem}
-            onVoicePress={() => setVoiceOpen(true)}
-          />
-        ) : voiceOpen ? (
-          <VoiceShoppingPanel
-            adding={addIntent.isPending}
-            onClose={() => setVoiceOpen(false)}
-            onConfirm={addVoiceDrafts}
-            service={speechRecognitionService}
-            aiParser={openAiShoppingIntentParser}
-          />
-        ) : null}
-        {inputError || addIntent.error ? (
-          <Text accessibilityRole="alert" style={styles.error}>
-            {inputError ?? getErrorMessage(addIntent.error)}
-          </Text>
-        ) : null}
-      </View>
+      {activeList ? (
+        <>
+          <Text style={styles.listTitle}>{activeList.name}</Text>
+          <View style={styles.addBox}>
+            {voiceOpen ? (
+              <VoiceShoppingPanel
+                adding={addIntent.isPending}
+                onClose={() => setVoiceListId(null)}
+                onConfirm={addVoiceDrafts}
+                service={speechRecognitionService}
+                aiParser={openAiShoppingIntentParser}
+              />
+            ) : (
+              <QuickAddPanel
+                key={activeList.id}
+                adding={addIntent.isPending}
+                onAdd={addFreeItem}
+                onVoicePress={() => setVoiceListId(activeList.id)}
+              />
+            )}
+            {inputError || addIntent.error ? (
+              <Text accessibilityRole="alert" style={styles.error}>
+                {inputError ?? getErrorMessage(addIntent.error)}
+              </Text>
+            ) : null}
+          </View>
+        </>
+      ) : null}
       {activeListId && activeIntents.length > 0 ? (
         <View style={styles.toolbar}>
           <AppButton
@@ -370,8 +392,7 @@ export default function GroupDetailScreen() {
             Enlazar automáticamente
           </AppButton>
           <Text style={styles.caption}>
-            Busca el equivalente más barato por artículo entre tus
-            supermercados. Conserva los enlaces manuales.
+            Busca el equivalente más barato y conserva los enlaces manuales.
           </Text>
           <AppButton
             tone="secondary"
@@ -420,10 +441,7 @@ export default function GroupDetailScreen() {
         </Text>
       ) : null}
       {detail.data.lists.length === 0 ? (
-        <ScreenState
-          title="Este grupo no tiene listas"
-          message="Crea una lista desde una próxima versión de la app."
-        />
+        <ScreenState title="Este grupo no tiene listas" />
       ) : activeIntents.length === 0 ? (
         <View style={styles.empty}>
           <Text style={styles.sectionTitle}>Tu lista empieza aquí</Text>
@@ -476,43 +494,123 @@ export default function GroupDetailScreen() {
                   (item) => item.retailerId === productLink.retailerId,
                 )?.enabled !== false;
               return (
-                <ShoppingItemCard
-                  key={intent.id}
-                  intent={intent}
-                  retailerEnabled={enabled}
-                  onQuantity={(direction) =>
-                    changeQuantity.mutate({
-                      intentId: intent.id,
-                      direction,
-                      operationId: createOperationId(),
-                    })
-                  }
-                  onDelete={() =>
-                    deleteIntent.mutate({
-                      intentId: intent.id,
-                      operationId: createOperationId(),
-                    })
-                  }
-                  onLink={() => setLinkingIntentId(intent.id)}
-                  onEdit={() => {
-                    setEditingIntentId(intent.id);
-                    setEditingValues(intentToFieldValues(intent));
-                    setEditingError(null);
-                  }}
-                />
+                <View key={intent.id} style={styles.cardCell}>
+                  <ShoppingItemCard
+                    intent={intent}
+                    retailerEnabled={enabled}
+                    onQuantity={(direction) =>
+                      changeQuantity.mutate({
+                        intentId: intent.id,
+                        direction,
+                        operationId: createOperationId(),
+                      })
+                    }
+                    onDelete={() =>
+                      deleteIntent.mutate({
+                        intentId: intent.id,
+                        operationId: createOperationId(),
+                      })
+                    }
+                    onLink={() => setLinkingIntentId(intent.id)}
+                    onEdit={() => {
+                      setEditingIntentId(intent.id);
+                      setEditingValues(intentToFieldValues(intent));
+                      setEditingError(null);
+                    }}
+                  />
+                </View>
               );
             })}
-            {row.length < columns ? <View style={styles.spacer} /> : null}
+            {Array.from({ length: columns - row.length }, (_, index) => (
+              <View key={index} style={styles.cardCell} />
+            ))}
           </View>
         )}
         ListFooterComponent={
-          mutationError ? (
-            <Text accessibilityRole="alert" style={styles.error}>
-              {getErrorMessage(mutationError)}
-            </Text>
+          activeList || mutationError ? (
+            <View style={styles.listFooter}>
+              {activeList ? (
+                <AppButton
+                  accessibilityHint="Disponible cuando la lista tiene al menos dos productos."
+                  disabled={!canDeleteList || deleteList.isPending}
+                  tone="danger"
+                  onPress={() => {
+                    deleteList.reset();
+                    setListIdToDelete(activeList.id);
+                  }}
+                >
+                  Borrar lista
+                </AppButton>
+              ) : null}
+              {mutationError ? (
+                <Text accessibilityRole="alert" style={styles.error}>
+                  {getErrorMessage(mutationError)}
+                </Text>
+              ) : null}
+            </View>
           ) : null
         }
       />
+      {listToDelete ? (
+        <Modal
+          animationType="fade"
+          onRequestClose={closeDeleteConfirmation}
+          transparent
+          visible
+        >
+          <View style={styles.deleteModalBackdrop}>
+            <View accessibilityViewIsModal style={styles.deleteModalCard}>
+              <Text accessibilityRole="header" style={styles.sectionTitle}>
+                ¿Borrar «{listToDelete.name}»?
+              </Text>
+              <Text style={styles.muted}>
+                Se borrarán la lista y todos sus productos para todo el grupo.
+                {detail.data.lists.length === 1
+                  ? " El grupo se quedará sin listas."
+                  : ""}
+              </Text>
+              {!canDeleteList ? (
+                <Text style={styles.muted}>
+                  La lista debe tener al menos dos productos para borrarla.
+                </Text>
+              ) : null}
+              {!sync.isOnline ? (
+                <Text style={styles.muted}>
+                  El cambio se sincronizará al recuperar la conexión.
+                </Text>
+              ) : null}
+              {deleteList.error ? (
+                <Text accessibilityRole="alert" style={styles.error}>
+                  {getErrorMessage(deleteList.error)}
+                </Text>
+              ) : null}
+              <AppButton
+                disabled={!canDeleteList}
+                loading={deleteList.isPending}
+                tone="danger"
+                onPress={() =>
+                  deleteList.mutate(
+                    {
+                      shoppingListId: listToDelete.id,
+                      operationId: createOperationId(),
+                    },
+                    { onSuccess: () => setListIdToDelete(null) },
+                  )
+                }
+              >
+                Borrar lista
+              </AppButton>
+              <AppButton
+                disabled={deleteList.isPending}
+                tone="secondary"
+                onPress={closeDeleteConfirmation}
+              >
+                Cancelar
+              </AppButton>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
       {linkingIntent ? (
         <ProductLinkModal
           key={linkingIntent.id}
@@ -522,7 +620,7 @@ export default function GroupDetailScreen() {
         />
       ) : null}
       <Modal
-        visible={editingIntentId !== null}
+        visible={activeIntents.some((intent) => intent.id === editingIntentId)}
         animationType="slide"
         presentationStyle="pageSheet"
         onRequestClose={() => {
@@ -576,6 +674,24 @@ const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     list: { flex: 1 },
     listContent: { paddingBottom: spacing.xl },
+    listFooter: { gap: spacing.sm },
+    deleteModalBackdrop: {
+      alignItems: "center",
+      backgroundColor: "rgba(0, 0, 0, 0.55)",
+      flex: 1,
+      justifyContent: "center",
+      padding: spacing.lg,
+    },
+    deleteModalCard: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: 16,
+      borderWidth: 1,
+      gap: spacing.md,
+      maxWidth: 420,
+      padding: spacing.lg,
+      width: "100%",
+    },
     header: { gap: spacing.md, marginBottom: spacing.sm },
     headerIconButton: {
       alignItems: "center",
@@ -636,10 +752,10 @@ const createStyles = (colors: ThemeColors) =>
     cardRow: {
       flexDirection: "row",
       alignItems: "stretch",
-      gap: 12,
-      marginBottom: 12,
+      gap: spacing.sm,
+      marginBottom: spacing.sm,
     },
-    spacer: { flex: 1 },
+    cardCell: { flex: 1, minWidth: 0 },
     actionText: {
       color: colors.primary,
       fontWeight: "700",

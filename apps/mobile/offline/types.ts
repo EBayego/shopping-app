@@ -43,6 +43,7 @@ export type ShoppingOperation =
       direction: "increment" | "decrement";
     })
   | (OperationBase & { kind: "delete_intent"; intentId: string })
+  | (OperationBase & { kind: "delete_list"; shoppingListId: string })
   | (OperationBase & {
       kind: "update_postal_code";
       shoppingListId: string;

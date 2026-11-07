@@ -395,6 +395,15 @@ export const shoppingSyncBackend: ShoppingSyncBackend = {
         );
       case "delete_intent":
         return deleteShoppingIntent(operation.intentId, operation.operationId);
+      case "delete_list": {
+        const { error } = await getSupabaseClient()
+          .from("shopping_lists")
+          .delete()
+          .eq("group_id", operation.groupId)
+          .eq("id", operation.shoppingListId);
+        if (error) throw error;
+        return undefined;
+      }
       case "update_postal_code":
         return updateShoppingListPostalCode(
           operation.shoppingListId,

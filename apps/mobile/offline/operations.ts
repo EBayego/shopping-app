@@ -31,7 +31,9 @@ export function applyOperationLocally(
       });
     }
     case "add_intent":
-      return detail.intents.some((item) => item.id === operation.localIntent.id)
+      return !detail.lists.some(
+        (list) => list.id === operation.shoppingListId,
+      ) || detail.intents.some((item) => item.id === operation.localIntent.id)
         ? detail
         : { ...detail, intents: [...detail.intents, operation.localIntent] };
     case "edit_intent":
@@ -82,6 +84,16 @@ export function applyOperationLocally(
         ...detail,
         intents: detail.intents.filter(
           (item) => item.id !== operation.intentId,
+        ),
+      };
+    case "delete_list":
+      return {
+        ...detail,
+        lists: detail.lists.filter(
+          (list) => list.id !== operation.shoppingListId,
+        ),
+        intents: detail.intents.filter(
+          (item) => item.shopping_list_id !== operation.shoppingListId,
         ),
       };
     case "update_postal_code":

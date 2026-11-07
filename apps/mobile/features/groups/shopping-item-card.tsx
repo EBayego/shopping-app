@@ -39,15 +39,24 @@ export function ShoppingItemCard({
   );
   return (
     <View style={styles.card}>
-      <View style={styles.main}>
-        <View style={styles.top}>
-          <Text style={styles.kind}>{link ? "ENLAZADO" : "TU LISTA"}</Text>
-        </View>
+      <View style={styles.top}>
         <Text accessible={false} style={styles.illustration}>
           {productIcon(intent.normalized_name)}
         </Text>
-        <Text style={styles.title}>{display.title}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Enlazar ${display.title}`}
+          onPress={onLink}
+          style={styles.action}
+        >
+          <Ionicons color={colors.primary} name="link-outline" size={20} />
+        </Pressable>
       </View>
+      <Text style={styles.title}>{display.title}</Text>
+      <Text style={styles.quantity}>
+        {display.quantity}
+        {display.unit ? ` ${display.unit}` : ""}
+      </Text>
       <View style={styles.quantityRow}>
         <Pressable
           accessibilityRole="button"
@@ -57,10 +66,6 @@ export function ShoppingItemCard({
         >
           <Text style={styles.quantitySymbol}>−</Text>
         </Pressable>
-        <Text style={styles.quantity}>
-          {display.quantity}
-          {display.unit ? ` ${display.unit}` : ""}
-        </Text>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Aumentar cantidad de ${display.title}`}
@@ -107,18 +112,8 @@ export function ShoppingItemCard({
             </Text>
           ) : null}
         </View>
-      ) : (
-        <Text style={styles.freeHint}>Sin marca ni formato obligatorio</Text>
-      )}
+      ) : null}
       <View style={styles.actions}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`Enlazar ${display.title}`}
-          onPress={onLink}
-          style={styles.action}
-        >
-          <Ionicons color={colors.primary} name="link-outline" size={22} />
-        </Pressable>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={`Editar ${display.title}`}
@@ -144,36 +139,27 @@ const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     card: {
       flex: 1,
-      minWidth: 0,
-      borderRadius: 24,
+      borderRadius: 16,
       backgroundColor: colors.surface,
-      padding: 12,
+      padding: 6,
       borderWidth: 1,
       borderColor: colors.border,
-      gap: 8,
+      gap: 4,
     },
-    main: { gap: 10, alignItems: "center" },
     top: {
       flexDirection: "row",
-      width: "100%",
       justifyContent: "space-between",
       alignItems: "center",
     },
-    kind: {
-      color: colors.muted,
-      fontSize: 10,
-      letterSpacing: 0.8,
-      fontWeight: "700",
-    },
-    illustration: { fontSize: 46, marginVertical: 4 },
+    illustration: { fontSize: 26, marginLeft: 4 },
     title: {
       color: colors.text,
-      fontSize: 17,
+      fontSize: 14,
       fontWeight: "700",
       textAlign: "center",
-      lineHeight: 23,
+      lineHeight: 18,
     },
-    quantityRow: { flexDirection: "row", alignItems: "center", gap: 2 },
+    quantityRow: { flexDirection: "row", justifyContent: "center", gap: 2 },
     quantityButton: {
       minWidth: 44,
       minHeight: 44,
@@ -186,7 +172,6 @@ const createStyles = (colors: ThemeColors) =>
     quantity: {
       color: colors.text,
       textAlign: "center",
-      flex: 1,
       fontSize: 12,
       fontWeight: "600",
     },
@@ -199,15 +184,10 @@ const createStyles = (colors: ThemeColors) =>
       lineHeight: 17,
     },
     meta: { color: colors.muted, fontSize: 11, lineHeight: 16 },
-    freeHint: {
-      color: colors.muted,
-      fontSize: 11,
-      textAlign: "center",
-      lineHeight: 16,
-    },
     actions: {
       flexDirection: "row",
-      justifyContent: "space-around",
+      justifyContent: "center",
+      gap: 2,
       marginTop: "auto",
     },
     action: {

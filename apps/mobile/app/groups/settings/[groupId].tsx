@@ -47,10 +47,10 @@ export default function GroupSettingsScreen() {
   const [postalCodeError, setPostalCodeError] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
 
-  const activeListId = selectedListId ?? detail.data?.lists[0]?.id ?? null;
-  const activeList = detail.data?.lists.find(
-    (list) => list.id === activeListId,
-  );
+  const activeList =
+    detail.data?.lists.find((list) => list.id === selectedListId) ??
+    detail.data?.lists[0];
+  const activeListId = activeList?.id ?? null;
   const supermarkets = useSupermarketsQuery(activeListId);
   const setSupermarketEnabled = useSetSupermarketEnabledMutation(activeListId);
   const [supermarketWarning, setSupermarketWarning] =
@@ -143,9 +143,6 @@ export default function GroupSettingsScreen() {
   return (
     <Screen>
       <Text style={styles.title}>{detail.data.group.name}</Text>
-      <Text style={styles.muted}>
-        Aquí puedes configurar cada lista y gestionar el acceso al grupo.
-      </Text>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Precios por zona</Text>
@@ -331,9 +328,6 @@ export default function GroupSettingsScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Miembros</Text>
-        <Text style={styles.muted}>
-          {detail.data.members.length} persona(s) tienen acceso a este grupo.
-        </Text>
         {detail.data.members.map((member) => (
           <Text key={member.profile_id} style={styles.member}>
             {member.displayName ?? "Miembro sin nombre"} ·{" "}

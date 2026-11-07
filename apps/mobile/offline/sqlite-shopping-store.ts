@@ -142,10 +142,13 @@ export class SQLiteShoppingStore implements LocalShoppingStore {
           localId,
         );
         await transaction.runAsync(
-          "insert or replace into cached_shopping_intents (id, shopping_list_id, data) values (?, ?, ?)",
+          `insert or replace into cached_shopping_intents (id, shopping_list_id, data)
+           select ?, ?, ?
+           where exists (select 1 from cached_lists where id = ?)`,
           serverIntent.id,
           serverIntent.shopping_list_id,
           JSON.stringify(projected),
+          serverIntent.shopping_list_id,
         );
 
         const laterRows = await transaction.getAllAsync<{

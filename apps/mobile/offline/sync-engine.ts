@@ -77,9 +77,6 @@ function isPermanentConflict(error: unknown): boolean {
 
 export function operationTargetsIntent(
   operation: ShoppingOperation,
-): operation is Exclude<
-  ShoppingOperation,
-  { kind: "add_intent" } | { kind: "update_postal_code" }
-> {
+): operation is Extract<ShoppingOperation, { intentId: string }> {
   return "intentId" in operation;
 }

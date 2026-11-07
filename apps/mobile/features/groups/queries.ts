@@ -38,7 +38,7 @@ export function useGroupDetailQuery(groupId: string) {
     session.status === "ready" ? session.session.user.id : "signed-out";
   return useQuery({
     queryKey: groupKeys.detail(profileId, groupId),
-    queryFn: () => getOfflineGroupDetail(groupId),
+    queryFn: ({ signal }) => getOfflineGroupDetail(groupId, signal),
     enabled: session.status === "ready" && groupId.length > 0,
   });
 }
@@ -273,6 +273,27 @@ export function useUpdatePostalCodeMutation(groupId: string) {
       }),
     onSuccess: (detail) =>
       completeLocalMutation(queryClient, groupId, detail, sync),
+  });
+}
+
+export function useDeleteListMutation(groupId: string) {
+  const queryClient = useQueryClient();
+  const sync = useOfflineSync();
+  return useMutation({
+    networkMode: "always",
+    mutationFn: (variables: { shoppingListId: string; operationId: string }) =>
+      enqueueShoppingOperation({
+        kind: "delete_list",
+        groupId,
+        ...variables,
+        createdAt: new Date().toISOString(),
+      }),
+    onSuccess: async (detail) => {
+      await queryClient.cancelQueries({
+        queryKey: groupKeys.detailScope(groupId),
+      });
+      completeLocalMutation(queryClient, groupId, detail, sync);
+    },
   });
 }
 

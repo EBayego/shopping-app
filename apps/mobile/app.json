@@ -33,7 +33,7 @@
       "supportsTablet": true
     },
     "android": {
-      "versionCode": 7
+      "versionCode": 8
     },
     "extra": {
       "appEnvironment": "development",
